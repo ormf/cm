@@ -7,9 +7,8 @@ extending it to be combined with other Common Lisp based realtime
 music systems, especially incudine
 (http://incudine.sourceforge.net). For the (much extended) current
 version please refer to
-http://www.sourceforge.net/projects/commonmusic. The README on the
-bottom of this page is the orginial text from the old version. It is
-not up to date!
+http://www.sourceforge.net/projects/commonmusic. The following README
+is the orginial text from the old version. It is not up to date:
 
 This is the README for Common Music (CM). Common Music is released
 under the GNU Software License.  See  the file doc/gpl.text for the
