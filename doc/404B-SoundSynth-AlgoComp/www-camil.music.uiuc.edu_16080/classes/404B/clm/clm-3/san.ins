@@ -1,0 +1,216 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument pins (beg dur file amp 
+		     &key (transposition 1.0) ; this can be used to transpose the sound
+			  (time-scaler 1.0)   ; this can make things happen faster (< 1.0)/slower (> 1.0) in the output
+			  (fftsize 256)       ; should be a power of 2
+			  ;; at 22050 srate, this is ok for sounds above 300Hz or so, below that you need 512 or 1024,
+			  ;; at 44100, probably best to double these sizes -- it takes some searching sometimes.
+			  (highest-bin 128)   ; how high in fft data should we search for peaks
+			  (max-peaks 16)      ; how many spectral peaks to track at the maximum
+			  printit	      ; whether to print out the envelopes as they are formed
+			  attack)	      ; whether to use original attack via time domain splice
+  ;; do the sliding fft shuffle, translate to polar coordinates, find spectral peaks,
+  ;;   match with current, do some interesting transformation, resynthesize using oscils
+  ;;   All the envelopes are created on the fly.  max-peaks is how many of these peaks
+  ;;   we are willing to track at any given time.
+  (let* ((start (floor (* beg *srate*)))
+	 (end (+ start (floor (* dur *srate*))))
+	 (file-duration (sound-duration file))
+	 (fdr (make-double-array fftsize))
+	 (fdi (make-double-array fftsize))
+	 (window (make-fft-window blackman2-window fftsize))
+	 (fftamps (make-double-array fftsize))
+	 (max-oscils (* 2 max-peaks))
+	 (current-peak-freqs (make-double-array max-oscils :initial-element 0.0))
+	 (last-peak-freqs (make-double-array max-oscils :initial-element 0.0))
+	 (current-peak-amps (make-double-array max-oscils :initial-element 0.0))
+	 (last-peak-amps (make-double-array max-oscils :initial-element 0.0))
+	 (peak-amps (make-double-array max-peaks :initial-element 0.0))
+	 (peak-freqs (make-double-array max-peaks :initial-element 0.0))
+	 (resynth-oscils (make-array max-oscils))
+	 (amps (make-double-array max-oscils))	;run-time generated amplitude and frequency envelopes
+	 (rates (make-double-array max-oscils))
+	 (freqs (make-double-array max-oscils))
+	 (sweeps (make-double-array max-oscils))
+	 (lowest-magnitude .001)
+	 (hop (floor fftsize 4))
+	 (outhop (floor (* time-scaler hop)))
+	 (ifreq (/ 1.0 outhop))
+	 (ihifreq (hz->radians ifreq))
+	 (fftscale (/ 1.0 (* fftsize .42323))) ;integrate Blackman-Harris window = .42323*window width and shift by fftsize
+	 (fft-mag (float (/ *srate* fftsize)))
+	 (furthest-away-accepted .1)
+	 (filptr 0)
+	 (trigger 0)
+	 (peaks 0)
+	 (sum 0.0)
+	 (cur-oscils max-oscils)
+	 (ramped attack)
+	 (splice-attack attack)
+	 (attack-size (or attack 0))	;dumb kludge to make Run happy -- doesn't yet handle boolean/number combination right
+	 (ramp-ind 0)
+	 (fil (make-file->sample file))
+	 (ramped-attack (if attack (make-double-array attack :initial-element 0.0))))
+    (if (> (/ dur time-scaler) file-duration)
+	(warn "~A is ~1,3F seconds long, but we'll need ~1,3F seconds of data for this note" 
+	      file file-duration (/ dur time-scaler)))
+    (loop for i from 0 below max-oscils do
+      (setf (aref resynth-oscils i) (make-oscil :frequency 0)))
+    (setf trigger outhop)
+    (loop for i from 0 below fftsize do (setf (aref window i) (double (* (aref window i) fftscale))))
+    (run
+     (loop for i from start to end do
+       (declare (type :integer trigger filptr peaks hop ram-ind outhop max-peaks highest-bin fftsize cur-oscils
+		               attack-size)
+		(type :float sum fft-mag fftscale ihifreq ifreq lowest-magnitude furthest-away-accepted amp
+		             transposition)
+		(type :mus-any* resynth-oscils)
+		(type :double* fftamps fdr fdi window fftamps current-peak-freqs last-peak-freqs last-peak-amps
+		               peak-amps amps rates freqs sweeps peak-freqs current-peak-amps ramped-attack))
+       (if splice-attack
+	   (let ((ramp (/ 1.0 attack-size)))
+	     ;; my experience in translating SMS, and rumor via Greg Sandell leads me to believe that
+	     ;; there is in fact no way to model some attacks successfully in this manner, so this block
+	     ;; simply splices the original attack on to the rest of the note.  "attack" is the number
+	     ;; of samples to include bodily.
+	     (outa i (* amp (ina filptr fil)))
+	     (incf filptr)
+	     (when (> filptr attack-size)
+	       (let ((mult 1.0))
+		 (dotimes (k attack-size) 
+		   (setf (aref ramped-attack k) (double (* mult (ina (+ filptr k) fil))))
+		   (decf mult ramp)))
+	       (setf splice-attack nil)))
+	 (progn
+	   (when (>= trigger outhop)
+	     ;; get next block of data and apply window to it
+	     (setf trigger 0)
+	     (dotimes (k fftsize)
+	       (setf (aref fdr k) (double (* (aref window k) (ina filptr fil))))
+	       (incf filptr))
+	     (clear-array fdi)
+	     (decf filptr (- fftsize hop))
+	     ;; get the fft 
+	     (fft fdr fdi fftsize 1)
+	     ;; change to polar coordinates (ignoring phases)
+	     (dotimes (k highest-bin)	;no need to paw through the upper half (so (<= highest-bin (floor fft-size 2)))
+	       (let ((x (aref fdr k))
+		     (y (aref fdi k)))
+		 (setf (aref fftamps k) (double (* 2 (sqrt (+ (* x x) (* y y))))))))
+	     (dotimes (k max-oscils)
+	       (setf (aref last-peak-freqs k) (aref current-peak-freqs k))
+	       (setf (aref last-peak-amps k) (aref current-peak-amps k))
+	       (setf (aref current-peak-amps k) (double 0.0)))
+	     (dotimes (k max-peaks)
+	       (setf (aref peak-amps k) (double 0.0)))
+	     (let ((ra (aref fftamps 0))
+		   (la 0.0)
+		   (ca 0.0))
+	       ;; search for current peaks following Xavier Serra's recommendations in
+	       ;; "A System for Sound Analysis/Transformation/Synthesis 
+	       ;;      Based on a Deterministic Plus Stochastic Decomposition"
+	       (setf peaks 0)		;how many peaks found so far
+	       (dotimes (k highest-bin)
+		 (setf la ca)
+		 (setf ca ra)
+		 (setf ra (aref fftamps k))
+		 (if (and (> ca lowest-magnitude)
+			  (> ca ra)
+			  (> ca la))
+		     ;; found a local maximum above the current threshold (its bin number is k-1)
+		     (let* ((logla (log la 10))
+			    (logca (log ca 10)) 
+			    (logra (log ra 10))
+			    (offset (/ (* .5 (- logla logra)) (+ logla (* -2 logca) logra)))
+			    (amp (expt 10.0 (- logca (* .25 (- logla logra) offset))))
+			    (freq (* fft-mag (+ k offset -1))))
+		       (if (= peaks max-peaks)
+			   ;; gotta either flush this peak, or find current lowest and flush him
+			   (let ((minp 0)
+				 (minpeak (aref peak-amps 0)))
+			     (loop for j integer from 1 below max-peaks do
+			       (when (< (aref peak-amps j) minpeak)
+				 (setf minp j)
+				 (setf minpeak (aref peak-amps j))))
+			     (when (> amp minpeak)
+			       (setf (aref peak-freqs minp) (double freq))
+			       (setf (aref peak-amps minp) (double amp))))
+			 (progn
+			   (setf (aref peak-freqs peaks) (double freq))
+			   (setf (aref peak-amps peaks) (double amp))
+			   (incf peaks)))))))
+	     ;; now we have the current peaks -- match them to the previous set and do something interesting with the result
+	     ;; the end results are reflected in the updated values in the rates and sweeps arrays.
+	     ;; search for fits between last and current, set rates/sweeps for those found
+	     ;;   try to go by largest amp first 
+	     (dotimes (k peaks)
+	       (let ((maxp 0)
+		     (maxpk (aref peak-amps 0)))
+		 (loop for j integer from 1 below max-peaks do
+		   (when (> (aref peak-amps j) maxpk)
+		     (setf maxp j)
+		     (setf maxpk (aref peak-amps j))))
+		 ;; now maxp points to next largest unmatched peak
+		 (when (> maxpk 0.0)
+		   (let* ((closestp -1)
+			  (closestamp 10)
+			  (current-freq (aref peak-freqs maxp))
+			  (icf (/ 1.0 current-freq)))
+		     (loop for j integer from 0 below max-peaks do
+		       (if (> (aref last-peak-amps j) 0.0)
+			   (let ((closeness (* icf (abs (- (aref last-peak-freqs j) current-freq)))))
+			     (when (< closeness closestamp)
+			       (setf closestamp closeness)
+			       (setf closestp j)))))
+		     (when (< closestamp furthest-away-accepted)
+		       ;; peak-amp is transferred to appropriate current-amp and zeroed,
+		       (setf (aref current-peak-amps closestp) (aref peak-amps maxp))
+		       (setf (aref peak-amps maxp) (double 0.0))
+		       (setf (aref current-peak-freqs closestp) (double current-freq)))))))
+	     (loop for k integer from 0 below max-peaks do
+	       (if (> (aref peak-amps k) 0.0)
+		   ;; find a place for a new oscil and start it up
+		   (let ((new-place (loop for j integer from 0 below max-oscils
+				     if (and (zerop (aref last-peak-amps j))
+					     (zerop (aref current-peak-amps j)))
+				     return j)))
+		     (setf (aref current-peak-amps new-place) (aref peak-amps k))
+		     (setf (aref peak-amps k) (double 0.0))
+		     (setf (aref current-peak-freqs new-place) (aref peak-freqs k))
+		     (setf (aref last-peak-freqs new-place) (aref peak-freqs k))
+		     (setf (mus-frequency (aref resynth-oscils new-place)) (* transposition (aref peak-freqs k))))))
+
+	     (setf cur-oscils 0)
+	     (dotimes (k max-oscils)
+	       (setf (aref rates k) (double (* ifreq (- (aref current-peak-amps k) (aref last-peak-amps k)))))
+	       (if (or (/= (aref current-peak-amps k) 0.0) (/= (aref last-peak-amps k) 0.0)) (setf cur-oscils k))
+	       (setf (aref sweeps k) (double (* ihifreq transposition (- (aref current-peak-freqs k) (aref last-peak-freqs k))))))
+	     (incf cur-oscils)
+	     
+	     (when printit
+	       ;; this block prints out the envelope data as it is generated
+	       (clm-print "~%~%~D:" filptr)
+	       (dotimes (k cur-oscils) 
+		 (when (or (> (aref rates k) 0.0) 
+			   (> (aref amps k) 0.0))
+		   (clm-print "~%  ~D ~F ~F ~F"
+			      k
+			      (aref current-peak-freqs k)
+			      (aref last-peak-freqs k)			      
+			      (aref current-peak-amps k))))))
+
+           ;; run oscils, update envelopes
+	   (incf trigger)
+	   (if (not ramped)
+	       (setf sum 0.0)
+	     (progn
+	       (setf sum (aref ramped-attack ramp-ind))
+	       (incf ramp-ind)
+	       (if (= ramp-ind ramped) (setf ramped nil))))
+	   (dotimes (k cur-oscils)
+	     (when (or (/= (aref amps k) 0.0) (/= (aref rates k) 0.0))
+	       (incf sum (* (aref amps k) (oscil (aref resynth-oscils k) (aref freqs k))))
+	       (incf (aref amps k) (aref rates k))
+	       (incf (aref freqs k) (aref sweeps k))))
+	   (outa i (* amp sum))))))))

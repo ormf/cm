@@ -1,0 +1,71 @@
+
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/fomus/primes.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:57 GMT -->
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>Fomus Example</title>
+</head>
+
+<body>
+
+<div id="content">
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> The harmonic series.
+</p>
+<pre class="code">
+(<b>load</b> <span class="string">"/Lisp/fomus/load")</span>
+<span class="comment">;; FOMUS v0.1.12
+;; Lisp music notation formatter
+;; Copyright (c) 2005 David Psenicka, All Rights Reserved
+;; See file "COPYING" for terms of use and distribution.</span>
+
+<span class="result">&rArr;</span> #P"/Lisp/fomus/load.lisp"
+
+(<span class="special">defun</span> <span class="defined">harmonics</span> (note rhy harm1 harm2 part)
+  (<b>process</b> with fund = (<b>hertz</b> note) and beat = (<b>rhythm</b> rhy)
+           for harm from harm1 to harm2
+           for knum = (<b>keynum</b> (<b>*</b> fund harm) <span class="keyword">:hz</span>)
+           output (<b>new</b> note <span class="keyword">:off</span> (<b>now</b>) <span class="keyword">:dur</span> beat <span class="keyword">:note</span> knum
+                       <span class="keyword">:partid</span> part)
+           wait beat))
+
+(<span class="special">defparameter</span> <span class="defined">primes</span> '(2 3 5 7 11))
+
+(<span class="special">defparameter</span> <span class="defined">cellos</span> (<b>loop</b> for p in primes
+                           collect (<b>new</b> part <span class="keyword">:partid</span> p <span class="keyword">:instr</span> <span class="keyword">:cello</span>)))
+
+(<b>events</b> (<b>process</b> for p in primes
+                 sprout (<b>harmonics</b> 'c1 (<b>/</b> 1 p) p (<b>*</b> p 4) p))
+        <span class="string">"primes.ly"</span> 
+        <span class="keyword">:quartertones</span> t 
+        <span class="keyword">:max-tuplet</span> 11
+        <span class="keyword">:parts</span> (<b>reverse</b> cellos))
+<span class="result">&rArr;</span> <span class="string">"primes.ly"</span>
+</pre>
+</div>
+
+<!-- 
+(events (process for p in primes
+                 sprout (harmonics 'c1 (/ 1 p) p (* p 4) p))
+        <span class="string">"primes.mid"</span> <span class="keyword">:channel-tuning</span> 8)
+<span class="result">&rArr;</span> <span class="string">"primes.mid" -->
+
+
+<ul>
+  <li><a href="primes.pdf">primes.pdf</a></li>
+  <li><a href="primes.mid">primes.mid</a></li>
+</ul>
+
+</div>
+</body>
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/fomus/primes.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:57 GMT -->
+</html>

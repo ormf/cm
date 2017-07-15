@@ -1,0 +1,72 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>sv</title>
+</head>
+
+<body>
+<div id="content">
+<!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Macro]</dt>
+<dd><code>(</code><code class="entry">sv</code> <var>object</var> 
+{<var>slot</var> | {<var>slot</var> <var>value</var>}+ }<code>)</code></dd>
+</dl>
+<p>
+Slot value reference.  <!-- Either returns the current value
+of <var>slot</var> in <var>object</var> or sets one or more slot
+values in <var>object</var>. --> Each <var>slot</var> is either the
+unquoted symbol or keyword name of a slot. If only one <var>slot</var>
+is provided then <code>sv</code> returns that slot's value
+in <var>object</var>. Otherwise one or more <var>slot</var>
+and <var>value</var> pairs may be provided where each <var>slot</var>
+in a pair will be set to its corresponding <var>value</var>. When
+setting slots, the value returned by the macro (if any) depends the
+underlying Lisp implementation's slot setting mechanism.
+</p>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> The <code>sv</code> macro.</span>
+</p>
+<pre class="code">
+(<span class="special">define</span> <span class="defined">m</span> (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> 0 <span class="keyword">:keynum</span> 60))
+
+<span class="comment">;;; getting slot values</span>
+(sv m <span class="keyword">:keynum</span>)
+<span class="result">&rArr;</span> 60
+(sv m time)
+<span class="result">&rArr;</span> 0
+<span class="comment">;;; setting slot values</span>
+(sv m <span class="keyword">:duration</span> 3)
+<span class="result">&rArr;</span> 3
+(sv m <span class="keyword">:keynum</span> 90 <span class="keyword">:channel</span> 10 <span class="keyword">:time</span> 2)
+<span class="result">&rArr;</span> 2
+m
+<span class="result">&rArr;</span> #i(midi time 2 keynum 90 duration 3 amplitude 64 channel 10)
+</pre>
+</div>
+<h4>See also:</h4>
+<ul>
+<li><a href="fold-objects-fn.html"><code>fold-objects</code></a> [Function]</li>
+<li><a href="map-objects-fn.html"><code>map-objects</code></a> [Function]</li>
+<li><a href="subobjects-fn.html"><code>subobjects</code></a> [Function]</li>
+<li><a href="svplus-mac.html"><code>sv+</code></a> [Macro]</li>
+<li><a href="svstar-mac.html"><code>sv*</code></a> [Macro]</li>
+</ul>
+
+</div>
+<!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

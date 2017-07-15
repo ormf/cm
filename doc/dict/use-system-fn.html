@@ -1,0 +1,102 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>use-system</title>
+</head>
+
+<body>
+<div id="content"> 
+<!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">use-system</code> <var>system</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+<p>
+Locates and loads an <a href="http://www.cliki.net/asdf">ASDF</a>
+defined software package given its keyword <var>system</var> name.
+The system's installation directory is located using the following
+precedence rules:
+</p>
+
+<ol>
+<li>the directory is specified to <code>use-system</code></li>
+<li>the directory is on <code>asdf:*central-registry*</code></li>
+<li>the directory is located in the same parent directory as the CM
+installation directory</li>
+</ol>
+
+<p id="args"><code class="entry">use-system</code> supports the following keyword arguments:
+</p>
+
+<dl>
+<dt>
+<code class="keyword">:directory</code> <var>string</var>
+</dt>
+<dd>
+If specified, the absolute pathname to the directory containing the
+system definition file <var>system</var>.asd. This pathname must end
+with a directory delimiter, i.e. "/usr/local/lisp/" not
+"/usr/local/lisp".
+</dd>
+<dt>
+<code class="keyword">:verbose</code> {<var>boolean</var> | <span class="keyword">:trace</span>}
+</dt>
+<dd>
+Determines the amount of information printed during compilation and
+loading.  If the value is false then no messages are printed during
+either the compile or load steps. If the value is boolean true then
+file pathnames are echoed to the terminal as they are compiled and
+loaded. If the value is <span class="keyword">:trace</span> then the
+compiler prints top-level form as they are processed from each
+file. The default value is boolean true.
+</dd>
+<dt>
+<code class="keyword">:warnings</code> <var>boolean</var>
+</dt>
+<dd>
+If true then compiler warnings are printed otherwise they are not. The default values is false.
+</dd>
+
+<dt> <code class="keyword">:symbols</code> <var>boolean</var> </dt>
+<dd> If true then the system's external symbols are imported into CM
+after the system is loaded. Conflicting symbols are not imported and
+the use is warned. (Conflicting symbols may still be referenced via 
+normal package prefixing).  </dd>
+
+</dl>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Loading software with <code>use-system</code>.
+</p>
+<pre class="code">
+(use-system <span class="keyword">:fomus</span>)
+
+(use-system <span class="keyword">:clm</span> <span class="keyword">:verbose</span> nil)
+
+(use-system <span class="keyword">:portmidi</span> <span class="keyword">:directory</span> <span class="string">"/usr/local/portmidi/")</span>
+</pre>
+</div>
+
+<h4>See also:</h4>
+<ul>
+<li><a href="cm-sh.html"><code>cm.sh</code></a> [Script]</li>
+<li><a href="../../src/cm.lisp"><code>cm.lisp</code></a> [Script]</li>
+<li><a href="../install.html">Installing Common Music</a> [Topic]</li>
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

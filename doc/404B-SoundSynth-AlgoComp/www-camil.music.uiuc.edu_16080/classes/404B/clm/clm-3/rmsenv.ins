@@ -1,0 +1,100 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+;;; rmsenv.ins
+;;;
+;;; directly returns rms envelope of a file in either db or linear
+;;;
+;;; by Bret Battey
+;;; July 7, 2003 - major math fix 
+;;; july 10 - changed from clm's linear->db to a version that
+;;;  is protected against 0 linear amps. 
+;;;  - linear is now the default return type (to facilitate
+;;;    in-line use in clm processing chains
+;;; july 11 - fixed run loop indexing
+;;; Mar 30, 2004 - moved process bar intro text inside of run loop
+;;;              - forced coercion to short-floats when compiling final list
+
+;; error in progress counter if doing portion of file
+
+;;; For a periodic sound, rfreq is best kept at or above the smallest 
+;;; expected frequency of the sound. [William Hartman. "Signals, Sound, and
+;;; Sensation." Woodbury, NY: American Institute of Physics." p. 25.]
+
+;;; rfreq = measurements per second
+;;; db = if T, returns db envelope, otherwise returns linear envelope
+
+(defmacro remsenv-linear->db (x) 
+  `(if (< ,x .00001)
+     -100
+     (* 20 (log ,x 10.0))))
+
+
+(definstrument rmsenv (file &key (beg 0.0) (dur NIL) (rfreq 30) (gain 1.0) (status T)
+                         (debug NIL) (db NIL))
+  (let* ((fil (open-input* file)))
+    (unwind-protect
+      (let* ((incr (/ rfreq))
+             (fsr (sound-srate file))
+             (incrsamps (round (* incr fsr)))
+             (start (* beg fsr))
+             (dur (if dur dur (- (sound-duration file) beg)))
+             (end (+ start (floor (* dur fsr))))
+             (rms-samples incrsamps)
+             (windows (1+ (floor (/ (- end start) incrsamps))))
+             (resultsy (make-double-float-array windows))
+             (resultsx (make-double-float-array windows))
+             (sum-of-squares 0.0)
+             (p-complete 0)
+             (j 0))
+        (run* (resultsx resultsy)
+	      (loop for i from start to end do
+                    (when (and status (not debug))
+                      (when (= i start)
+                        (clm-print "~%rms percent complete: "))
+                      (let ((nc (round (* (/ (1+ j) windows) 100))))
+                        (when (> nc p-complete)
+                          (clm-print "~D " nc)
+                          (setf p-complete nc))))
+                    (when debug
+                      (clm-print "Window ~D, file sample ~D, ~F s.~%" 
+                                 j i (/ i fsr)))
+                    (setf sum-of-squares 0)
+                    (loop for filptr from i to (+ i rms-samples) do
+                          (setf sum-of-squares 
+                                (+ sum-of-squares (expt (ina filptr fil) 2))))
+                    (when debug
+                      (clm-print "sum = ~F, linear = ~F, db = ~F~%"
+                                 sum-of-squares 
+                                 (sqrt (/ sum-of-squares rms-samples))
+                                 (remsenv-linear->db 
+                                  (sqrt (/ sum-of-squares rms-samples)))))
+                     (setf (aref resultsx j) (/ i fsr))
+                     (setf (aref resultsy j) 
+                           (if db
+                             (remsenv-linear->db 
+                              (sqrt (/ sum-of-squares rms-samples)))
+                             (sqrt (/ sum-of-squares rms-samples))))
+                    (incf i incrsamps)
+                    (incf j)))
+        (close-input fil)
+        (when status (clm-print "~%"))
+        (loop for x in (coerce resultsx 'list)
+              for y in (coerce resultsy 'list)
+              collect (coerce x 'single-float)
+              collect (coerce y 'single-float))))))
+
+
+#|
+
+
+(compile-file "/Users/bbattey/CMJ-audio/picacs/clm/rmsenv/rmsenv.ins")
+(load "/Users/bbattey/CMJ-audio/picacs/clm/rmsenv/rmsenv")
+(defparameter myfile 
+  "/Users/bbattey/CMJ-Audio/vk-yaman/vk-yaman-1-alap.aif")
+(defparameter renv '())
+(progn
+  (setf renv (rmsenv myfile :dur NIL :debug NIL :db T))
+  NIL)
+
+
+|#

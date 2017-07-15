@@ -1,0 +1,20 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; Drone instrument
+
+(definstrument drone (startime dur frequency amp-1
+		      ampfun synth ampat ampdc amtrev deg dis rvibamt rvibfreq)
+  (multiple-value-bind (beg end) (times->samples startime dur)
+    (let* ((waveform (partials->wave synth))
+	   (amplitude (* amp-1 .25))
+	   (freq (hz->radians frequency))
+	   (s (make-table-lookup :frequency frequency :wave waveform))
+	   (amp-env (make-env :envelope (stretch-envelope ampfun 25 (* 100 (/ ampat dur)) 75 (- 100 (* 100 (/ ampdc dur))))
+			      :scaler amplitude :duration dur))
+	   (ran-vib (make-rand :frequency rvibfreq 
+			       :amplitude (* rvibamt freq)))
+	   (loc (make-locsig :degree deg :distance dis :reverb amtrev)))
+      (run 
+       (loop for i from beg to end do
+	 (locsig loc i (* (env amp-env) (table-lookup s (+ (rand ran-vib))))))))))
+

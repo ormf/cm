@@ -1,0 +1,455 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "css/cm.css";
+<!--
+h1,h2,h3,h4 { color:#9999cc }
+p { color:#9999bb }
+a:link    { color: #aaaaff; }
+a:visited { color: #aaaaff; }
+a:hover   { color: #aaaaff; }
+a:active  { color: #ddddff; }
+-->
+</style>
+<title>Common Music</title>
+</head>
+
+<body style="background:black; color=#9999bb;">
+
+<div  style="text-align: center; border-bottom: 1px solid #aaa;">
+<div class="inv">Navigation:</div>
+<ul class="nav">
+<li class="nav1"><a href="#news">News</a></li>
+<li class="navn"><a href="#about">About</a></li>
+<li class="navn"><a href="#download">Download</a></li>
+<li class="navn"><a href="#documentation">Documentation</a></li>
+<li class="navn"><a href="#implementation">Implementation</a></li>
+<li class="navn"><a href="http://sourceforge.net/projects/commonmusic/">Project</a></li>
+<li class="navn"><a href="#cm_links">Links</a></li>
+<li class="navn"><a href="#contact">Contact</a></li>
+</ul>
+</div>
+
+<hr class="inv"/>
+
+<table>
+<tr>
+<td><img src="img/cmlogobb.png" alt="[cmlogobb.png]"/></td>
+  <td><h1><span style="font: normal 48px sans-serif; color:#9999cc">Common Music</span></h1></td>
+</tr>
+</table>
+
+<div id="content" style="color:#9999aa">
+
+<!-- background:#D8D5EC -->
+
+<h2 id="news">News</h2>
+
+<p>
+Read the  <a href="http://mitpress2.mit.edu/e-journals/Computer-Music-Journal/reviews/29-3/phillips-taube.html">Computer Music Journal Review</a> by Dave Phillips of <a href="http://www.routledge-ny.com/shopping_cart/products/product_detail.asp?sku=&amp;isbn=9026519753&amp;parent_id=&amp;pc=">Notes from the Metalevel</a>.
+</p>
+
+<p>New features in CM 2.11.0 (CVS HEAD):</p>
+
+<ul>
+  <li>Added Gnuplot support for plotting data sets and output from musical processes. See new dictionary entries <a href="http://commonmusic.sf.net/doc/dict/gnuplot-fn.html"><code>gnuplot</code></a> and <a href="http://commonmusic.sf.net/doc/dict/gnuplot-fn.html"><code>gnuplot-file</code></a> for examples and more information.</li>
+  
+</ul>
+
+<h2 id="about">About</h2>
+
+<p>
+Common Music (CM) is an object-oriented music composition environment.
+It produces sound by transforming a high-level representation of
+musical structure into a variety of control protocols for <a href="#applications">sound
+synthesis and display</a>. Common Music defines an extensive library of
+compositional tools and an API through which the composer can easily
+modify and extend the system.
+</p>
+
+<p>
+Common Music began in 1989 as a response to the proliferation of
+different audio hardware, software and computers that resulted from
+the introduction of low cost computers. As choices increased it became
+clear that composers would be well served by a portable, powerful and
+consistent interface to the myriad sound rendering possibilities. Work
+on Common Music began in 1989 when the author was a guest composer
+at <a href="http://ccrma-www.stanford.edu/">CCRMA</a>, Stanford
+University. Much of the system as it exists today was implemented at
+the Institut f&uuml;r Musik und Akustik at
+the <a href="http://www.zkm.de">Zentrum f&uuml;r Kunst und
+Medientechnologie</a> in Karlsruhe, Germany, where the author worked
+for five years. Common Music continues to evolve today at the
+University of Illinois at Urbana-Champaign, where the author is now an
+associate professor of music composition. In 1996 Common Music
+received First Prize in the computer-assisted composition category at
+the <i>1er Concours International de Logiciels Musicaux</i> in
+Bourges, France.
+</p>
+
+<p>
+CM is released under the <a href="http://www.cliki.net/LLGPL">LLGPL</a> (Lisp Lesser General Public License).
+</p>
+
+<h2 id="download">Download</h2>
+
+<p>
+Sources, runtime images and CVS access are all available from the
+<a href="http://sourceforge.net/projects/commonmusic/">Sourceforge project</a>:
+</p>
+
+<ul>
+<li>
+Stable releases are available from the <a href="http://sourceforge.net/project/showfiles.php?group_id=9766">project release page</a>.
+</li>
+<li>
+The most current development sources are available via <a href="install.html#cvs">CVS</a>.
+</li>
+
+<li>
+A nightly (1:33AM PST) snapshot of CVS HEAD is available
+at <a
+href="http://commonmusic.sourceforge.net/cm.tgz">http://commonmusic.sourceforge.net/cm.tgz</a>
+</li>
+</ul>
+
+<h2 id="documentation">Documentation</h2>
+<ul>
+<li><a href="http://www.routledge-ny.com/shopping_cart/products/product_detail.asp?sku=&amp;isbn=9026519753&amp;parent_id=&amp;pc=">Notes from the Metalevel, an Introduction to Algorithmic Music Composition</a></li>
+<li><a href="dict/index.html">Common Music Dictionary</a></li>
+<li><a href="install.html">Installing Common Music</a></li>
+<li><a href="emacs.html">Running Common Music under (X)Emacs</a></li>
+<li><a href="../etc/tutorials/index.html">Tutorials</a> (cm version 2.7.0 or higher)</li>
+<li><a href="../etc/examples">Source Examples</a></li>
+<li><a href="changelog.text">Change History</a></li>
+</ul>
+
+<h2 id="implementation">Implementation</h2>
+
+<p>
+Common Music can be used with the following synthesis and display
+applications:
+</p>
+
+<blockquote>
+<table>
+<tr><td>A.</td> <td> <a href="http://www.csounds.com/">Csound</a> (sound synthesis)</td></tr>
+<tr><td>B.</td> <td> <a href="http://common-lisp.net/project/fomus/">Fomus</a> (music notation)</td></tr>
+<tr><td>C.</td> <td> <a href="http://www-ccrma.stanford.edu/software/clm/">Common Lisp Music</a> (sound synthesis)</td></tr>
+<tr><td>D.</td> <td> <a href="http://www-ccrma.stanford.edu/software/cmn/">Common Music Notation</a> (music notation)</td></tr>
+<tr><td>E.</td> <td> <a href="http://www.midi.org">MIDI</a> (synthesis control)</td></tr>
+<tr><td>F.</td> <td> <a href="http://midishare.sourceforge.net/">Midishare</a> (MIDI I/O)</td></tr>
+<tr><td>G.</td> <td> <a href="dict/plotter-topic.html">Plotter</a> (data visualization)</td></tr>
+<tr><td>H.</td> <td> <a href="http://www.cnmat.berkeley.edu/OpenSoundControl/">Open Sound Control</a> (synthesis control)</td></tr>
+<tr><td>I.</td> <td> <a href="http://www.audiosynth.com/">Supercollider</a> (sound synthesis)</td></tr>
+<tr><td>J.</td> <td> <a href="http://www-2.cs.cmu.edu/~music/portmusic/">Portmidi</a> (MIDI I/O)</td></tr>
+<tr><td>K.</td> <td> <a href="dict/rts-fn.html">RTS</a> and <a href="dict/receive-fn.html">Receive</a> (real time extensions)</td></tr>
+</table>
+</blockquote>
+
+<p>
+Common Music has both Common Lisp and Scheme bindings and works in the
+following configurations:
+</p>
+
+<div class="float" >
+<table class="float">
+<tr style="color:#9999bb">
+<td>&nbsp;</td>
+<th class="col" align="center">Linux</th>
+<th class="col" align="center">OS X</th>
+<th class="col" align="center">Windows</th>
+</tr>
+<!-- 1   2   3      4     5    6         7       8  9 -->
+<!-- clm cmn csound fomus midi midishare plotter sc sc-rt -->
+<!-- tr><th class="row">&nbsp;</th><td>ABCDEFGHI</td><td>ABCDEFGHI</td><td>ABCDEFGHI</td></tr -->
+
+<tr style="color:#9999bb">
+<th class="row">ACL</th>
+<td align="left">A&ndash;CDE&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;CDE&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;DE&ndash;&ndash;HI&ndash;&ndash;</td>
+</tr>
+<tr style="color:#9999bb">
+<th class="row" >CLISP</th>
+<td align="left">A&ndash;&ndash;DE&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;DE&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;DE&ndash;&ndash;HI&ndash;&ndash;</td>
+</tr>
+<tr style="color:#9999bb">
+<th class="row" >CMUCL</th>
+<td align="left">ABCDEFGHIJK</td>
+<td align="left">ABCDEF&ndash;HIJ&ndash;</td>
+<td align="left">&nbsp;</td>
+</tr>
+<tr style="color:#9999bb">
+<th class="row" >ECL</th>
+<td align="left">A&ndash;&ndash;DE&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;DE&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;DE&ndash;&ndash;HI&ndash;&ndash;</td>
+</tr>
+<tr style="color:#9999bb">
+<th class="row">LispWorks</th>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+</tr>
+<tr style="color:#9999bb">
+<th class="row">OpenMCL</th>
+<td align="left"></td>
+<td align="left">ABCDEFGHIJK</td>
+<td align="left"></td>
+</tr>
+<tr style="color:#9999bb">
+<th class="row">SBCL</th>
+<td align="left">ABCDE&ndash;GHIJK</td>
+<td align="left">ABCDE&ndash;&ndash;HIJK</td>
+<td align="left"></td>
+</tr>
+
+<tr><td colspan="4">&nbsp;</td></tr>
+
+<tr style="color:#9999bb">
+<th class="row">Gauche</th>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left"></td>
+</tr>
+<tr style="color:#9999bb">
+<th class="row">Guile</th>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left"></td>
+</tr>
+
+<tr style="color:#9999bb">
+<th class="row">STklos</th>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left">A&ndash;&ndash;&ndash;E&ndash;&ndash;HI&ndash;&ndash;</td>
+<td align="left"></td>
+</tr>
+
+</table>
+</div>
+
+<dl>
+<dt>
+<a href="http://www.franz.com/">Allegro Common Lisp (ACL)</a>
+</dt>
+<dd>
+A commercial CL for Linux, Windows and OSX.  Includes a
+native CLOS and a graphical interface.
+</dd>
+<dt>
+<a href="http://sourceforge.net/projects/clisp/">CLISP</a></dt>
+<dd>
+An opensource ANSI CL that runs practically everywhere.  Includes a
+native CLOS, is actively supported.
+</dd>
+
+<dt><a href="http://www.cons.org/cmucl/">CMUCL</a></dt>
+<dd>
+An opensource ANSI CL for Linux. Includes a very good compiler.
+</dd>
+
+<dt><a href="http://ecls.sourceforge.net/">ECL</a></dt>
+<dd>
+Embeddable Common Lisp. An opensource ASCI CL that can be embedded in C++ applications. Includes a native CLOS.
+</dd>
+
+<dt>
+<a href="http://www.shiro.dreamhost.com/scheme/gauche/index.html">Gauche Scheme</a>
+</dt>
+<dd>
+An opensource R5RS Scheme with an object system very similar to
+GOOPS.  Quick startup, built-in system interface, native multilingual
+support.
+</dd>
+
+<dt>
+<a href="http://www.gnu.org/software/guile/guile.html">Guile Scheme</a>
+</dt>
+<dd>
+Gnu's opensource Scheme for Linux, OSX, and Cygwin. Includes GOOPS,
+the Guile object system.
+</dd>
+
+<dt>
+<a href="http://www.lispworks.com">Lispworks</a>
+</dt>
+<dd>
+A commercial implementation of ANSI Common Lisp running on Windows,
+Linux, Mac OS X and UNIX LispWorks is source code compatible across
+all supported platforms and offers many features including an advanced
+Common Lisp compiler, runtime system, language extensions and the
+Common LispWorks IDE.
+</dd>
+
+
+
+<!-- dt>
+<a href="http://www.digitool.com/">Macintosh Common Lisp (MCL)</a>
+</dt>
+<dd>
+A commercial ANSI CL available for Macintosh.  Includes a native CLOS
+and a graphical interface.
+</dd -->
+
+<dt>
+<a href="http://openmcl.clozure.com/">OpenMCL</a>
+</dt>
+<dd>
+An opensource version MCL for OSX and LinuxPPC.  Includes a native
+CLOS, true (native) multi-processing, callbacks, is actively
+supported.
+</dd>
+
+<dt><a href="http://www.cons.org/cmucl/">Steel Bank Common Lisp (SBCL)</a></dt>
+<dd>
+An opensource ANSI CL (offshoot from CMUCL) for Linux and OS
+X. Includes a very good compiler and is actively supported.
+</dd>
+
+
+<dt><a href="http://www.stklos.org">STklos</a></dt>
+<dd>
+An opensource Scheme. Fast and light with an efficient and powerful
+object system based on CLOS and an easy connection to GTK+ toolkit.
+</dd>
+
+</dl>
+
+
+
+<!-- h2>History</h2 -->
+
+
+<h2 id="cm_links">CM Links</h2>
+<ul>
+<li><a href="http:/common-lisp.net/project/lambda-gtk">&lambda;gtk</a></li>
+<li><a href="http://www.wordecho.org/code/cmcode/cmusic.html">Drew Krause's CM code archive</a></li>
+<li><a href="http://pinhead.music.uiuc.edu/~hkt/osx-portmidi.tar.gz">Portmidi installation for OS X</a></li>
+<li><a href="http://pinhead.music.uiuc.edu/~hkt/portmidi.tar.gz">Linux Portmidi installation</a></li>
+<li><a href="http://pinhead.music.uiuc.edu/~hkt/sbcl-af-2004-10-22.tgz">Thomas Burdick's SBCL callback support for SBCL 0.8.n</a></li>
+</ul>
+
+<h2>Common Lisp Links</h2>
+
+<ul>
+
+<li>
+<a href="http://www-2.cs.cmu.edu/Groups/AI/html/hyperspec/HyperSpec/FrontMatter/">Common Lisp HyperSpec</a>
+</li>
+
+<li>
+<a href="http://www.cs.cmu.edu/afs/cs.cmu.edu/project/ai-repository/ai/html/cltl/cltl2.html">Common  Lisp: the Language (2nd Edition)</a>
+</li>
+
+
+
+<li>
+<a href="http://www.gigamonkeys.com/book/">Practical Common Lisp</a> (online book)</l>
+
+
+
+<li>
+<a href="http://common-lisp.net">Common-Lisp.net</a>
+</li>
+
+<li>
+<a href="http://www.apl.jhu.edu/~hall/lisp.html">Common Lisp Resources</a>
+</li>
+</ul>
+
+<h2>Scheme Links</h2>
+
+<ul>
+<li><a href="http://www.swiss.ai.mit.edu/~jaffer/r5rs_toc.html">Revised Report of the Algorithmic Language Scheme</a></li>
+<li><a href="http://www.schemers.org/">Schemers.org</a></li>
+</ul>
+
+
+<h2 id="contact">Contact</h2>
+
+<p>
+Please contact me with questions or comments or to tell me of any
+compositions you create using CM.  To receive email information
+about <a href="http://ccrma-www.stanford.edu/">CCRMA</a>'s family of
+Lisp music programs (CM, <a
+href="http://www-ccrma.stanford.edu/software/clm/">CLM</a> and <a
+href="http://www-ccrma.stanford.edu/software/cmn/">CMN</a>) please
+join the CMDIST mailing list by e-mailing your request to: <a
+href="mailto:cmdist-request@ccrma.stanford.edu">cmdist-request@ccrma.stanford.edu</a>.
+</p>
+
+<p>
+Rick Taube
+<br/>Associate Professor Composition/Theory
+<br/>School of Music
+<br/>University of Illinois
+<br/>Urbana, IL
+<br/>Net: <a href="mailto:taube@uiuc.edu">taube@uiuc.edu</a>
+<br/>Fax: +1 (217) 355 5780
+<br/>Vox: +1 (217) 244 2684
+</p>
+
+<!-- p>
+<a href="http://validator.w3.org:8001/check?uri=referer">
+<img src="http://www.w3.org/Icons/valid-xhtml10" 
+     alt="Valid XHTML 1.0!" height="31" width="88" />
+</a>
+</p -->
+
+
+
+
+<!-- Footer -->
+
+<hr/>
+<div id="footer" style=" border:none;">
+
+<div id="author" style="color:#9999bb;">
+    <a href="http://sourceforge.net">
+      <img src="http://sflogo.sourceforge.net/sflogo.php?group_id=1355&amp;type=2&amp;page=index"
+           width="125" height="37" alt="SourceForge Logo"/>
+    </a>
+</div>
+
+
+<div id="cvs-info" style="color:#9999bb; margin-bottom: 1em;">
+<table>
+<tr>
+  <td>
+    <a href="http://validator.w3.org/check/referer">
+      <img src="http://www.w3.org/Icons/valid-xhtml10"
+           alt="Valid XHTML" height="31" width="88"/>
+    </a>
+  </td>
+  <td>
+    <a href="http://www.w3.org/Style/CSS/Buttons/">
+      <img src="http://www.w3.org/Style/CSS/Buttons/mwcts"
+           alt="Use CSS" height="31" width="88"/>
+    </a>
+  </td>
+  <td>
+    <a href="http://jigsaw.w3.org/css-validator/check/referer">
+      <img src="http://jigsaw.w3.org/css-validator/images/vcss"
+           alt="Valid CSS" height="31" width="88"/>
+  </a>
+  </td>
+</tr>
+</table>
+
+</div>
+
+</div>
+
+
+</div> <!-- end "content" -->
+
+</body>
+</html>

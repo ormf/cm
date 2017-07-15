@@ -1,0 +1,33 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument filter-sound (file beg &optional (dur -1.0) 
+						(orig-beg 0.0) 
+						(x-coeffs '(.5 .2 .1))
+						(y-coeffs nil))
+  (let* ((f (open-input file))
+	 (st (floor (* beg *srate*)))
+	 (new-dur (if (plusp dur) dur (- (sound-duration file) orig-beg)))
+	 (flA (make-filter :xcoeffs x-coeffs :ycoeffs y-coeffs))
+	 (orig-start (round (* (sound-srate file) orig-beg)))
+	 (rdA (make-readin :file f :start orig-start))
+	 (two-chans (and (= (mus-channels f) 2) (= (mus-channels *output*) 2)))
+	 (rdB (if two-chans (make-readin :file f :start orig-start :channel 1)))
+	 (flB (if two-chans (make-filter :xcoeffs x-coeffs :ycoeffs y-coeffs)))
+	 (nd (+ st (floor (* *srate* new-dur)))))
+    (run
+     (loop for i from st to nd do
+       (outa i (filter flA (readin rdA)))
+       (if two-chans (outb i (filter flB (readin rdB))))))
+    (close-input f)))
+
+
+
+#|
+  (with-sound () 
+     (filter-sound "/zap/yow.snd" 0 -1 0
+       (envelope->coeffs :order 12 :envelope '(0 0.0 .125 0.5 .200 0.0 .300 1.0 .500 0.0 1.000 0.0))))
+
+   (with-sound () 
+     (filter-sound "/zap/yow.snd" 0 -1 0
+       (envelope->coeffs :order 20 :envelope '(0 0.0 .025 0 .02525 1.0 .100 1.0 .200 0.0 1.000 0.0))))
+|#

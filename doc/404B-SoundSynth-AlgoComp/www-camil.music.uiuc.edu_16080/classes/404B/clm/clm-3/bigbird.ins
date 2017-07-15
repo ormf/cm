@@ -1,0 +1,41 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument bigbird-2 (start dur frequency freqskew amplitude
+			  &key (freq-envelope '(0 0 100 1))
+			       (amp-envelope '(0 0 25 1 75 1 100 0))
+			       (partials '(1 .5 2 .25 3 .2))
+			       (lpcoeff 1.0)
+			       (degree 0.0)
+			       (reverb-amount 0.0))
+  (multiple-value-bind (beg end) (times->samples start dur)
+    (let* ((gls-env (make-env freq-envelope (hz->radians freqskew) dur))
+	   (os (make-polyshape frequency :coeffs (partials->polynomial (normalize-partials partials))))
+	   (fil (make-one-pole lpcoeff (- 1.0 lpcoeff)))
+	   (loc (make-locsig :degree degree :distance 1.0 :reverb reverb-amount))
+	   (amp-env (make-env amp-envelope amplitude dur)))
+      (run
+       (loop for i from beg to end do
+	 (locsig loc i (one-pole fil (* (env amp-env)
+					(polyshape os 1.0 (env gls-env))))))))))
+
+(defun scissor (begin-time)
+  (let ((scissorf '(0 0  40 1  60 1  100 0)))
+    (bigbird-2 begin-time 0.05 1800 1800 .2 
+	       :freq-envelope scissorf 
+	       :amp-envelope '(0 0  25 1  75 1  100 0) 
+	       :partials '(1 .5  2 1  3 .5  4 .1  5 .01))))
+
+
+
+(definstrument bigbird (start dur frequency freqskew amplitude freq-envelope amp-envelope partials
+			&optional (lpcoeff 1.0) (degree 0.0) (reverb-amount 0.0))
+  (multiple-value-bind (beg end) (times->samples start dur)
+    (let* ((gls-env (make-env freq-envelope (hz->radians freqskew) dur))
+	   (os (make-polyshape frequency :coeffs (partials->polynomial (normalize-partials partials))))
+	   (fil (make-one-pole lpcoeff (- 1.0 lpcoeff)))
+	   (loc (make-locsig :degree degree :distance 1.0 :reverb reverb-amount))
+	   (amp-env (make-env amp-envelope amplitude dur)))
+      (run
+       (loop for i from beg to end do
+	 (locsig loc i (one-pole fil (* (env amp-env)
+					(polyshape os 1.0 (env gls-env))))))))))

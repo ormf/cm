@@ -1,0 +1,55 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument resflt (start dur driver 
+	       ranfreq noiamp noifun cosamp cosfreq1 cosfreq0 cosnum
+	       ampcosfun freqcosfun 
+	       frq1 r1 g1 frq2 r2 g2 frq3 r3 g3
+	       &key (degree 0.0)
+		    (distance 1.0)
+		    (reverb-amount 0.005))
+
+  ;; driver=0 -- use sum of cosines to drive the filter,
+  ;; driver=1 -- use white noise
+  ;; if noise used, ranfreq=frequency of random number generator,
+  ;;                noiamp=amplitude thereof,
+  ;;                noifun=amplitude envelope on white noise
+  ;; if sum-of-cosines (i.e. a band-limited pulse train),
+  ;;                cosamp=amplitude of pulse train,
+  ;;                cosfreq1=top frequency (given freqcosfun) (i.e. pulse frequency)
+  ;;                cosfreq0=bottom frequency,
+  ;;                cosnum=number of cosines in the pulse,
+  ;;                ampcosfun=amplitude envelope on pulse train
+  ;;                freqcosfun=frequency envelope on pulse train
+  ;; There are then 3 resonators, centered at frq1, frq2, frq3,
+  ;; with pole-radius r1, r2, and r3 respectively, and
+  ;; with gains of g1, g2, and g3.
+
+  (let* ((beg (floor (* start *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (f1 (make-ppolar r1 frq1))
+	 (f2 (make-ppolar r2 frq2))
+	 (f3 (make-ppolar r3 frq3))
+	 (input1 0.0)
+	 (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	 (frqf (if (/= driver 1) 
+		   (make-env :envelope freqcosfun  :duration dur
+			      :scaler (hz->radians (- cosfreq1 cosfreq0)))))
+	 (ampf (if (= driver 1)
+		   (make-env :envelope noifun :scaler noiamp :duration dur)
+		 (make-env :envelope ampcosfun :scaler cosamp :duration dur)))
+	 (rn (if (= driver 1)
+		 (make-rand :frequency ranfreq)))
+	 (cn (if (= driver 0)
+		 (make-sum-of-cosines :frequency cosfreq0 :cosines cosnum))))
+    (run
+     (loop for i from beg to end do
+       (if (= driver 1)
+	   (setf input1 (* (env ampf) (rand rn)))
+	 (setf input1 (* (env ampf) (sum-of-cosines cn (env frqf)))))
+       (locsig loc i (+ (two-pole f1 (* input1 g1))
+			(two-pole f2 (* input1 g2))
+			(two-pole f3 (* input1 g3))))))))
+
+
+;  (resflt 0 1.0 0 0 0 nil .1 200 230 10 '(0 0 50 1 100 0) '(0 0 100 1) 500 .995 .1 1000 .995 .1 2000 .995 .1)
+;  (resflt 0 1.0 1 10000 .01 '(0 0 50 1 100 0) 0 0 0 0 nil nil 500 .995 .1 1000 .995 .1 2000 .995 .1)

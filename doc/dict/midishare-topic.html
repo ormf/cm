@@ -1,0 +1,714 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>Midishare</title>
+</head>
+<body>
+<div id="content">
+
+<dl class="dictsyntax">
+<dt>[Topic]</dt>
+<dd>Midishare</dd>
+</dl>
+
+<p>
+Common Music supports reading and writing MIDI data in real time and
+non-real time using
+Grame's <a
+href="http://sourceforge.net/projects/midishare/">Midishare</a>. CM
+supports Midishare on OS X and Linux in OpenMCL and CMUCL. The support
+consists of the stream classes
+<a href="#midishare-stream"><code>midistream-stream</code></a> and 
+<a href="#player-stream"><code>player-stream</code></a> that manage IO
+connections and a handful of auxiliary functions for opening Midishare
+streams and working with Midishare's <a href="#MidiEv">MidiEv</a>
+foreign object. This low-level object is most appropriate for
+interactive, real-time work
+using <a href="rts-fn.html">rts</a>
+and <a href="set-receiver-fn.html">set-receiver!</a>.
+It is more convenient to use
+ <a href="midi-cls.html">midi</a> objects for non-real time output
+with the <a href="events-fn.html">events</a> function.
+</p>
+
+
+<h3 id="midishare-stream">The Midishare stream</h3>
+
+<dl class="dictsyntax">
+<dt>[Class]</dt>
+<dd><code class="entry">midishare-stream</code></dd>
+</dl>
+
+<p>
+A subclass
+of <a href="midi-stream-cls.html"><code>midi-stream</code></a> that
+implements direct-to-driver MIDI io. This class is automatically
+chosen when you specify a stream with a ".ms" extension.  The name of
+the stream will become the "client name" used by Midishare.  The
+convenience
+functions <a href="#midishare-open"><code>midishare-open</code></a>
+and <a href="#midishare-close"><code>midishare-close</code></a> are
+provided for the typical case of a single input/output pair using
+"Common Music" as the client name.
+</p>
+
+<p><code class="entry">midishare-stream</code> supports the following slot initializations:
+</p>
+<dl>
+<dt><code class="keyword">:connections</code> <var>list</var></dt>
+<dd>
+A list of two strings specifying the names of the input and output
+Midishare client applications to connect to. If a connections list is
+not specified it will default to the value of the global variable <a
+href="midi-connections-var.html"><code>*midi-connections*</code></a>.
+</dd>
+</dl>
+
+
+<h4>Midishare stream functions</h4>
+
+<p>
+A connection between CM and Midishare must first be established before
+reading or writing any MIDI data.  The easiest way to make this
+connection is to use the following convenience functions.
+</p>
+
+<dl class="dictsyntax" id="midishare-open"> 
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midishare-open</code> [<var>name</var>]<code>)</code></dd></dl>
+<p>
+Opens a connection to a Midishare stream. If <var>name</var> is not
+provided it defaults to <span class="string">"midi-port.ms"</span>
+with <span class="string">"Common Music"</span> set as the client
+application name.
+<p>
+
+<dl class="dictsyntax"id="midishare-close">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midishare-close</code> [<var>stream</var>]<code>)</code></dd></dl>
+<p>
+Closes a connection to optional <var>stream</var>, which defaults to
+the stream named <span class="string">"midi-port.ms"</span> if it is
+not provided.</p>
+
+<dl class="dictsyntax" id="midishare-open?">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midishare-open?</code> [<var>stream</var>]</code><code>)</code></dd></dl>
+<p>Returns one
+of <span class="keyword">:in</span>, <span class="keyword">:out</span>
+or <span class="keyword">:inout</span> if the <var>stream</var> is
+open, otherwise false. If <var>stream</var> is not provided it
+defaults to the stream
+named <span class="string">"midi-port.ms"</span>.
+</p>
+
+<h3 id="player-stream">The Player stream</h3>
+
+<dl class="dictsyntax">
+<dt>[Class]</dt>
+<dd><span class="syntax"><code class="entry">player-stream</code></span></dd>
+</dl>
+
+<p>
+A subclass
+of <a href="#midishare-stream"><code>midishare-stream</code></a>
+that implements input and output to a Midishare Player multi-track
+sequencer application. A <code>player-stream</code> is automatically
+created when you specify a file with a .mp extension.  The name of
+the player stream will become the player's application name used by
+Midishare.
+</p>
+
+<p>
+<code class="entry">player-stream</code> supports the following slot initializations:
+</p>
+
+<dl>
+<dt><code class="keyword">:track</code> <var>integer</var></dt>
+<dd>
+Events generated to a player are placed in the track number specified
+by <code class="keyword">:track</code> according to the value of <code class="keyword">:seq-mode</code>.
+If <code class="keyword">:seq-mode</code> is <code class="keyword">:replace</code> (the default) then the
+the track contents at <code class="keyword">:track</code> are replaced.  If
+<code class="keyword">:seq-mode</code> is <code class="keyword">:add</code> then new tracks are created
+starting at <code class="keyword">:track</code> and incrementing by 1 each time the <a
+href="events-fn.html"><code>events</code></a> function outputs to the player.
+</dd>
+
+<dt><code class="keyword">:seq-mode</code> {<code class="keyword">:replace</code> | <code class="keyword">:add</code>}</dt>
+<dd>
+Determines if events sent to the player either replace the current
+sequence or are added as a new track in the sequence. The default
+value is <code class="keyword">:replace</code>.
+</dd>
+
+<dt><code class="keyword">:play</code> <var>boolean</var></dt>
+<dd>
+If true then the player application is automatically started once
+output to the player has concluded. If <code class="keyword">:play</code> is false then
+the player is not automatically started. In either case a
+player-stream can be controlled interactively in the Lisp interpreter
+using the functions <a
+href="player-start-fn.html"><code>player-start</code></a>, <a
+href="player-stop-fn.html"><code>player-stop</code></a>, <a
+href="player-pause-fn.html"><code>player-pause</code></a> and <a
+href="player-cont-fn.html"><code>player-cont</code></a>.  The default
+value of <code class="keyword">:play</code> is true.
+</dd>
+
+
+<dt><code class="keyword">:tempo</code> <var>bmp</var></dt>
+<dd>
+
+
+The initial tempo of the player, specified in beats per minute.  The
+default value is tempo 60.
+</dd>
+</dl>
+
+<h4>Player stream functions</h4>
+
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-cont</code> <var>stream</var>)</dd>
+</dl>
+<p>
+Continues playing the Player application associated with the 
+<a href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-load-midifile</code> <var>stream</var> <var>file</var>)</dd>
+</dl>
+<p>
+Loads the MIDI file <var>file</var> into the Player application associated with the <a
+href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-mute</code> <var>stream</var> <var>track</var>)</dd>
+</dl>
+<p>
+Mutes <var>track</var> number in the Player application associated
+with the <a href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-pause</code> <var>stream</var>)</dd>
+</dl>
+<p>
+Pauses playing the Player application associated with the <a
+href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-save-midifile</code> <var>stream</var> <var>file</var>)</dd>
+</dl>
+<p>
+Saves the sequence in the Player application associated with the <a
+href="#player-stream"><code>player-stream</code></a>
+<var>stream</var> to the MIDI file <var>file</var> into
+</p>
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-set-tempo</code> <var>stream</var> <var>tempo</var>)</dd>
+</dl>
+<p>Sets the tempo of the Player application associated
+with the <a href="#player-stream"><code>player-stream</code></a>
+<var>stream</var> to <var>tempo</var>, in beats per minute.
+The default tempo is 60.
+</p>
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-solo</code> <var>stream</var> <var>track</var>)</dd>
+</dl>
+<p>Solos <var>track</var> number in the Player application associated
+with the <a href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.</p>
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-start</code> <var>stream</var>)</dd>
+</dl>
+<p>Starts playing the Player application associated with the <a
+href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-stop</code> <var>stream</var>)</dd>
+</dl>
+<p>
+Stops playing the Player application associated with the <a
+href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-unmute</code> <var>stream</var> <var>track</var>)</dd>
+</dl>
+<p>
+Unmutes <var>track</var> number in the Player application associated
+with the <a href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd>(<code class="entry">player-unsolo</code> <var>stream</var> <var>track</var>)</dd>
+</dl>
+<p>
+Unsolos <var>track</var> number in the Player application associated
+with the <a href="#player-stream"><code>player-stream</code></a>
+<var>stream</var>.
+</p>
+
+
+<h3 id="midiev">The MidiEv foreign object</h3>
+
+<p>
+Once a connection between CM and Midishare has been established, MIDI
+data can be sent to and from Midishare ports in real time. For real
+time work it is best to work directly with the low-level MIDI 
+objects that Midishare itself uses. These foreign objects are called MidiEvs..
+Special care should be taken working with them because:
+</p>
+
+<ul>
+<li>they are not part of the Lisp data type system</li>
+<li>they are not managed by Lisp's garbage collection facility</li>
+<li>they are not trapped and handled by Lisp's error system</li>
+</ul>
+
+<p>
+You are completely responsible for properly managing the MidiEv's you
+allocate and use. In some cases this may include
+explicit <em>deallocation</em> after a MidiEv has been sent or
+received.  Be sure to consult the Midishare manual and
+the <a href="../../src/midishare/Midishare-Interface.lisp">Midishare
+FFI</a> for information about how to create, read, write and
+deallocate MidiEv structs.
+</p>
+
+<p>
+Common Music adds two functions to Midishare's API:
+<a href="#ms:new"><code>ms:new</code></a>, a high level MidiEv constructor, and
+<a href="#ms:MidiPrintEv"><code>ms:MidiPrintEv</code></a>, a printer
+for MidiEv objects.  These two functions allow low-level MidiEvs to be
+manipulated in manner consistent with CLOS objects defined in CM. Note
+that to reference functions in the Midishare API you must include
+the package prefix <code>ms:</code> in the function name.
+</p>
+
+<dl class="dictsyntax" id="new">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">ms:new</code> <var>type</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd></dl>
+
+<p>
+Allocates, initializes and returns a foreign Midishare
+event. Every <var>type</var> of MidiEv is identified by a unique
+integer type id, a Lisp constant (symbol) with an integer value.  This
+value is followed by zero or more keyword parameters as appropriate
+for the <var>type</var> of MidiEv returned:
+</p>
+
+<p>
+Keyword arguments applicable to all types of MidiEvs:
+</p>
+
+<dl>
+<dt><code class="keyword">:port</code> <var>integer</var></dt> <dd>The
+reference number of the Midishare port to send the event to. Defaults
+to 0.</dd> <dt><code class="keyword">:chan</code>
+<var>integer</var></dt> <dd>The channel number to send the event
+to. Defaults to 0.</dd> <dt><code class="keyword">:date</code>
+<var>integer</var></dt> <dd>The time (in milliseconds) of the
+event. Defaults to 0.</dd>
+</dl>
+
+<p><code class="entry">typeNote</code>
+(0), <code class="entry">typeKeyOn</code> (1), <code
+class="entry">typeKeyOff</code> (2):
+</p>
+
+<dl>
+<dt><code class="keyword">:pitch</code> <em>integer</em></dt>
+<dd>An integer key number 0-127. Defaults to 60.</dd>
+<dt><code class="keyword">:vel</code> <em>integer</em></dt>
+<dd>An integer velocity 0-127. Defaults to 60.</dd>
+<dt><code class="keyword">:dur</code> <em>integer</em></dt>
+<dd>Duration in milliseconds, defaults to 500. Only available
+for <code>typeNote</code>.
+</dl>
+
+<p><code class="entry">typeKeyPress</code> (3):</p>
+
+<dl>
+<dt><code class="keyword">:pitch</code> <em>integer</em></dt>
+<dd>An integer key number 0-127. Defaults to 60.</dd>
+<dt><code class="keyword">:pressure</code> <em>integer</em></dt>
+<dd>An integer pressure 0-127. Defaults to 0.</dd>
+</dl>
+
+
+<p><code class="entry">typeCtrlChange</code> (4):</p>
+<dl>
+<dt><code class="keyword">:controller</code> <em>integer</em></dt>
+<dd>An integer controller 0-127. Defaults to 0.</dd>
+<dt><code class="keyword">:change</code> <em>integer</em></dt>
+<dd>An integer change 0-127. Defaults to 0.</dd>
+</dl>
+
+<p><code class="entry">typeProgChange</code> (5):</p>
+<dl>
+<dt><code class="keyword">:program</code> <em>integer</em></dt>
+<dd>An integer program 0-127. Defaults to 0.</dd>
+</dl>
+
+<p><code class="entry">typeChanPress</code> (6):</p>
+<dl>
+<dt><code class="keyword">:pressure</code> <em>integer</em></dt>
+<dd>An integer pressure 0-127. Defaults to 0.</dd>
+</dl>
+
+<p><code class="entry">typePitchBend</code> (7),
+     <code class="entry">typePitchWheel</code> (7):</p>
+<dl>
+<dt><code class="keyword">:bend</code> <em>integer</em></dt>
+<dd>An integer bend value -8192 to 8191. Defaults to 0 (no bend).</dd>
+</dl>
+
+<p><code class="entry">typeSongPos</code> (8):</p>
+<dl>
+<dt><code class="keyword">:lsb</code> <em>integer</em></dt>
+<dd>An integer 0-127. Defaults to 0.</dd>
+<dt><code class="keyword">:msb</code> <em>integer</em></dt>
+<dd>An integer 0-127. Defaults to 0.</dd>
+</dl>
+
+<p><code class="entry">typeSongSel</code> (9):</p>
+<dl>
+<dt><code class="keyword">:song</code> <em>integer</em></dt>
+<dd>An integer song 0-127. Defaults to 0.</dd>
+</dl>
+
+<p><code class="entry">typeClock</code> (10),
+<code class="entry">typeStart</code> (11),
+<code class="entry">typeContinue</code> (12),
+<code class="entry">typeStop</code> (13),
+<code class="entry">typeTune</code> (14),
+<code class="entry">typeActiveSens</code> (15),
+<code class="entry">typeReset</code> (16):</p>
+
+<p>
+None
+</p>
+
+<p><code class="entry">typeSysEx</code> (17):</p>
+<dl>
+<dt><code class="keyword">:data</code> <em>list</em></dt> <dd>A list
+of data bytes. Do not include a leading #xF0 or tailing #xF7 in the
+list; these markers are added automatically by Midishare.</dd>
+</dl>
+
+<p><code class="entry">typeSeqNum</code> (134):</p>
+<dl>
+<dt><code class="keyword">:number</code> <em>integer</em></dt>
+<dd>A sequence integer 0-127.</dd>
+</dl>
+
+<p><code class="entry">typeTextual</code> (135),
+<code class="entry">typeCopyright</code> (136),
+<code class="entry">typeSeqName</code> (137),
+<code class="entry">typeInstrName</code> (138),
+<code class="entry">typeLyric</code> (139),
+<code class="entry">typeMarker</code> (140),
+<code class="entry">typeCuePoint</code> (141):</p>
+<dl>
+<dt><code class="keyword">:text</code> <em>string</em></dt>
+<dd>A text string, defaults to "".</dd>
+</dl>
+
+<p><code class="entry">typeChannelPrefix</code> (142):</p>
+<dl>
+<dt><code class="keyword">:prefix</code> <em>integer</em></dt>
+<dd>A prefix integer 0-127, defaults to 0.</dd>
+</dl>
+
+<p><code class="entry">typeEndTrack</code> (143):</p>
+<p>None</p>
+
+<p><code class="entry">typeTempo</code> (144):</p>
+<dl>
+<dt><code class="keyword">:tempo</code> <em>integer</em></dt>
+<dd>Tempo in quarter notes per minute, defaults to 120.</dd>
+</dl>
+
+<p><code class="entry">typeSMPTEOffset</code> (145):</p>
+<dl>
+<dt><code class="keyword">:offset</code> <em>list</em></dt> <dd>A list
+of SMPTE integer offsets (<em>hr min sec frame subframe</em>).</dd>
+</dl>
+
+<p><code class="entry">typeTimeSign</code> (146):</p>
+<dl>
+<dt><code class="keyword">:numerator</code> <em>integer</em></dt>
+<dd>The upper number of the time signature, defaults to 4.</dd>
+<dt><code class="keyword">:denominator</code> <em>integer</em></dt>
+<dd>The lower number of the time signature, defaults to 4.</dd>
+<dt><code class="keyword">:clocks</code> <em>integer</em></dt>
+<dd>Clocks per quarter, defaults to 24.</dd>
+<dt><code class="keyword">:32nds</code> <em>integer</em></dt>
+<dd>Thirty-seconds per quarter, defaults to 8.</dd>
+</dl>
+
+<p><code class="entry">typeKeySign</code> (147):</p>
+<dl>
+<dt><code class="keyword">:sign</code> <em>integer</em></dt> 
+<dd>The number of flats or sharps in the key signature -7 to 7,
+defaults to 0.</dd> 
+<dt><code class="keyword">:mode</code><em>integer</em></dt> 
+<dd>An integer 0 or 1 where 0 means major and 1
+means minor, defaults to 0.</dd>
+</dl>
+
+</dl>
+</dd>
+
+<p>
+The MIDI Meta message types 134-147 can appear in MIDI files but
+cannot be sent to an external synthesizer.
+</p>
+
+
+<dl class="dictsyntax" id="midiprintev">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">ms:MidiPrintEv</code> <var>ev</var> [<var>stream</var>]<code>)</code></dd></dl>
+
+<p>
+Formats the message contents of <var>ev</var> to <var>stream</var>,
+which defaults to the standard output.
+</p>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span>  Creating and printing a MidiEv.</p>
+</p>
+<pre class="code">
+(<span class="special">define</span> <span class="defined">ev</span> (ms:new typeNote <span class="keyword">:chan</span> 3 <span class="keyword">:dur</span> 2000))</span>
+
+(ms:MidiPrintEv ev)
+#&lt;MidiEv Note [0/3 0ms] 60 64 2000ms&gt;
+</pre>
+</div>
+
+<h4 id="accessors">Accessing and modifying MidiEvs</h4>
+
+<p>
+To access values or set the fields of a MidiEv struct you use the
+functions provided by the MidiShare API. The more important
+constructors and accessors are listed here.
+</p>
+
+<dl class="dictsyntax" id="midinewev">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:MidiNewEv </code><var>typenum</var>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="midicopyev">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:MidiCopyEv </code><var>ev</var><code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="midifreeev">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:MidiFreeEv </code><var>ev</var><code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="midifreeev">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:evtype </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="port">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:port </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="chan">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:chan </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="date">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:date </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="pitch">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:pitch </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="dur">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:dur </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="vel">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:vel </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="bend">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:bend </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="pgm">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:pgm  </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="ctl">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:ctl </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax" id="val">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:val </code><var>ev</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+<dl class="dictsyntax">
+</dd></dl>
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code>ms:field </code><var>ev pos</var> [<var>val</var>]<code>)</code>
+</dd></dl>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Non-realtime Midishare output using <a href="midi-cls.html">midi</a> objects.
+</p>
+<pre class="code">
+(<span class="special">defun</span> <span class="defined">simp</span> (len lb ub rhy dur amp)
+  (<a href="process-mac.html">process</a> repeat len
+           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>)
+                       <span class="keyword">:keynum</span> (<a href="between-fn.html">between</a> lb ub)
+                       <span class="keyword">:duration</span> dur
+                       <span class="keyword">:amplitude</span> amp)
+           wait rhy))
+
+(<a href="events-fn.html">events</a> (simp 20 60 80 .1 .15 .6) <span class="string">"midi-port.ms"</span>)
+#&lt;midishare-stream <span class="string">"midi-port.ms"</span>&gt;
+
+(<a href="#midishare-open">midishare-open?</a>)
+<span class="result">&rArr;</span> <span class="keyword">:inout</span>
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Real-time output using <a href="#MidiEv">MidiEv</a> objects.
+</p>
+<pre class="code">
+(<span class="special">defparameter</span> <span class="defined">*ms*</span> (midishare-open ))
+
+(<span class="special">defun</span> <span class="defined">zzz</span> (len knum wai vel)
+  <span class="comment">;; a process that creates ms:typeNote objects</span>
+  (<a href="process-mac.html">process</a> for i below len
+           for k = knum then (<a href="between-fn.html">between</a> knum (+ knum 12))
+           <span class="comment">;; IMPORTANT: the 'at (now)' subclause in the output statement
+           ;; is required because MidiEv is a foreign type and has no
+           ;; object-time CLOS method.</span>
+           output (ms:new typeNote
+                    <span class="keyword">:dur</span> 100
+                    <span class="keyword">:pitch</span> k
+                    <span class="keyword">:vel</span> (round (<a href="interp-fn.html">interp</a> i 0 vel (- len 1) (* vel .3))))
+               at (<a href="now-fn.html">now</a>)
+           wait wai))
+
+<span class="comment">;;; start the realtime scheduler...</span>
+
+(<a href="rts-fn.html">rts</a> nil *ms*)
+
+<span class="comment">;;; ...eval this sprout multiple times, plays in real time...</span>
+
+(<a href="sprout-fn.html">sprout</a> (zzz 20 (between 40 80) .1 (between 60 80)) )
+
+<span class="comment">;;; ...then stop the rts</span>
+
+(<a href="rts-stop-fn.html">rts-stop</a> )
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 3.</span> Setting and clearing a Midishare receiver.
+</p>
+<pre class="code">
+<span class="comment">;;; Set a receiver that prints out incoming events</span>
+
+(<a href="set-receiver-fn.html">set-receiver!</a> (<span class="special">lambda</span> (ev) (ms:MidiPrintEv ev)) *ms*)
+
+<span class="comment">;;; play the keyboard, then clear the receiver</span>
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *ms*)
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 4.</span> Receiving and real-time scheduling together.
+</p>
+<pre class="code">
+(<span class="special">defun</span> <span class="defined">trigger</span> (ev)
+  <span class="comment">;; triggers zzz process in real time
+  ;; if ev is NoteOn otherwise deallocate event</span>
+  (if (= (ms:evType ev) 1)
+      (<a href="sprout-fn.html">sprout</a> (zzz 20 (ms:pitch ev) .1 (ms:vel ev)))
+    (ms:MidiFreeEv ev)))
+
+<span class="comment">;;; start rts and receiver running</span>
+
+(<a href="rts-fn.html">rts</a> nil *ms*)
+
+(<a href="set-receiver-fn.html">set-receiver!</a> #'trigger *ms*)
+
+<span class="comment">;;; ...now play the keyboard to sprout processes...</span>
+                 
+<span class="comment">;;; ...then stop rts and clear receiver</span>
+
+(<a href="rts-stop-fn.html">rts-stop</a>)
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *ms*)
+</pre>
+</div>
+
+<h4>See also:</h4>
+<ul>
+<li><a href="events-fn.html"><code>events</code></a> [Function]</li>
+<li><a href="midi-topic.html">MIDI</a> [Topic]</li>
+<li><a href="midi-topic.html">Portmidi</a> [Topic]</li>
+<li><a href="rts-fn.html"><code>rts</code></a> [Function]</li>
+<li><a href="set-receiver-fn.html"><code>set-receiver!</code></a> [Function]</li>
+</ul>
+
+</div> 
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

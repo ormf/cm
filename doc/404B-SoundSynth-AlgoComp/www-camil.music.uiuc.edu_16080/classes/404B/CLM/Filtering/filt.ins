@@ -1,0 +1,18 @@
+(in-package :cm)
+
+(definstrument filt-noise (start dur amp a0 a1)
+  (let* ((beg (seconds->samples start))
+         (end (+ beg (seconds->samples dur)))
+         (flt (make-one-zero :a0 a0 :a1 a1))
+         (noi (make-rand-interp :frequency (* .5 *srate*))))
+    (run (loop for i from beg to end
+            do
+              (outa i (* amp (one-zero flt (rand-interp noi))))))))
+
+;;; one-zero:  y(n) = a0 x(n) + a1 x(n-1)
+
+
+
+
+
+

@@ -1,0 +1,159 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>harmonics</title>
+</head>
+
+<body>
+<div id="content">
+<!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">harmonics</code> <var>low high</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+<p>
+Returns the harmonic series between harmonic numbers <var>low</var>
+and <var>high</var> (inclusive) as a list of ratios, hertz values or floating
+point keynums according to keyword arguments.
+</p>
+
+<p id="args"><code class="entry">harmonics</code> supports the following keyword arguments:
+</p>
+
+<dl>
+
+<dt>
+<code class="keyword">:hertz</code> <var>number</var>
+</dt>
+<dd>The frequency base of the returned series. The default value of 1
+Hz returns rational frequency ratios.
+</dd>
+
+<dt>
+<code class="keyword">:keynum</code> {<var>keynum</var> | <var>note</var>}
+</dt>
+<dd>
+A keynum specification of the base frequency returns floating point
+key numbers.
+</dd>
+
+<dt>
+<code class="keyword">:undertones</code> <var>boolean</var>
+</dt>
+<dd>If true then undertones are generated, i.e. the reciprocals of the
+harmonics between <var>low</var> and <var>high</var> in decreasing
+order. The default value is false.
+</dd>
+
+<dt>
+<code class="keyword">:invert</code> <var>boolean</var>
+</dt>
+<dd>
+If true the harmonic series between <var>low</var> and <var>high</var>
+is inverted, or flipped. The default value is false.
+</dd>
+
+<dt>
+<code class="keyword">:rescale</code> <var>number</var>
+</dt>
+<dd>
+If provided the entire series is rescaled to lie between the
+values <span class="keyword">:hertz</span>
+and <span class="keyword">:rescale</span> (inclusive). If
+<span class="keyword">:keynum</span> is specified then the value of <span class="keyword">:rescale</span> must be a key number as well.
+</dd>
+
+<dt>
+<code class="keyword">:scale-order</code> {<var>false</var> | <span class="keyword">:reverse</span> | <span class="keyword">:up</span> | <span class="keyword">:down</span> | <span class="keyword">:random</span>}
+</dt>
+<dd>
+Optionally reorders the series. If <var>false</var> then overtones are
+returned in ascending order and undertones in decending order. The
+value <span class="keyword">:reverse</span> reverses this. The
+value <span class="keyword">:up</span> reverses undertones without
+affecting overtones and <span class="keyword">:down</span> does the
+opposite.  The value <span class="keyword">:random</span> returns a
+random permutation of the list. The default value is false.
+</dd>
+
+<dt>
+<code class="keyword">:harmonic</code> <var>integer</var>
+</dt>
+<dd>If specified then <var>integer</var> must be a harmonic number
+between <var>low</var> and <var>high</var> (inclusive) and only that
+harmonic value is returned.
+</dd>
+</dl>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Generating frequency
+ratios.
+</p>
+<pre class="code">
+(harmonics 1 8)
+<span class="result">&rArr;</span> (1 2 3 4 5 6 7 8)
+
+(harmonics 8 16)
+<span class="result">&rArr;</span> (1 9/8 5/4 11/8 3/2 13/8 7/4 15/8 2)
+
+(harmonics 1 8 <span class="keyword">:undertones</span> #t)
+<span class="result">&rArr;</span> (1 1/2 1/3 1/4 1/5 1/6 1/7 1/8)
+
+(harmonics 8 16 <span class="keyword">:undertones</span> #t)
+<span class="result">&rArr;</span> (1 8/9 4/5 8/11 2/3 8/13 4/7 8/15 1/2)
+
+(harmonics 1 8 <span class="keyword">:invert</span> #t)
+<span class="result">&rArr;</span> (1 8/7 4/3 8/5 2 8/3 4 8)
+
+(harmonics 1 8 <span class="keyword">:undertones</span> #t <span class="keyword">:invert</span> #t)
+<span class="result">&rArr;</span> (1 7/8 3/4 5/8 1/2 3/8 1/4 1/8)
+
+(<span class="special">define</span> <span class="defined">septimal-scale</span>
+  (<a href="new-mac.html">new</a> <a href="tuning-cls.html">tuning</a> <span class="keyword">:ratios</span> (harmonics 7 14)))
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Hertz and key numbers.
+</p>
+<pre class="code">
+(harmonics 1 8 <span class="keyword">:hertz</span> 100)
+<span class="result">&rArr;</span> (100 200 300 400 500 600 700 800)
+
+(harmonics 6 12 <span class="keyword">:hertz</span> 100.0)
+<span class="result">&rArr;</span> (100.0 116.666664 133.33334 150.0 166.66666 183.33334 200.0)
+
+(harmonics 1 8 <span class="keyword">:keynum</span> 'c2)
+<span class="result">&rArr;</span> (35.999992 47.999992 55.019547 60.0 63.863136 67.01955 69.68826 72.0)
+
+(harmonics 8 12 <span class="keyword">:keynum</span> 'a4 <span class="keyword">:scale-order</span> '<span class="keyword">:random</span>)
+<span class="result">&rArr;</span> (74.51318 76.019554 71.03909 79.88269 69.0 72.86314 78.68826 77.40527 81.0)
+
+(harmonics 1 4 <span class="keyword">:keynum</span> 60 <span class="keyword">:harmonic</span> 3)
+<span class="result">&rArr;</span> 79.01955
+</pre>
+</div>
+
+<h4>See also:</h4>
+<ul>
+<li><a href="fm-spectrum-fn.html"><code>fm-spectrum</code></a> [Function]</li>
+<li><a href="rm-spectrum-fn.html"><code>rm-spectrum</code></a> [Function]</li>
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

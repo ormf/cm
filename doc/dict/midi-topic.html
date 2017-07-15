@@ -1,0 +1,1058 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>Midi</title>
+</head>
+<body>
+<div id="content">
+
+<!-- Entry: "midi-text-evemt" -->
+<dl class="dictsyntax">
+<dt>[Topic]</dt>
+<dd><span class="syntax">MIDI</span></dd>
+</dl>
+
+<p>
+Common Music uses <a href="midi-stream-cls.html">MIDI stream</a> to
+support reading and writing MIDI data to
+to <a href="midi-file-cls.html">MIDI
+files</a>, <a href="portmidi-topic.html">Portmidi</a>
+and <a href="http:www.grame.fr/MidiShare">Midishare</a>.  Two levels
+of MIDI support are provided:
+</p>
+
+<ul>
+
+<li>
+<a href="#midi_high_level">A high level interface</a> provides Lisp
+classes and methods for generating music to MIDI streams in non-real
+time mode.
+</li>
+
+<li>
+<a href="#midi_real_time">A low level interface</a> implements
+"conless" midi messages that can be sent to, and received from an
+open Midiport or Midishare connection in real time without adding
+garbage to the Lisp heap.
+</li>
+
+</ul>
+
+<h2 id="midi_high_level">High level MIDI support</h2>
+
+<p>
+High level MIDI support consists of class definitions of MIDI scores
+and events and functions that operate on them in non-real time.  Note
+that <em>non-real</em> does not imply <em>slower</em> than real
+time -- the high level interface generates output many times faster
+than real time.  High level support is documented by main entries in
+the Common Music dictionary, the following topic list provides links
+to this documentation:
+</p>
+
+<h3 id="midi_event_classes">MIDI event classes</h3>
+
+<ul>
+<li><a href="midi-cls.html"><code>midi</code></a></li>
+<li><a href="midi-note-on-cls.html"><code>midi-note-on</code></a></li>
+<li><a href="midi-note-off-cls.html"><code>midi-note-off</code></a></li>
+<li><a href="midi-key-pressure-cls.html"><code>midi-key-pressure</code></a></li>
+<li><a href="midi-control-change-cls.html"><code>midi-control-change</code></a></li>
+<li><a href="midi-program-change-cls.html"><code>midi-program-change</code></a></li>
+<li><a href="midi-channel-pressure-cls.html"><code>midi-channel-pressure</code></a></li>
+<li><a href="midi-pitch-bend-cls.html"><code>midi-pitch-bend</code></a></li>
+
+<li><a href="midi-system-event-cls.html"><code>midi-system-event</code></a></li>
+
+<li><a href="midi-sequence-number-cls.html"><code>midi-sequence-number</code></a></li>
+<li><a href="midi-text-event-cls.html"><code>midi-text-event</code></a></li>
+<li><a href="midi-eot-cls.html"><code>midi-eot</code></a></li>
+<li><a href="midi-tempo-change-cls.html"><code>midi-tempo-change</code></a></li>
+<li><a href="midi-smpte-offset-cls.html"><code>midi-smpte-offset</code></a></li>
+<li><a href="midi-time-signature-cls.html"><code>midi-time-signature</code></a></li>
+<li><a href="midi-key-signature-cls.html"><code>midi-key-signature</code></a></li>
+<li><a href="midi-sequencer-event-cls.html"><code>midi-sequencer-event</code></a></li>
+<li><a href="midi-port-event-cls.html"><code>midi-port-event</code></a></li>
+<li><a href="midi-chan-event-cls.html"><code>midi-chan-event</code></a></li>
+</ul>
+
+<h3 id="midi_score_classes">MIDI score classes</h3>
+
+<ul>
+<li><a href="midi-file-cls.html"><code>midi-file</code></a></li>
+<li>
+<a 
+href="midishare-stream-cls.html"><code>midishare-stream</code></a></li>
+<li><a href="player-stream-cls.html"><code>player-stream</code></a></li>
+<li><a href="portmidi-topic.html#portmidi-stream"><code>portmidi-stream</code></a></li>
+</ul>
+
+
+<h3 id="midi_functions">MIDI functions</h3>
+
+<ul>
+<li><a href="events-fn.html"><code>events</code></a></li>
+<li><a href="import-events-fn.html"><code>import-events</code></a></li>
+<li><a href="midi-file-print.html"><code>midi-file-print</code></a></li>
+<!-- <li><a href="osx-play-midi-file.html"><code>osx-play-midi-file</code></a></li>
+<li><a href="win-play-midi-file.html"><code>win-play-midi-file</code></a></li>
+<li><a href="set-midi-output-hook-fn.html"><code>set-midi-output-hook!</code></a></li> -->
+</ul>
+
+<h2 id="midi_low_level">Low level MIDI support</h2>
+
+<p>
+Low level MIDI support provides functions for working with specially
+formatted unsigned fixnum values called <em>midi messages</em>.  Common Music
+supports all of the message types defined in the MIDI 1.0 specification as well as those
+described in the MIDI Time Code and Cueing supplement. 
+</p>
+
+
+<h3 id="midi_messages">MIDI Messages</h3>
+<p>
+A MIDI message is a specially formatted fixnum (28-30 bits) containing
+up to three 7-bit bytes of information.  Each MIDI message is
+implemented by a constructor function, a predicate, and one or more
+field accessors.  <!-- Field accessors are set!-able, that is, they
+may be used to both set and retrieve the contents of message data
+fields. -->
+
+<!-- pre>
+(define mm (make-note-on 2 70 120))
+(note-on-key mm)
+70
+(set! (note-on-key mm) 60)
+(note-on-key mm)
+60
+</pre -->
+
+Some message types, such as System Exclusive and Meta messages, are
+implemented as composite data. Constructors for these types return two
+values: a message and a vector of message data bytes.
+
+<h3 id="message_utilities">Message Utility Functions</h3>
+
+<p>
+</p>
+
+<dl class="dictsyntax" id="midi-copy-message">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midi-copy-message</code> <var>msg</var> {<var>keyword value</var>}*<code>)</code></dd>
+</dl>
+<p>
+Returns a copy of <var>msg</var> with fields altered according to
+keyword arguments.
+</p>
+
+<p id="args"><code class="entry">midi-copy-message</code> supports the
+following keyword arguments:
+
+<p id="args"><code class="entry">
+
+<dl>
+<dt><code class="keyword">:opcode</code> <var>byte</var>
+<dd>An optional new status opcode for the copied message.</dd>
+
+<dt><code class="keyword">:channel</code> <var>byte</var>
+<dd>An optional new channel value for the copied message.</dd>
+
+<dt><code class="keyword">:data1</code> <var>byte</var>
+<dd>An optional new  value for upper data byte the copied message.</dd>
+
+<dt><code class="keyword">:data2</code> <var>byte</var>
+<dd>An optional new value for lower data byte the copied message.</dd>
+</dl>
+
+<h4>Examples:</h4>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Copying MIDI messages.
+</p>
+<pre class="code">
+(<span class="special">define</span> <span class="defined">m1</span> (<a href="#make-note-on">make-note-on</a> 0 20 90))
+
+(<span class="special">define</span> <span class="defined">m2</span> (midi-copy-message m1 <span class="keyword">:data1</span> 73))
+
+(<a href="#midi-print-message">midi-print-message</a> m2)
+#&lt;Note-On 0 73 90&gt;
+<span class="result">&rArr;</span> 156890
+
+(<span class="special">define</span> <span class="defined">m3</span> (midi-copy-message</a> m2 <span class="keyword">:data1</span> 73 <span class="keyword">:opcode</span> #b1000 <span class="keyword">:data2</span> 127))
+
+(<a href="#midi-print-message">midi-print-message</a> m3)
+#&lt;Note-Off 0 73 127&gt;
+<span class="result">&rArr;</span> 140543
+</pre>
+</div>
+
+<dl class="dictsyntax" id="midi-print-message">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midi-print-message</code> <var>msg</var> [<var>time</var>]<code>)</code></dd>
+</dl>
+
+<p>
+Prints <var>msg</var> and an optional <var>time</var> value. Returns <var>msg</var> as its value.
+</p>
+
+</dl>
+<h4>Example:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Printing MIDI messages.
+</p>
+<pre class="code">
+(midi-print-message (<a href="#make-note-on">make-note-on</a> 0 60 90) )
+#&lt;Note-On 0 60 90&gt;
+<span class="result">&rArr;</span> 155226
+(midi-print-message (<a href="#make-note-off">make-note-off</a> 9 60 90) 1000)
+    1000 #&lt;Note-Off P <span class="string">"hi-bongo"</span> 90&gt;
+<span class="result">&rArr;</span> 2514522
+(midi-print-message (<a href="#make-program-change">make-program-change</a> 2 45))
+#&lt;Program-Change 2 <span class="string">"pizzicato-strings"</span>&gt;
+<span class="result">&rArr;</span> 726656
+(midi-print-message (<a href="#make-control-change">make-control-change</a> 0 +sustain+ 60))
+#&lt;Control-Change 0 <span class="string">"hold-1"</span> 60&gt;
+<span class="result">&rArr;</span> 188476
+</pre>
+</div>
+
+<h3 id="message-functions">Message Constructors, Predicates and Accessors</h3>
+
+<a name="channel_messages"></a>
+<h4 id=>Channel Messages</h4>
+<p>
+Channel messages encode the performance information sent to particular
+instruments on the synthesizer.
+</p>
+
+<!-- <h4>Generic Message Predicates and Accessors</h4>
+
+<a name="midi-channel-message-p"></a> 
+<a name="midi-system-message-p"></a>
+<a name="midi-meta-message-p"></a>
+<a name="midi-message-data1"></a>
+<a name="midi-message-data2"></a>
+
+<p>
+<code>(</code><code class="entry">midi-channel-message-p</code> <I>message</I><code>)</code><br/>
+<code>(</code><code class="entry">midi-system-message-p</code> <var>message</var><code>)</code><br/>
+<code>(</code><code class="entry">midi-meta-message-p</code> <var>message</var><code>)</code><br/>
+
+<code>(</code><code class="entry">midi-message-data1</code> <var>message</var><code>)</code><br/>
+<code>(</code><code class="entry">midi-message-data2</code> <var>message</var><code>)</code>
+</p>
+
+<a name="channel_messages"></a>
+<h4>Channel Messages</h4>
+
+<p>Channel messages define the basic device operations in MIDI.</p>
+-->
+
+<h5>All Channel Messages</h5>
+
+<dl class="dictsyntax" id="make-channel-message">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-channel-message</code> <var>opcode channel data1</var> . <var>data2</var><code>)</code><br/></dd>
+</dl>
+<dl class="dictsyntax" id="channel-message-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-message-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="channel-message-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-message-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="channel-message-opcode">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-message-opcode</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="channel-message-data1">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-message-data1</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="channel-message-data2">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-message-data2</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Note-On</h5>
+
+<dl class="dictsyntax" id="make-note-on">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-note-on</code> <var>channel key velocity</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-on-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-on-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-on-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-on-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-on-key""note-on-key">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-on-key</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-on-velocity">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-on-velocity</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Note-Off</h5>
+
+<dl class="dictsyntax" id="make-note-off">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-note-off</code> <var>channel key velocity</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-off-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-off-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-off-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-off-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-off-key">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-off-key</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="note-off-velocity">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">note-off-velocity</code> <var>message</var></dd>
+</dl>
+</p>
+
+<h5>Key Pressure (Aftertouch)</h5>
+
+<dl class="dictsyntax" id="make-key-pressure">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-key-pressure</code> <var>channel key pressure</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="key-pressure-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">key-pressure-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="key-pressure-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">key-pressure-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="key-pressure-key">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">key-pressure-key</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="key-pressure-pressure">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">key-pressure-pressure</code> <var>message</var><code>)</code></dd>
+</dl>
+
+
+<h5>Control Change</h5>
+
+
+<dl class="dictsyntax" id="make-control-change">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-control-change</code> <var>channel controller value</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="control-change-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">control-change-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="control-change-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">control-change-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="control-change-controller">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">control-change-controller</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="control-change-value">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">control-change-value</code> <var>message</var></dd>
+</dl>
+
+<h5>Program Change</h5>
+
+<dl class="dictsyntax" id="make-program-change">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-program-change</code> <var>channel program</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="program-change-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">program-change-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="program-change-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">program-change-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="program-change-program">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">program-change-program</code> <var>message</var><code>)</code></dd>
+</dl>
+
+
+<h5>Channel Pressure</h5>
+
+
+<dl class="dictsyntax" id="make-channel-pressure">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-channel-pressure</code> <var>channel pressure</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="channel-pressure-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-pressure-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="channel-pressure-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-pressure-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="channel-pressure-pressure">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">channel-pressure-pressure</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Pitch-Bend</h5>
+
+
+<dl class="dictsyntax" id="make-pitch-bend">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-pitch-bend</code> <var>channel lsb msb</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="pitch-bend-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pitch-bend-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="pitch-bend-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pitch-bend-channel</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="pitch-bend-lsb">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pitch-bend-lsb</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="pitch-bend-msb">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pitch-bend-msb</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<a name="system_messages"></a>
+<h4>System Messages</h4>
+
+<p>
+System messages are sent to the device (or each device in a
+daisy-chain), as opposed to a specific channel.
+</p>
+
+<h5>All System Messages</h5>
+
+
+<dl class="dictsyntax" id="make-system-message">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-system-message</code> <var>type route</var>  . <var> data1 data2</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="system-message-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">system-message-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="system-message-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">system-message-route</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="system-message-status">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">system-message-status</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="system-message-data1">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">system-message-data1</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="system-message-data2">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">system-message-data2</code> <var>message</var><code>)</code></dd>
+</dl>
+
+
+<h5>System Exclusive</h5>
+
+<p>
+A System Exclusive, or SysEx, message is a message that is specific to one vendor
+or synthesizer. The first one or three data bytes of the sysex specifies the
+vendor. The first one or three data bytes after the start
+tag <code>F0</code> of the sysex specifies the vendor.  If the
+synthesizer recognizes this Manufacturer's ID as its own, it will
+listen to the rest of the message.  Otherwise, the message will be
+ignored.  System Exclusive is used to send bulk dumps such as patch
+parameters and other non-spec data.
+</p>
+
+<dl class="dictsyntax" id="make-sysex">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-sysex</code> <var>route data</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="sysex-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">sysex-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="sysex-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">sysex-route</code> <var>message</var></dd>
+</dl>
+
+<p>
+The <code>make-sysex</code> constructor returns two values, a message bitfield
+indicating a system exclusive message and an array of system exclusive
+data.  <var>data</var> must be either:
+</p>
+<ul>
+<li>A vector of unsigned bytes containing a full system exclusive message enclosed within <code>FO</code> and <code>F7</code> tags</li>
+<li>A polymorphous list of numbers, characters, strings,  lists, vectors, or sequences of these, which will be used to construct the system exclusive message array.
+</li>
+</ul>
+
+
+<h5>MIDI Time Code Quarter Frame</h5>
+
+<dl class="dictsyntax" id="make-mtc-quarter-frame">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-mtc-quarter-frame</code> <var>route tag nibble</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="mtc-quarter-frame-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">mtc-quarter-frame-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="mtc-quarter-frame-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">mtc-quarter-frame-route</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="mtc-quarter-frame-tag">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">mtc-quarter-frame-tag</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="mtc-quarter-frame-nibble">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">mtc-quarter-frame-nibble</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Song Position</h5>
+
+<dl class="dictsyntax" id="make-song-position">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-song-position</code> <var>route lsb msb</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="song-position-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">song-position-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="song-position-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">song-position-route</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="song-position-lsb">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">song-position-lsb</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="song-position-msb">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">song-position-msb</code> <var>message</var><code>)</code></dd>
+</dl>
+				
+<h5>Song Select</h5>
+
+<dl class="dictsyntax" id="make-song-select">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-song-select</code> <var>route song</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="song-select-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">song-select-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="song-select-route""song-select-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">song-select-route</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="song-select-song">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">song-select-song</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Cable Select</h5>
+
+<dl class="dictsyntax" id="make-cable-select">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-cable-select</code> <var>route cable</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="cable-select-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">cable-select-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="cable-select-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">cable-select-route</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="cable-select-cable">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">cable-select-cable</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Tune Request</h5>
+
+<dl class="dictsyntax" id="make-tune-request">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-tune-request</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="tune-request-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">tune-request-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="tune-request-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">tune-request-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>End of Sysex</h5>
+
+<!-- p>
+This message is provided for completeness only and should never be used
+to terminate sysex message data,
+</p -->
+
+<dl class="dictsyntax" id="make-eox">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-eox</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="eox-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">eox-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="eox-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">eox-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Timing Clock</h5>
+
+<dl class="dictsyntax" id="make-timing-clock">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-timing-clock</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="timing-clock-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">timing-clock-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="timing-clock-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">timing-clock-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Timing Tick</h5>
+
+<dl class="dictsyntax" id="make-timing-tick">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-timing-tick</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="timing-tick-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">timing-tick-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="timing-tick-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">timing-tick-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Start, Continue and Stop</h5>
+
+<dl class="dictsyntax" id="make-start">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-start</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="start-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">start-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="start-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">start-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-continue">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-continue</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="continue-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">continue-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="continue-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">continue-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-stop">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-stop</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="stop-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">stop-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="stop-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">stop-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Active Sensing</h5>
+
+<dl class="dictsyntax" id="make-active-sensing">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-active-sensing</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="active-sensing-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">active-sensing-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="active-sensing-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">active-sensing-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>System Reset</h5>
+
+<dl class="dictsyntax" id="make-system-reset">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-system-reset</code> <var>route</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="system-reset-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">system-reset-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="system-reset-route">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">system-reset-route</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<a name="meta_messages"></a>
+<h4>Meta Messages</h4>
+
+<p>
+Meta messages store various sorts of non-event information for MIDI
+tracks and MIDI files.  The meta message constructors return two
+values, a message and an array of unsigned bytes.  Meta messages
+should not be sent to MIDI devices.
+</p> 
+
+<h5>All Meta Messages</h5>
+
+<dl class="dictsyntax" id="make-meta-message">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-meta-message</code> <var>type</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="meta-message-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">meta-message-p</code> <var>message</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="meta-message-type">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">meta-message-type</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Sequence Number</h5>
+
+<dl class="dictsyntax" id="make-sequence-number">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-sequence-number</code> <var>num</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="sequence-number-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">sequence-number-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Text Event</h5>
+
+<dl class="dictsyntax" id="make-text-event">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-text-event</code> <var>string</var> . <var>type</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="text-event-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">text-event-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-copyright-note">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-copyright-note</code> <var>string</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="copyright-note-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">copyright-note-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-sequence_track-name">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-sequence/track-name</code> <var>string</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="sequence_track-name-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">sequence/track-name-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-instrument-name">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-instrument-name</code> <var>string</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="instrument-name-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">instrument-name-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-lyric">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-lyric</code> <var>string</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="lyric-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">lyric-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-marker">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-marker</code> <var>string</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="marker-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">marker-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<dl class="dictsyntax" id="make-cue-point">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-cue-point</code> <var>string</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="cue-point-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">cue-point-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>MIDI Channel</h5>
+
+<dl class="dictsyntax" id="make-midi-channel">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-midi-channel</code> <var>channel</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="midi-channel-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midi-channel-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>MIDI Port</h5>
+
+<dl class="dictsyntax" id="make-midi-port">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-midi-port</code> <var>port</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="midi-port-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midi-port-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>End of Track</h5>
+
+<dl class="dictsyntax" id="make-eot">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-eot</code><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="eot-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">eot-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Tempo Change</h5>
+
+<dl class="dictsyntax" id="make-tempo-change">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-tempo-change</code> <var>usec</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="tempo-change-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">tempo-change-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>SMPTE Offset</h5>
+
+<dl class="dictsyntax" id="make-smpte-offset">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-smpte-offset</code> <var>hours mins secs frames fractional-frames</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="smpte-offset-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">smpte-offset-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Time Signature</h5>
+
+<p>
+<var>Denominator</var> is a negative power of 2.  <var>clocks</var>
+expresses the number of MIDI clocks per metronome click
+and <var>32nds</var> the number of notated 32nd notes in a MIDI
+quarter note (i.e., 24 MIDI clocks).  This event allows a program to
+relate what MIDI thinks of as a quarter to any desired value.
+</p>
+
+<dl class="dictsyntax" id="make-time-signature">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-time-signature</code> <var>numerator denominator</var> . <var>clocks 32nds</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="time-signature-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">time-signature-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+<h5>Key Signature</h5>
+
+<p>
+<var>Key</var> is either a number between -7 and 7 representing the number of
+  flats (-) or sharps (+) in the key signature or a note symbol such as 
+<code>c</code>, <code>cf</code>, <code>cs</code> etc. indicating the tonic.  
+  <var>mode</var> is either <code>:major</code> (the default) or <code>:minor</code>.
+</p>
+
+<dl class="dictsyntax" id="make-key-signature">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-key-signature</code> <var>key mode</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="key-signature-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">key-signature-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+
+<h5>Sequencer Event</h5>
+
+<dl class="dictsyntax" id="make-sequencer-event">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">make-sequencer-event</code> . <var>data</var><code>)</code></dd>
+</dl>
+<dl class="dictsyntax" id="sequencer-event-p">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">sequencer-event-p</code> <var>message</var><code>)</code></dd>
+</dl>
+
+
+<h2 id="constants-and-variables">MIDI Values</h2>
+
+<p>
+Common Music provides numerous constants and variables that
+ symbolically encode common MIDI values such as program changes and
+ controller values.
+</p>
+
+
+<h3>General MIDI (GM) Values</h3>
+
+<h4>GM Program Changes</h4>
+
+<dl>
+<dt>Piano (0-7)</dt>
+<dd><p><code class="entry">+acoustic-grand-piano+ +bright-acoustic-piano+ +electric-grand-piano+ +honky-tonk-piano+ +electric-piano-1+ +electric-piano-2+ +harpsichord+ +clavi+</code></dd>
+
+<dt>Chromatic Percussion (8-15)</dt>
+<dd><p><code class="entry">+celesta+ +glockenspiel+ +music-box+ +vibraphone+ +marimba+ +xylophone+ +tubular-bells+ +dulcimer+</code></p></dd>
+
+<dt>Organ (16-23)</dt>
+<dd><p><code class="entry">+drawbar-organ+ +percussive-organ+ +rock-organ+ +church-organ+ +reed-organ+ +accordion+ +harmonica+ +tango-accordion+</code></p></dd>
+
+<dt>Guitar (24-31)</dt>
+<dd><p><code class="entry">+acoustic-guitar-nylon+ +acoustic-guitar-steel+ +electric-guitar-jazz+ +electric-guitar-clean+ +electric-guitar-muted+ +overdriven-guitar+ +distortion-guitar+ +guitar-harmonics+</code></p></dd>
+
+<dt>Bass (32-39)</dt>
+<dd><p><code class="entry">+acoustic-bass+ +electric-bass-finger+ +electric-bass-pick+ +fretless-bass+ +slap-bass-1+ +slap-bass-2+ +synth-bass-1+ +synth-bass-2+</code></p></dd>
+
+<dt>Solo strings (40-47)</dt>
+<dd><p><code class="entry"> +violin+ +viola+ +cello+ +contrabass+ +tremolo-strings+ +pizzicato-strings+ +orchestral-strings+ +timpani+</code></p></dd>
+
+<dt>Ensemble (48-55)</dt>
+<dd><p><code class="entry">+string-ensemble-1+ +string-ensemble-2+ +synthstrings-1+ +synthstrings-2+ +choir-aahs+ +voice-oohs+ +synth-voice+ +orchestra-hit+</code></p></dd>
+
+<dt>Brass (56-63)</dt>
+<dd><p><code class="entry">+trumpet+ +trombone+ +tuba+ +muted-trumpet+ +french-horn+ +brass-section+ +synthbrass-1+ +synthbrass-2+</code></p></dd>
+
+<dt>Reed (64-71)</dt>
+<dd><p><code class="entry">+soprano-sax+ +alto-sax+ +tenor-sax+ +baritone-sax+ +oboe+ +english-horn+ +bassoon+ +clarinet+</code></p></dd>
+
+<dt>Pipe (72-79)</dt>
+<dd><p><code class="entry">+piccolo+ +flute+ +recorder+ +pan-flute+ +blown-bottle+ +skakuhachi+ +whistle+ +ocarina+</code></p></dd>
+
+<dt>Synth Lead (80-87)</dt>
+<dd><p><code class="entry">+lead-1-square+ +lead-2-sawtooth+ +lead-3-calliope+ +lead-4-chiff+ +lead-5-charang+ +lead-6-voice+ +lead-7-fifths+ +lead-8-bass+lead+</code></p></dd>
+
+<dt>Synth Pad (88-95)</dt>
+<dd><p><code class="entry">+pad-1-new-age+ +pad-2-warm+ +pad-3-polysynth+ +pad-4-choir+ +pad-5-bowed+ +pad-6-metallic+ +pad-7-halo+ +pad-8-sweep+</code></p></dd>
+
+<dt>Synth Effects (96-103)</dt>
+<dd><p><code class="entry">+fx-1-rain+ +fx-2-soundtrack+ +fx-3-crystal+ +fx-4-atmosphere+ +fx-5-brightness+ +fx-6-goblins+ +fx-7-echoes+ +fx-8-sci-fi+</code></p></dd>
+
+<dt>Ethnic (104-111)</dt>
+<dd><p><code class="entry">+sitar+ +banjo+ +shamisen+ +koto+ +kalimba+ +bagpipe+ +fiddle+ +shanai+</code></p></p></dd>
+
+<dt>Percussive (112-119)</dt>
+<dd><p><code class="entry">+tinkle-bell+ +agogo+ +steel-drums+ +woodblock+ +taiko-drum+ +melodic-tom+ +synth-drum+ +reverse-cymbal+</code></p></p></dd>
+
+<dt>Sound Effects (120-127)</dt>
+<dd><p><code class="entry">+guitar-fret-noise+ +breath-noise+ +seashore+ +bird-tweet+ +telephone-ring+ +helicopter+ +applause+ +gunshot+</code></p></dd>
+</dl>
+
+<h4>GM Drum Map</h4>
+<p>
+The GM drum map on channel 9 (zero-based counting) maps key numbers
+35-81 to the following sounds:
+</p>
+
+<blockquote>
+<code class="entry">+acoustic-bass-drum+ +bass-drum-1+ +side-stick+ +acoustic-snare+ +hand-clap+ +electric-snare+ +low-floor-tom+ +closed-hi-hat+ +high-floor-tom+ +pedal-hi-hat+ +low-tom+ +open-hi-hat+ +low-mid-tom+ +hi-mid-tom+ +crash-cymbal-1+ +high-tom+ +ride-cymbal-1+ +chinese-cymbal+ +ride-bell+ +tambourine+ +splash-cymbal+ +cowbell+ +crash-cymbal-2+ +vibraslap+ +ride-cymbal-2+ +hi-bongo+ +low-bongo+ +mute-hi-conga+ +open-hi-conga+ +low-conga+ +high-timbale+ +low-timbale+ +high-agogo+ +low-agogo+ +cabasa+ +maracas+ +short-whistle+ +long-whistle+ +short-guiro+ +long-guiro+ +claves+ +hi-wood-block+ +low-wood-block+ +mute-cuica+ +open-cuica+ +mute-triangle+ +open-triangle+</code>
+</blockquote>
+
+<h3>Controller Values</h3>
+
+<p>The following standard controller and Registered Parameter Numbers
+(RPNs) are defined:
+</p>
+
+<dl>
+<dt>Specific Coarse Controllers</dt>
+<dd><p><code class="entry">+bank-select+ +modulation-wheel+ +breath-control+ +foot-controller+  +portamento-time+ +data-entry+ +channel-volume+ +volume+ +balance+ +pan+ +expression-controller+ +effect-control-1+ +effect-control-2+ +general-purpose-controller-1+ +general-purpose-controller-2+ +general-purpose-controller-3+ +general-purpose-controller-4+</code></p></dd>
+
+<dt>Specific Fine Controllers</dt>
+<dd><p><code class="entry">+bank-select-fine+ +modulation-wheel-fine+ +breath-control-fine+ +foot-controller-fine+ +portamento-time-fine+ +data-entry-fine+ +channel-volume-fine+ +volume-fine+ +balance-fine+ +pan-fine+ +expression-controller-fine+ +effect-control-1-fine+ +effect-control-2-fine+ +general-purpose-controller-1-fine+ +general-purpose-controller-2-fine+ +general-purpose-controller-3-fine+ +general-purpose-controller-4-fine+</code></p></dd>
+
+<dt>Common Switches</dt>
+<dd><p><code class="entry">+sustain+ +portamento+ +sostenuto+ +soft-pedal+ +legato-footswitch+ +hold-2+</code></p></dd>
+
+<dt>Sound Controllers</dt>
+<dd><p><code class="entry">+sound-variation+ +sound-timbre+ +sound-release-time+ +sound-attack-time+ +sound-brightness+ +portamento-control+</code></p></dd>
+
+<dt>Level Controller</dt>
+<dd><p><code class="entry">+effects-level+ +tremolo-level+ +chorus-level+ +detune-level+ +phasor-level+</code></p></dd>
+
+<dt>Data Entry Step Controllers</dt>
+<dd><p><code class="entry">+data-entry-increment+ +data-entry-decrement+</code></p></dd>
+
+<dt>Parameter Number Selection</dt>
+<dd><p><code class="entry">+non-registered-parameter-number-fine+ +non-registered-parameter-number+ +registered-parameter-number-fine+ +registered-parameter-number+</code></p></dd>
+
+<dt>Channel Mode Messages</dt>
+<dd><p><code class="entry">+all-sound-off+ +reset-all-controllers+ +local-control+ +all-notes-off+ +omni-mode-off+ +omni-mode-on+ +poly-mode-on/off+ +poly-mode-on+</code></p></dd>
+
+<dt>Registered Parameter Numbers</dt>
+<dd><p><code class="entry">+rpn-pitch-bend-sensitivity+ +rpn-fine-tuning+ +rpn-coarse-tuning+ +rpn-reset+</code></p></dd>
+</dl>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

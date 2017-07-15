@@ -1,0 +1,211 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>play</title>
+</head>
+<body>
+<div id="content">
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">play</code> <var>file</var> {<var>keyword</var> <var>value</var>}<code>)</code></dd>
+</dl>
+
+<p>
+Plays <var>file</var> in a manner appropriate for the file type (extension) of <var>file</var>.
+
+</p>
+
+<p id="args"><code class="entry">play</code> supports the following keyword arguments for all file types:
+</p>
+
+<dl>
+
+<dt>
+<code class="keyword">:play</code> <var>boolean</var>
+</dt>
+<dd>If true, file is played otherwise it is not. The default value is true.</dd>
+
+<dt>
+<code class="keyword">:verbose</code> <var>boolean</var> 
+</dt>
+<dd>If true then the play command is printed to the terminal before it
+is executed. The default value is false.</dd>
+
+<dt>
+<code class="keyword">:wait</code> <var>boolean</var> 
+</dt>
+<dd>If true then play waits for the playing process to complete before returning, otherwise it does not wait. The default value is false.
+</dd>
+</dl>
+
+<p>
+Other keyword arguments may be available depending on the type of <var>file</var>:
+</p>
+
+<dl>
+<dt><a href="audio-file-cls.html"><code>audio-file</code></a> (.aiff, .wav, .snd)</dt>
+<dd>
+<p>
+If CLM is loaded then <code>play</code> passes <var>file</var> directly to <code>dac</code> along with any of the following keyword arguments:
+</p>
+
+<dl>
+<dt><code class="keyword">:start</code> <var>number</var></dt>
+<dd>The time in <var>file</var> to start playback.</dd>
+<dt><code class="keyword">:end</code> <var>number</var></dt>
+<dd>The time in <var>file</var> to stop playback.</dd>
+</dl>
+
+<p>
+If CLM is not loaded then <code>play</code> executes the shell command
+string <code>*audio-player*</code> to play <var>file</var>. CM
+attempts to provide a valid audio player command for each operating
+system:
+</p>
+<ul>
+
+<li>OS X: /usr/local/bin and /usr/bin are tested
+for <code>sndplay</code>, <a
+href="http://home.earthlink.net/~rainbowflight/"><code>qtplay</code</a> else <code>open</code>.</li>
+
+<li>Unix, Linux, Cygwin: /usr/local/bin and /usr/bin tested
+for <code>sndplay</code></li>
+
+<li>Windows: \Program Files\Windows Media Player\mplayer2.exe</li>
+
+</ul>
+<p>The <code>*audio-player*</code> variable can be reset to a different
+player in a ~/.cminit.lisp initialization file.</p>
+</dd>
+
+<dt><a href="clm-file-cls.html">clm-file</a> (.clm)</dt>
+<dd>
+<p>
+Passes <var>file</var> to <code>clm-load</code> along with any keyword
+arguments specfied to <code>play</code>.
+</p> 
+</dd>
+
+<dt><a href="midi-file-cls.html">midi-file</a> (.mid, .midi)</dt>
+<dd>
+<p>
+Executes the shell command string <code>*midi-player*</code> to
+play <var>file</var>. CM attempts to provide a valid MIDI player
+command for each operating system:
+</p>
+
+<ul>
+<li>OS X: /usr/local/bin and /usr/bin tested for <a
+href="http://home.earthlink.net/~rainbowflight/"><code>qtplay</code</a>, <code>open</code>.</li>
+<li>Unix, Linux, Cygwin: /usr/local/bin and /usr/bin tested for <code>timidity</code></li>
+<li>Windows: \Program Files\Windows Media Player\mplayer2.exe</li>
+</ul>
+
+<p>The <code>*midi-player*</code> variable can be reset to a different
+player in a ~/.cminit.lisp initialization file.</p>
+
+</dd>
+
+<dt><a href="sc-file-cls.html">sc-file</a> (.osc)</dt>
+<dd>
+<p>
+Executes the shell command string <code>*scsynth*</code> and passes
+it <var>file</var> and any keyword value supported by <a
+href="sc-file-cls.html">sc-file</a>. 
+
+<p>
+CM attempts to find a valid <code>*scsynth*</code> command for each
+operating system:
+</p>
+
+<ul>
+<li>OS X: /Applications/SuperCollider3 or
+/Applications/SuperCollider_f tested for <code>scsynth</code>.
+<li>Unix, Linux, Cygwin: /usr/local/bin and /usr/bin tested for <code>scsynth</code></li>
+<li>Windows: \Program Files\SuperCollider3\scsynth.exe</li>
+</ul>
+
+<p>
+If the SC environment variables SC_PLUGIN_PATH and SC_SYNTHDEF_PATH
+are not set then CM attempts to set them using the values of
+of <code>*sc-synthdef-path*</code>
+and <code>*sc-plugin-path*</code>. The <code>*scsynth*</code>, <code>*sc-plugin-path*</code>
+and <code>*sc-synthdef-path*</code> variables can be reset in a
+~/.cminit.lisp initialization file.
+</p>
+
+</dd>
+
+<dt><a href="sco-file-cls.html">sco-file</a> (.sco)</dt>
+<dd>
+<p>
+Executes the shell command string <code>*csound*</code> and
+passes it <var>file</var> and any of the following keyword values:
+</p>
+
+<dl>
+<dt> <code class="keyword">:orchestra</code> <var>orcfile</var> </dt>
+<dd>
+The .orc file to use. If <var>orcfile</var> does not contain a directory component it defaults to the same directory as <var>file</var>.
+</dd>
+<dt><code class="keyword">:output</code> <var>sndfile</var></dt>
+<dd>
+The sound file for Csound to write.  If <var>sndfile</var> does not
+contain a directory component it defaults to the same directory
+as <var>file</var>.
+</dd>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Playing a MIDI file.
+</p>
+<pre class="code">
+(play <span class="string">"test.mid"</span>)
+<span class="result">&rArr;</span> <span class="string">"test.mid"</span>
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Playing CLM score and audio files:
+</p>
+<pre class="code">
+(play <span class="string">"test.clm"</span> <span class="keyword">:srate</span> 44100 <span class="keyword">:output</span> <span class="string">"foo.aiff"</span> <span class="keyword">:channels</span> 2)
+<span class="result">&rArr;</span> <span class="string">"test.clm"</span>
+(play <span class="string">"test.aiff"</span> <span class="keyword">:start</span> 4 <span class="keyword">:verbose</span> #t)
+<span class="result">&rArr;</span> <span class="string">"test.aiff"</span>
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 3.</span> Playing a Csound score file.
+</p>
+<pre class="code">
+(play <span class="string">"test.sco"</span> <span class="keyword">:orchestra</span> <span class="string">"beep.orc"</span> <span class="keyword">:output</span> <span class="string">"beep.aiff"</span>)
+<span class="result">&rArr;</span> <span class="string">"test.sco"</span>
+</pre>
+</div>
+
+
+<h4>See also:</h4>
+<ul>
+<li><a href="events-fn.html"><code>events</code></a> [Function]</li>
+</ul>
+
+</div>
+<hr class="inv"/>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

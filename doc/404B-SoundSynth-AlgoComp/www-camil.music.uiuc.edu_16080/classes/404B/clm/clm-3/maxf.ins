@@ -1,0 +1,333 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  maxf.ins
+;;  This is Max Mathews (mvm) new filter (2002)
+;;  High-Q, 2-Integrator, filter with
+;;  Two Poles, and one Zero at the Origin
+;;
+;; It synthesizes equal-tempered frequencies
+;; integer \& just scales out of a wide-band input
+;; signal.
+;; Based on  Max's code (filter.cpp)
+;;
+;;  This heuristic might be called Modal Synthesis.
+;;  But as well it can also be  additive synthesis in
+;;  which a resonator is  initialized to generate the
+;;  exponentially decaying sinusoids at the desired
+;;  phase.
+;;
+;;   This implementation written by Juan Reyes with dsp 
+;;   assistance from JOS.
+;;   This  version Oct-30, 2002
+;;
+;;   Change gain(att) of input file if clipping
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(def-clm-struct mvm (yy2 0.00) (yy1 0.0)  (zz2 0.0) (zz1 0.0)
+  (pp1 0.0) (pp2 0.0) (pp3 0.0) (out 0.0))
+;;
+;;
+(defmacro mvmfilt (b sample0)
+  `(let ((sample ,sample0))
+     ;;
+     (setf (mvm-yy2 ,b) (- (+ (* (mvm-pp1 ,b) (mvm-yy1 ,b))
+			      (* (mvm-pp2 ,b) (mvm-zz1 ,b)))
+			   (* (mvm-pp3 ,b) sample)))
+     (setf (mvm-zz2 ,b) (- (mvm-zz1 ,b) (* (mvm-pp2 ,b) (mvm-yy2 ,b))))
+     (setf (mvm-zz1 ,b) (mvm-zz2 ,b))
+     (setf (mvm-yy1 ,b) (mvm-yy2 ,b))
+     (setf (mvm-out ,b) (mvm-yy1 ,b))
+     ))
+;;
+;;
+(defmacro set-coeffs (nom ampl frequ decaying)
+  `(let* ((b ,nom)
+	 (famp ,ampl)
+	 (ffreq ,frequ)
+	 (fdecay ,decaying)
+	 (tper (/ 1 *srate*))
+	 (centerfreq (/ (* 2.0 pi ffreq)) *srate*)
+	 (maxdecay (/ (* 2 tper) (* centerfreq centerfreq)))
+	 (mindecay (/ tper centerfreq))
+	 )
+     ;;
+     ;; Conditions for JOS constraints
+     ;; maxdecay: Filter may be unstable
+     ;; mindecay: Filter may not oscillate
+     ;;
+     
+     (if (>= fdecay maxdecay)
+	 (progn
+	   (setf fdecay (- maxdecay 0.0)))
+       (setf fdecay (* 1 fdecay)))
+     (if (<= fdecay mindecay)
+	 (progn
+	   (setf fdecay (+ mindecay 0.0))))
+					;
+     (setf (mvm-pp1 b) (- 1.0 (/ 2.0  (* fdecay *srate*))))
+     (setf (mvm-pp2 b) (/ (* 2.0 pi ffreq) *srate*))
+     (setf (mvm-pp3 b) (* (mvm-pp2 b) famp))
+     ;;
+     ))
+;;
+(definstrument maxfilter (file beg 
+			       &key
+			       (att 1) ; in-file attenuation 
+			       (numf 1) ; one filter
+			       ;;(numf 9)	; 9 Filters
+			       ;;(numf 12); 12 Filters
+			       ;;(numf 13); 13 Filters
+			       ;;(numf 4); 4 Filters
+			       (freqfactor 1)
+			       (amplitude 1.0)
+			       (amp-env '(0 1 100 1))
+			       )
+  (let ((infile (open-input* file)))
+    (when infile
+      (unwind-protect
+	  (let* ((st (floor (* beg *srate*)))
+		 (dur (sound-duration file))
+		 (rdA (make-readin infile :channel 0))
+		 (formfil (make-mvm)) ;; make set of points and assign to form-filter
+		 (ampf (make-env amp-env amplitude dur))
+		 (state-0 (make-array '(1 3) :initial-element 0.0d0))
+		 (state-1 (make-array '(12 3) :initial-element 0.0d0))
+		 (state-2 (make-array '(9 3) :initial-element 0.0d0))
+		 (state-3 (make-array '(13 3) :initial-element 0.0d0))
+		 (state-4 (make-array '(4 3) :initial-element 0.0d0))
+		 (state-5 (make-array '(2 3) :initial-element 0.0d0))
+		 (end (+ st (floor (* *srate* dur)))))
+	    ;;
+	    ;;
+	    (cond ((= numf 1)
+		   (progn
+		     (format t ";;;; state0 (default):  One filter ~%")
+		     (setf (aref state-0 0 0) 7.54e-002)
+		     (setf (aref state-0 0 1) (* 2000 freqfactor))
+		     (setf (aref state-0 0 2) 2)
+		     ))
+					;
+		  ((= numf 2)
+		   (progn
+		     (format t ";;;; state5:  Two filters ~%")
+		     (setf (aref state-5 0 0) 7.54e-003)
+		     (setf (aref state-5 0 1) (* 200 freqfactor))
+		     (setf (aref state-5 0 2) 4)
+		     (setf (aref state-5 1 0) 7.54e-004)
+		     (setf (aref state-5 1 1) (* 800 freqfactor))
+		     (setf (aref state-5 1 2) 1)
+		     ))
+					;
+		  ((= numf 9)
+		   (progn
+		     (format t ";;;; state2:   Streached overtone string 9 filters ~%")
+		     (setf (aref state-2 0 0) 1.07e-002)
+		     (setf (aref state-2 0 1) 100)
+		     (setf (aref state-2 0 2) 2.5)
+					;
+		     (setf (aref state-2 1 0) 1.07e-002)
+		     (setf (aref state-2 1 1) 202)
+		     (setf (aref state-2 1 2) .75)
+					;
+		     (setf (aref state-2 2 0) 1.07e-002)
+		     (setf (aref state-2 2 1) 305)
+		     (setf (aref state-2 2 2) .5)
+					;
+		     (setf (aref state-2 3 0) 7.077e-003)
+		     (setf (aref state-2 3 1) 408)
+		     (setf (aref state-2 3 2) .4)
+					;
+		     (setf (aref state-2 4 0) 1.07e-002)
+		     (setf (aref state-2 4 1) 501)
+		     (setf (aref state-2 4 2) .3)
+					;
+		     (setf (aref state-2 5 0) 1.07e-002)
+		     (setf (aref state-2 5 1) 612)
+		     (setf (aref state-2 5 2) .25)
+					;
+		     (setf (aref state-2 6 0) 1.07e-003)
+		     (setf (aref state-2 6 1) 715)
+		     (setf (aref state-2 6 2) .25)
+					;
+		     (setf (aref state-2 7 0) 1.07e-002)
+		     (setf (aref state-2 7 1) 817)
+		     (setf (aref state-2 7 2) .2)
+					;
+		     (setf (aref state-2 8 0) 1.07e-002)
+		     (setf (aref state-2 8 1) 920)
+		     (setf (aref state-2 8 2) .18)
+		     ))
+					;
+		   ((= numf 12)
+		   (progn
+		     (format t ";;;; state1:    Risset bell long 12 filters ~%")  
+		     (setf (aref state-1 0 0) 5.025e-002)
+		     (setf (aref state-1 0 1) 224)
+		     (setf (aref state-1 0 2) 3.7)
+					;
+		     (setf (aref state-1 1 0) 5.025e-002)
+		     (setf (aref state-1 1 1) 225)
+		     (setf (aref state-1 1 2) 3.3)
+					;
+		     (setf (aref state-1 2 0) 5.025e-002)
+		     (setf (aref state-1 2 1) 368)
+		     (setf (aref state-1 2 2) 2.8)
+					;
+		     (setf (aref state-1 3 0) 5.025e-002)
+		     (setf (aref state-1 3 1) 369)
+		     (setf (aref state-1 3 2) 2.4)
+					;
+		     (setf (aref state-1 4 0) 1.047e-002)
+		     (setf (aref state-1 4 1) 476)
+		     (setf (aref state-1 4 2) 1.9)
+		     
+		     (setf (aref state-1 5 0) 5.025e-002)
+		     (setf (aref state-1 5 1) 680)
+		     (setf (aref state-1 5 2) 1.7)
+					;
+		     (setf (aref state-1 6 0) 5.025e-002)
+		     (setf (aref state-1 6 1) 800)
+		     (setf (aref state-1 6 2) 1.5)
+					;
+		     (setf (aref state-1 7 0) 4.05e-002)
+		     (setf (aref state-1 7 1) 1096)
+		     (setf (aref state-1 7 2) 1.1)
+					;
+		     (setf (aref state-1 8 0) 4.05e-002)
+		     (setf (aref state-1 8 1) 1099)
+		     (setf (aref state-1 8 2) .9)
+					;
+		     (setf (aref state-1 9 0) 4.05e-002)
+		     (setf (aref state-1 9 1) 1200)
+		     (setf (aref state-1 9 2) .6)
+					;
+		     (setf (aref state-1 10 0) 3.78e-002)
+		     (setf (aref state-1 10 1) 1504)
+		     (setf (aref state-1 10 2) .4)
+					;
+		     (setf (aref state-1 11 0) 4.05e-002)
+		     (setf (aref state-1 11 1) 1628)
+		     (setf (aref state-1 11 2) .3)
+		     ))
+					;
+		   ((= numf 13)
+		   (progn
+		     (format t ";;;;  state3:   Open major chord with repeated octave  12 filters ~%")
+		     (setf (aref state-3 0 0) 5.025e-002)
+		     (setf (aref state-3 0 1) 100)
+		     (setf (aref state-3 0 2) 2)
+					;
+		     (setf (aref state-3 1 0) 5.025e-002)
+		     (setf (aref state-3 1 1) 251)
+		     (setf (aref state-3 1 2) 2)
+					;
+		     (setf (aref state-3 2 0) 5.025e-002)
+		     (setf (aref state-3 2 1) 299)
+		     (setf (aref state-3 2 2) 2)
+					;
+		     (setf (aref state-3 3 0) 5.025e-002)
+		     (setf (aref state-3 3 1) 401)
+		     (setf (aref state-3 3 2) 2)
+					;
+		     (setf (aref state-3 4 0) 5.025e-002)
+		     (setf (aref state-3 4 1) 199)
+		     (setf (aref state-3 4 2) 2)
+					;
+		     (setf (aref state-3 5 0) 5.025e-002)
+		     (setf (aref state-3 5 1) 501)
+		     (setf (aref state-3 5 2) 2)
+					;
+		     (setf (aref state-3 6 0) 5.025e-002)
+		     (setf (aref state-3 6 1) 599)
+		     (setf (aref state-3 6 2) 2)
+					;
+		     (setf (aref state-3 7 0) 5.025e-002)
+		     (setf (aref state-3 7 1) 801)
+		     (setf (aref state-3 7 2) 2)
+					;
+		     (setf (aref state-3 8 0) 5.025e-002)
+		     (setf (aref state-3 8 1) 201)
+		     (setf (aref state-3 8 2) 2)
+					;
+		     (setf (aref state-3 9 0) 5.025e-002)
+		     (setf (aref state-3 9 1) 749)
+		     (setf (aref state-3 9 2) 2)
+					;
+		     (setf (aref state-3 10 0 ) 5.025e-002)
+		     (setf (aref state-3 10 1) 900)
+		     (setf (aref state-3 10 2) 2)
+					;
+		     (setf (aref state-3 11 0) 5.025e-004)
+		     (setf (aref state-3 11 1) 1205)
+		     (setf (aref state-3 11 2) 2)
+					;
+		     (setf (aref state-3 12 0) 5.025e-004)
+		     (setf (aref state-3 12 1) 1205)
+		     (setf (aref state-3 12 2) 2)
+		     ))
+					;
+		   ((= numf 4)
+		    (progn
+		      (format t ";;;; State4:   Four filters ~%")
+		      (setf (aref state-4 0 0) 7.54e-002)
+		      (setf (aref state-4 0 1) (* 1000 freqfactor ))
+		      (setf (aref state-4 0 2) 0.5)
+					;
+		      (setf (aref state-4 1 0) 3.225e-002)
+		      (setf (aref state-4 1 1) (* 400 freqfactor))
+		      (setf (aref state-4 1 2) 3.0)
+					;
+		     (setf (aref state-4 2 0) 1.14e-002)
+		     (setf (aref state-4 2 1) (* 800 freqfactor))
+		     (setf (aref state-4 2 2) 2.8)
+					;
+		     (setf (aref state-4 3 0) 7.54e-002)
+		     (setf (aref state-4 3 1) (* 1600 freqfactor))
+		     (setf (aref state-4 3 2) 1.0)
+		     ))
+					;
+		   (t
+		    (progn
+		      (format t "Please leave default or enter [1] [2] [4] [9] [12] [13]  ~%")
+		      (setf numf 1))
+		    ))
+	    ;;
+	    (run
+	     (loop for i from st to end and j from 0 by 1 do
+	       ;;
+	       (let* ((outvalA (* att (readin rdA)))
+		      (add-fl 0)
+		      )
+		 ;;
+		 (dotimes (jj numf)
+		   (progn
+		     (cond ((= numf 1)
+			    (set-coeffs formfil (aref state-0 jj 0) (aref state-0 jj 1) (aref state-0  jj 2)))
+			   ((= numf 2)
+			    (set-coeffs formfil (aref state-5 jj 0) (aref state-5 jj 1) (aref state-5  jj 2)))
+			   ((= numf 4)
+			    (set-coeffs formfil (aref state-4 jj 0) (aref state-4 jj 1) (aref state-4  jj 2)))
+			   ((= numf 9)
+			    (set-coeffs formfil (aref state-2 jj 0) (aref state-2 jj 1) (aref state-2  jj 2)))
+			   ((= numf 12)
+			    (set-coeffs formfil (aref state-1 jj 0) (aref state-1 jj 1) (aref state-1  jj 2)))
+			   ((= numf 13)
+			    (set-coeffs formfil (aref state-3 jj 0) (aref state-3 jj 1) (aref state-3  jj 2)))
+			   )
+		     (let ((filsig (mvmfilt formfil outvalA))
+			   )
+		       (incf add-fl filsig)
+		   )))
+		 ;;
+		 (outa i (*  (env ampf) add-fl))
+		 )))
+	    (close-input infile)
+	    )))
+    )
+  )
+;;;(with-sound () (maxfilter "/zap/dog.snd" 0 ))
+;;;(with-sound (:srate 44100) (maxfilter "/zap/hubcap.snd" 0 :numf 12))
+;;;(with-sound (:srate 44100) (maxfilter "/zap/peanutcan.snd" 0 :numf 13  :att 0.75 ))
+;;;(with-sound (:srate 44100) (maxfilter "/zap/dog.snd" 0 :numf 2  :att 0.25 :freqfactor 0.5))

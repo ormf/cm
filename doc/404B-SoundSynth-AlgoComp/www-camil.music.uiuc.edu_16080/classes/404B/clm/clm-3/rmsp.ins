@@ -1,0 +1,132 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; track-rms:  Prints out the rms of a soundfile at an interval of every 
+;;; <time-interval> seconds.  Also prints decibel values on a scale up to 0 dB.
+
+
+(def-clm-struct amps (scaled 0) (db 0))
+(def-clm-struct extreme rms (time1 0.0) (time2 0.0))
+
+(defvar *lowest-rms-period*)
+(defvar *highest-rms-period*)
+
+(defconstant +lowest-db-value+ -96.3296)
+
+
+(defmacro amp-to-db (amp)
+  `(if (zerop ,amp)
+      +lowest-db-value+
+    (* 20 (log (abs ,amp) 10))))
+
+
+(defmacro set-amps-struct (val struc)
+  `(setf (amps-scaled ,struc) ,val
+	 (amps-db ,struc) (amp-to-db ,val)))
+
+(defmacro calc-and-print (sum sumsq max min scount time1 time2 do-extremes rms-struc
+			      max-struc min-struc)
+  `(let* ((mean (/ ,sum ,scount))
+	  (meansq (/ ,sumsq ,scount))
+	  (var (- meansq (* mean mean)))
+	  (rms (sqrt var)))
+     (set-amps-struct rms ,rms-struc)
+     (set-amps-struct ,max ,max-struc)
+     (set-amps-struct ,min ,min-struc)
+     (when ,do-extremes
+	   (when (> rms (extreme-rms *highest-rms-period*))
+		 (setf (extreme-rms *highest-rms-period*) rms
+		       (extreme-time1 *highest-rms-period*) time1
+		       (extreme-time2 *highest-rms-period*) time2))
+	   (when (and (> rms 0.0) (< rms (extreme-rms *lowest-rms-period*)))
+		 (setf (extreme-rms *lowest-rms-period*) rms
+		       (extreme-time1 *lowest-rms-period*) time1
+		       (extreme-time2 *lowest-rms-period*) time2)))
+     (clm-print "~%    *** Time ~,4f seconds to ~,4f seconds: ***~%" ,time1 ,time2)
+     (clm-print "RMS = ~f (~f dB)~%" (amps-scaled rms-struc) (amps-db rms-struc))
+     (clm-print "Mean = ~f~%" mean)
+     (clm-print "Max = ~f (limit = 1.0) (~f dB)~%" 
+		(amps-scaled max-struc) (amps-db max-struc))
+     (clm-print "Min = ~f (limit = -1.0) (~f dB)"
+		(amps-scaled min-struc) (amps-db min-struc))))
+
+
+
+(definstrument track-rms (&optional (time-interval 1.0) (file clm::last-dac-filename))
+  (setq *lowest-rms-period* (make-extreme :rms 1.0)
+	*highest-rms-period* (make-extreme :rms 0.0))
+  (let* ((f (open-input* file))
+	 (samples (sound-frames file))
+	 (srate (sound-srate file))
+	 (dur (/ samples srate))
+	 (ch (sound-chans file))
+	 (stereo? (= ch 2))
+	 (quad? (= ch 4))
+	 (rda (make-readin :file f :start 0))
+	 (rdb (when stereo? (make-readin :file f :start 0 :channel 1)))
+	 (rdc (when quad? (make-readin :file f :start 0 :channel 2)))
+	 (rdd (when quad? (make-readin :file f :start 0 :channel 3)))
+	 (interval-samples (* time-interval srate))
+	 (next-print interval-samples)
+	 (rms-struc (make-amps))
+	 (max-struc (make-amps))
+	 (min-struc (make-amps))
+	 (max -1.0)
+	 (min 1.0)
+	 (all-max -1.0)
+	 (all-min 1.0)
+	 (sum 0.0)
+	 (sumsq 0.0)
+	 (all-sum 0.0)
+	 (all-sumsq 0.0)
+	 (time1 0.0)
+	 (time2 time-interval)
+	 temp1 temp2)
+    (macrolet
+     ;; macro to do the incrementing and checking for each sample, i.e. each channel.
+     ((do-incs (rd)
+	       `(progn
+		  (setq temp1 (readin ,rd)
+			temp2 (* temp1 temp1))
+		  (incf sum temp1)
+		  (incf all-sum temp1)
+		  (incf sumsq temp2)
+		  (incf all-sumsq temp2)
+		  (when (< max temp1) (setq max temp1))
+		  (when (> min temp1) (setq min temp1)))))
+     (run* (all-sum all-sumsq all-max all-min rms-struc max-struc min-struc *lowest-rms-period* *highest-rms-period*)
+      (loop for i below samples do
+	      (do-incs rda)
+	      (when stereo? (do-incs rdb))
+	      (when quad? (do-incs rdc) (do-incs rdd))
+	      (when (= i next-print)
+		    (calc-and-print sum sumsq max min interval-samples time1 time2 t
+				    rms-struc max-struc min-struc)
+		    (setq time1 time2)
+		    (incf time2 time-interval)
+		    (when (< all-max max)
+			  (setq all-max max))
+		    (when (> all-min min)
+			  (setq all-min min))
+		    (incf next-print interval-samples)
+		    (setq sum 0.0
+			  sumsq 0.0
+			  max -1.0
+			  min 1.0))))
+     (calc-and-print sum sumsq max min (- interval-samples (- next-print samples))
+		     time1 dur (if (zerop (extreme-rms *highest-rms-period*)) t nil)
+		     rms-struc max-struc min-struc)
+     (format t "~%    ******** Overall values: **********")
+     (calc-and-print all-sum all-sumsq all-max all-min samples 0.0 dur nil
+		     rms-struc max-struc min-struc)
+     (format t "~%*** Lowest RMS is ~f (~f dB) (between time ~,4f and time ~,4f--silent sections and final section ignored)."
+		(extreme-rms *lowest-rms-period*)
+		(amp-to-db (extreme-rms *lowest-rms-period*))
+		(extreme-time1 *lowest-rms-period*) 
+		(extreme-time2 *lowest-rms-period*))
+     (format t "~%*** Highest RMS is ~f (~f dB) (between time ~,4f and time ~,4f).~%~%"
+		(extreme-rms *highest-rms-period*) 
+		(amp-to-db (extreme-rms *highest-rms-period*))
+		(extreme-time1 *highest-rms-period*) 
+		(extreme-time2 *highest-rms-period*))
+     (close-input f)
+     nil)))

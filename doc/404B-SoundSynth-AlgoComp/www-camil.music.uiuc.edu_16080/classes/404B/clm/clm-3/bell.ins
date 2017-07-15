@@ -1,0 +1,41 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument fm-bell (startime dur frequency amplitude 
+			amp-env index-env index
+		        &optional (degree 0.0)
+				  (distance 1.0)
+				  (reverb-amount 0.005))
+  (let* ((beg (floor (* startime *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (fmInd1 (hz->radians (* 32.0 frequency)))
+	 (fmInd2 (hz->radians (* 4.0 (- 8.0 (/ frequency 50.0)))))
+	 (fmInd3 (* fmInd2 0.705 (- 1.4 (/ frequency 250.0))))  
+	 ;;(no hz->radians because included in fmInd2)
+	 (fmInd4 (hz->radians (* 32.0 (- 20 (/ frequency 20)))))
+	 (fmenv 0.0)
+	 (loc (make-locsig :degree degree 
+			   :distance distance 
+			   :reverb reverb-amount))
+	 (mod1 (make-oscil :frequency (* frequency 2)))
+	 (mod2 (make-oscil :frequency (* frequency 1.41)))
+	 (mod3 (make-oscil :frequency (* frequency 2.82)))
+	 (mod4 (make-oscil :frequency (* frequency 2.4)))
+	 (car1 (make-oscil :frequency frequency))
+	 (car2 (make-oscil :frequency frequency))
+	 (car3 (make-oscil :frequency (* frequency 2.4)))
+	 (indf (make-env index-env index dur))
+	 (ampf (make-env amp-env amplitude dur)))
+    (run
+     (loop for i from beg to end do
+       (setf fmenv (env indf))
+       (locsig loc i 
+	       (* (env ampf)
+		  (+        (oscil car1 (* fmenv fmInd1 (oscil mod1)))
+		     (* .15 (oscil car2 (* fmenv 
+					   (+ (* fmInd2 (oscil mod2))
+					      (* fmInd3 
+						 (oscil mod3))))))
+		     (* .15 (oscil car3 (* fmenv 
+					   fmInd4 
+					   (oscil mod4)))))))))))
+

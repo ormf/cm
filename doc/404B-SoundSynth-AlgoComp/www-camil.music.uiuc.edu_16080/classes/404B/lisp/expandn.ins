@@ -1,0 +1,193 @@
+;;; multi-channel sound file expansion with srate and reverb.
+;;; michael klingbeil (michael@klingbeil.com)
+;;;
+;;; $Name:  $
+;;; $Revision: 1.1 $
+;;; $Date: 2005/10/16 22:15:44 $
+
+(definstrument expandn (time duration filename amplitude
+                             &key (expand 1.0)
+                             (matrix nil)
+                             (ramp 0.4)
+                             (seglen 0.15)
+                             (srate 1.0)
+                             (hop .05)
+                             (amp-env '(0 0 50 1 100 0))
+                             (input-start 0.0)
+                             (grain-amp 0.8)
+                             (reverb nil))
+  (let* ((beg (floor (* time *srate*)))
+         (end (+ beg (floor (* duration *srate*))))
+         ;; translate logical pathnames and make sure file
+         ;; exists before calling clm funs.
+         (fnam (namestring (truename filename))) 
+         (in-chans (sound-chans fnam))
+	 (out-chans (mus-channels *output*))
+	 (inframe (make-empty-frame in-chans))
+	 (outframe (make-empty-frame out-chans))
+         (mx (if matrix
+               (make-empty-mixer (max in-chans out-chans))
+	       (make-identity-mixer (max in-chans out-chans))))
+         (rev-chans (if *reverb* (mus-channels *reverb*)))
+         (rev-mx (if (and *reverb* reverb (> reverb 0.0))
+                   (let ((rmx (make-empty-mixer
+                               (max out-chans rev-chans))))
+                     (loop for i from 0 below (max out-chans rev-chans)
+                        do
+                          (setf (mixer-ref rmx (mod i out-chans)
+                                           (mod i rev-chans))
+                                (double-float reverb)))
+                     rmx)))
+         ;; theoretically this should just be rev-chans, but I think
+         ;; there is a bug in frame->frame which overwrites past the
+         ;; end of the output frame
+         ;; BIL sez: "The code (clm.c) makes this impossible."
+         (revframe (if rev-mx (make-empty-frame
+                               (max out-chans rev-chans))))
+         (update-env (or (listp expand)
+                         (listp seglen)
+                         (listp ramp)
+                         (listp hop)))
+         (update-rate 100)
+         (expenv (make-env :envelope (if (listp expand) expand 
+                                         `(0 ,expand 1 ,expand))
+                           :duration (/ duration update-rate)))
+         (lenenv (make-env :envelope (if (listp seglen) seglen
+                                         `(0 ,seglen 1 ,seglen))
+                           :duration (/ duration update-rate)))
+         (max-seg-len (if (listp seglen) (max-envelope seglen) seglen))
+         (segment-scaler (if (> max-seg-len .15)
+                             (/ (* grain-amp .15) max-seg-len) grain-amp))
+         (srenv (if (listp srate) (make-env :envelope srate
+				            :duration duration)))
+         (resa (if (listp srate) (second srate) srate))
+         (rampdata (if (listp ramp) ramp `(0 ,ramp 1 ,ramp)))
+         (rampenv (make-env :envelope rampdata
+                            :duration (/ duration update-rate)))
+         (minramp-bug (<= (min-envelope rampdata) 0.0))
+         (maxramp-bug (>= (max-envelope rampdata) 0.5))
+         (hopenv (make-env :envelope (if (listp hop) hop `(0 ,hop 1 ,hop))
+                           :duration (/ duration update-rate)))
+         (ampenv (make-env :envelope amp-env
+                           :duration duration
+                           :scaler amplitude))
+         (ex-array (make-array in-chans))
+         (start (floor (* input-start (sound-srate fnam))))
+         (max-out-hop (if (listp hop) (max-envelope hop) hop))
+         (min-exp-amt (if (listp expand) (min-envelope expand) expand))
+         (max-in-hop (/ max-out-hop min-exp-amt))
+         (max-len (ceiling (* *srate* (+ (max max-out-hop max-in-hop)
+                                         max-seg-len))))
+         (input-array (make-array in-chans :initial-element nil))
+         (ex-samp -1.0)
+         ;; these vars used for in-line resampling (rather than use
+         ;; resample generator)
+         (next-samp 0.0)
+         (samples-0 (make-double-float-array in-chans 
+                                             :initial-element 0.0))
+         (samples-1 (make-double-float-array in-chans
+                                             :initial-element 0.0))
+         (gen nil)
+         )
+    (if (or minramp-bug maxramp-bug)
+      (warn "ramp argument to expsnd must always be ~A"
+            (if (and minramp-bug maxramp-bug) "between 0.0 and 0.5"
+                (if minramp-bug "greater than 0.0"
+                    "less than 0.5"))))
+    ;; setup granulate generators
+    (loop for i from 0 below in-chans do
+          (setf (aref input-array i)
+                (open-input fnam :start start :channel i))
+          (setf (aref ex-array i)
+                (make-granulate :input (aref input-array i)
+                                :expansion (if (listp expand)
+                                               (second expand) expand)
+                                :max-size max-len
+                                :ramp (if (listp ramp) (second ramp) ramp)
+                                :hop (if (listp hop) (second hop) hop)
+                                :length (if (listp seglen)
+                                            (second seglen) seglen)
+                                :scaler segment-scaler)))
+    (when matrix
+      (loop for inp from 0 below in-chans
+            for inlist in matrix do
+            (loop for outp from 0 below out-chans
+                  for outn in inlist do
+                  (setf (mixer-ref mx inp outp) (double-float outn)))))
+
+    (run
+     (loop for i from beg to end do
+          (declare (type (:mus-any* granulate) ex-array)
+                   (type :mus-any gen))
+          (let ((vol (env ampenv)))
+             (if srenv (setf resa (env srenv)))
+             ;; should be (mod (- i beg) update-rate) but i is ok
+             ;; since we set the initial values when we constructed
+             ;; the unit generators
+             (if (and update-env (= 0 (mod (- i beg) update-rate)))
+               (let* ((expa (env expenv)) ;current expansion amount
+                      (segl (env lenenv)) ;current segment length
+                      (rmpl (env rampenv)) ;current ramp length (0 to .5)
+                      (hp (env hopenv)) ;current hop size
+                      ;; now we set the granulate generator internal
+                      ;; state to reflect all these envelopes
+                      (sl (floor (* segl *srate*)))
+                      (rl (floor (* rmpl sl))))
+                 ;; declare types
+                 (loop for ix from 0 below in-chans do
+                       (progn
+                         (setf gen (aref ex-array ix))
+                         (setf (mus-length gen) sl)
+                         (setf (mus-ramp gen) rl)
+                         (setf (mus-frequency gen) hp)
+                         (setf (mus-increment gen) expa)))))
+             (if (minusp ex-samp)
+               (progn
+                 (loop for ix from 0 below in-chans do
+                       (progn
+                         (setf gen (aref ex-array ix))
+                         (setf (aref samples-0 ix)
+                               (* vol (granulate gen)))
+                         (setf (aref samples-1 ix)
+                               (* vol (granulate gen)))))
+                 (incf ex-samp)
+                 (setf next-samp ex-samp))
+               (progn
+                 (incf next-samp resa)
+                 (when (> next-samp (1+ ex-samp))
+                   (let ((samps (floor (- next-samp ex-samp))))
+                     (dotimes (k samps)
+                       (loop for ix from 0 below in-chans do
+                             (progn
+                               (setf gen (aref ex-array ix))
+                               (setf (aref samples-0 ix)
+                                     (aref samples-1 ix))
+                               (setf (aref samples-1 ix)
+                                     (* vol (granulate gen)))))
+                       (incf ex-samp))))))
+             (if (= next-samp ex-samp)
+               ;; output actual samples
+               (loop for ix from 0 below in-chans do
+                     (let ((samp (aref samples-0 ix)))
+                       (setf (frame-ref inframe ix) samp)))
+               ;; output interpolated samples
+               (loop for ix from 0 below in-chans do
+                     (let* ((v0 (aref samples-0 ix))
+                            (v1 (aref samples-1 ix))
+                            (samp (+ v0 (* (- next-samp ex-samp)
+                                           (- v1 v0)))))
+                       (setf (frame-ref inframe ix) samp))))
+             ;; output mixed result
+             (frame->file *output* i (frame->frame inframe mx outframe))
+             ;; if reverb is turned on, output to the reverb streams
+             (if rev-mx
+                 (frame->file *reverb* i
+                              (frame->frame outframe rev-mx revframe))))))
+    ;; make sure everything is closed
+    (loop for i from 0 below in-chans 
+       do (close-input (aref input-array i)))))
+
+
+
+
+

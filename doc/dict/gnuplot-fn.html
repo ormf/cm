@@ -1,0 +1,190 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>gnuplot</title>
+</head>
+<body>
+<div id="content">
+
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">gnuplot</code> <var>file</var> {<var>setting value</var>}* {<var>plot</var> {<var>setting</var> <var>value</var>}*}+<code>)</code></dd>
+</dl>
+
+<p>
+
+Creates a <a href="http://www.gnuplot.info/">Gnuplot</a>
+<var>file</var> containing (optional) global file settings followed by
+one or more plots with (optional) plot-specific settings.
+
+
+Each <var>plot</var> is a list or <a href="seq-cls.html">seq</a> in
+one of the following formats:</p>
+
+<dl>
+  <dt><code>(</code> <code>(</code><var>c1</var> <var>c2</var> <var>...</var> <var>cn</var><code>)</code> <var>...</var><code>)</code></dt>
+<dd>A list of lists where each sublist defines the "columns" of a Gnuplot point record.</dd>
+
+
+<dt><code>(</code><var>x1</var> <var>y1</var> <var>x2</var> <var>y2</var> <var>...</var> <var>xn</var> <var>yn</var><code>)</code></dt>
+<dd>A flat list of <var>x</var> <var>y</var> point data.</dd>
+
+<dt><code>(</code><var>v1</var> <var>v2</var> <var>...</var>
+<var>vn</var><code>)</code></dt> <dd>A flat list of values to graph in
+left-to-right order along the x axis.</dd>
+
+<dt><code>(</code><var>object1</var> <var>object2</var> <var>...</var> <var>objectn</var> <code>)</code></dt>
+<dd>A flat list of CLOS objects whose slots are graphed according to the <a href="#points">:points</a> setting.</dd>
+</dl>
+
+<p>Of these formats, only the first (point record) format is directly
+supported by Gnuplot. The other (flat list) formats require an
+interpretation of their data. The special <a href="#points">:points</a>
+setting described below can be used to specify the format of plots
+globally or individually. The function will attempt to determine the
+format of any flat list plot without a :points specification.  </p>
+
+<h4>Settings</h4>
+
+<p>
+
+In general, each <var>setting</var> is the keyword name of a <a
+href="http://www.gnuplot.info/docs/gnuplot.html#set-show">Gnuplot
+setting</a> followed by its <var>value</var>. Settings that appear
+before the first plot become (global) gnuplot <code>set</code> command
+directives, e.g <code>:title "Hiho"</code> becomes <code>set title
+"HiHo"</code> in the gnuplot file.  Settings that appear after a
+<var>plot</var> are unique to that plot. </p>
+
+<p>Setting values are interpreted in the following way: </p>
+
+<ul>
+  <li>Numbers and strings are passed directly to gnuplot without any interpretation. This means that a string can pass a multi-word gnuplot clause including spaces and commas.</li>
+  <li>Keywords are treated specially by some settings (see the :style setting) else they are converted to a lowercase string and printed to the file.
+  <li>Symbols are converted to lowercase strings and printed to the file.</li>
+  <li>Lists are clause groupings or range specifications.</li>
+</ul>  
+
+<p><code class="entry">gnuplot</code> supports following non-Gnu settings:</p>
+
+<dl>
+  <dt><span class="keyword">:view</span> <var>bool</var></dt>
+
+  <dd>If true then the <code>gnuplot</code> program is automatically
+  called with <var>file</var> after it has been written. The default
+  value is true.</dd>
+
+  <dt id="points"><span class="keyword">:points</span> { <var>int</var> | <span class="keyword">:y</span> |  <span class="keyword">:xy</span> | <var>slot</var> | <code>(</code><var>slot1</var>
+  <var>...</var><code>)</code>}</dt>
+
+  <dd>Identifies the point format in flat lists of data. An integer
+value groups that many values into each point record, e.g. 2 means
+that each pair of values becomes a point record in the gnuplot
+file. The values <span class="keyword">:y</span> and <span
+class="keyword">:xy</span> can be used in place of 1 and 2,
+respectively. Otherwise the value should be the slot name (symbol) or
+list of slot names to access in a flat list of CLOS objects. </dd>
+
+  <dt><span class="keyword">:comment</span> <var>string</var></dt>
+  <dd>Optional comment string to appear as the first line of <var>file</var>.</dd>
+</dl>
+
+<p><code class="entry">gnuplot</code> alters the syntax of the following Gnu settings:</p>
+<dl>
+    <dt><span class="keyword">:style</span> {<var>plotstyle</var>}</dt>
+  <dd>A keyword <var>plotstyle</var> is expanded to the proper command form '<code>set style data {<var>plotstyle</var>}</code>'. Valid plotting styles are
+    <blockquote><p>:lines :points :linespoints :impulses :dots :steps :fsteps :histeps :errorbars :xerrorbars :yerrorbars :xyerrorbars :errorlines  :xerrorlines :yerrorlines :boxes :filledboxes :filledcurves
+	   :boxederrorbars :boxxyerrorbars :financebars :candlesticks
+	   :vector</p></blockquote>
+    <p>See <a href="http://www.gnuplot.info/docs/gnuplot.html#plotting_styles">Gnuplot plotting styles</a> for more information.</dd>
+
+<dt><span class="keyword">:[txy]range</span> <code>(</code><var>low</var> <var>high</var><code>)</code></dt>
+<dd>The value is a list of two values. These global axis settings can be applied to individual plots as well.</dd>
+</dl>
+
+<h4>Examples:</h4>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Plotting data sets 
+</p>
+<pre class="code">
+(gnuplot <span class="string">"test.plt"</span> '( 0 0 50 .9 100 0) )
+
+(gnuplot <span class="string">"test.plt"</span> <span class="keyword">:title</span> <span class="string">"My envelopes"</span>
+	 '(0 0 25 .9 75 .9 100 0) <span class="keyword">:title</span> <span class="string">"ramp"</span>	
+	 '(0 1 5 .5 10 .1 100 0) <span class="keyword">:title</span> <span class="string">"expt"</span> 
+	 '(0 0 50 1 100 0) <span class="keyword">:title</span> <span class="string">"updown"</span>)
+
+(gnuplot <span class="string">"test.plt"</span> <span class="keyword">:title</span> <span class="string">"Random numbers"</span> 
+	 <span class="keyword">:points</span> <span class="keyword">:y</span>
+         <span class="keyword">:style</span> <span class="keyword">:impulses</span>
+	 (<span class="string">loop</span> repeat 20 collect (random 1.0)))
+
+(gnuplot <span class="string">"test.plt"</span> <span class="keyword">:title</span> <span class="string">"Hi Ho!"</span> <span class="keyword">:nokey</span> <span class="special">#t</span>
+	 '(0 0 25 .9 80 .5 100 0) 
+	 <span class="keyword">:with</span> <span class="keyword">:linespoints</span>
+	 (<span class="special">loop</span> for i to 100 by 10 
+               collect i collect (random 1.0))
+	 <span class="keyword">:with</span> <span class="keyword">:points</span>)
+
+(gnuplot <span class="string">"test.plt"</span> <span class="keyword">:title</span> <span class="string">"Random Midis"</span>
+	 <span class="keyword">:points</span> '(time keynum duration)
+	 <span class="keyword">:style</span> <span class="keyword">:xerrorbars</span>
+	 <span class="keyword">:yrange</span> '(60 100)
+	 (<span class="special">loop</span> repeat 20 
+	    for beg = 0 then (+ beg (random 1.0))
+	    for dur = (<a href="pick-fn.html">pick</a> .1 .2 .3)
+	    for key = (<a href="between-fn.html">between</a> 70 80)
+	    collect (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> beg <span class="keyword">:keynum</span> key 
+			 <span class="keyword">:duration</span> dur)))
+</pre>
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Process output to Gnuplot
+</p>
+<pre class="code">
+(<span class="special">define</span> (<span class="defined">simp</span> num )
+  (<a href="process-mac.html">process</a> repeat num
+	   output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>)
+		       <span class="keyword">:keynum</span> (random 127)
+		       <span class="keyword">:duration</span> .1)
+	   wait (<a href="between-fn.html">between</a> .1 1)))
+
+(<a href="io-mac.html">io</a> <span class="string">"algo.plt"</span> <span class="keyword">:title</span> <span class="string">"My very own process"</span> <span class="keyword">:nokey</span> <span class="special">#t</span> <span class="keyword">:style</span> <span class="keyword">:points</span> <span class="keyword">:pointsize</span> 2)
+
+(<a href="events-fn.html">events</a> (simp 20 ) <span class="string">"algo.plt"</span>)
+</pre>
+  </div>
+  
+<h4>Variables:</h4>
+
+<dl>
+  <dt><code>*gnuplot*</code></dt> <dd> The shell command (string) to start gnuplot. Defaults to <code><span class="string">"gnuplot"</span></code>.</dd>
+
+  <!-- dt><code>*gnuterm*</code></dt> <dd> An explicit terminal type for gnuplot. Defaults to <code><span class="string">"aqua"</span></code> on OS X and to <var>false</var> everywhere else. See Gnuplot documentation on GNUTERM environment variable for more information.</dd -->
+
+  <dt><code>*gnuplot-default-settings*</code><dd>A list of default
+settings passed to Gnuplot. Defaults to <code>(:view #t :style
+:linespoints)</code>.</dd> </dl>
+    
+<h4>See also:</h4>
+<ul>
+<li><a href="gnuplot-file-cls.html"><code>gnuplot-file</code></a> [Class]</li>
+</ul>
+
+</Div>
+<hr class="inv"/>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
+
+

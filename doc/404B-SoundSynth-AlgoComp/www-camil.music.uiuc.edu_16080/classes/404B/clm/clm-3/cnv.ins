@@ -1,0 +1,61 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; several examples of the convolve unit generator
+
+(definstrument cnv (beg dur filter file &optional (amp 1.0) (chan 0))
+  (let* ((start (floor (* beg *srate*)))
+	 (end (+ start (floor (* dur *srate*))))
+	 (fil (open-input file :channel chan))
+	 (filt (open-input filter))
+	 (ff (make-convolve :input fil :filter filt)))
+    (run
+     (loop for i from start to end do (outa i (* amp (convolve ff)))))
+    (close-input filt)
+    (close-input fil)))
+
+#|
+(with-sound (:output "1.snd") (outa 0 .5) (outa 3000 .5) (outa 10000 .5))
+(with-sound (:output "v.snd") (fm-violin 0 1 440 .1 :amp-env '(0 1 100 1)))
+(with-sound (:statistics t) (cnv 0 1 "1.snd" "v.snd"))
+(with-sound (:statistics t) (cnv 0 6 "fyow.snd" "fyow.snd" .1))
+|#
+
+(definstrument cnvo (beg dur filter file &optional (size 512))
+  (let* ((start (floor (* beg *srate*)))
+	 (end (+ start (floor (* dur *srate*))))
+	 (fil (open-input file))
+	 (filt (make-double-array (length filter) :initial-contents filter))
+	 (ff (make-convolve :input fil :filter filt :fft-size size)))
+    (run
+     (loop for i from start to end do (outa i (convolve ff))))
+    (close-input fil)))
+
+#|
+(with-sound (:statistics t) (cnvo 0 1 '(.5 .2 .1 .05 0 0 0 0) "/zap/v.snd" 64))
+|#
+
+;;; use an array to hold the impulse response (and therefore use overlap-add internally --
+
+(definstrument cnvrev (file impulse &optional (rev-amt .1))
+  (let* ((file-len (sound-frames file))
+	 (filter-len (sound-frames impulse))
+	 (filter-chan0 (make-double-array filter-len))
+	 (filter-chan1 (if (and (= (mus-channels *output*) 2) (> (sound-chans impulse) 1))
+			   (make-double-array filter-len))))
+    (file->array impulse 0 0 filter-len filter-chan0)
+    (if filter-chan1
+	(file->array impulse 1 0 filter-len filter-chan1)
+      (setf filter-chan1 filter-chan0))
+    (let* ((fd (open-input file))
+	   (fd1 (if (and (= (mus-channels *output*) 2) (> (sound-chans file) 1)) (open-input file :channel 1)))
+	   (ff0 (make-convolve :input fd :filter filter-chan0))
+	   (ff1 (if (and (= (mus-channels *output*) 2) (> (sound-chans file) 1))
+		    (make-convolve :input fd1 :filter filter-chan1))))
+      (run
+       (loop for i from 0 to (+ file-len filter-len) do
+	 (outa i (* rev-amt (convolve ff0)))
+	 (if (and (= (mus-channels *output*) 2) ff1) (outb i (* rev-amt (convolve ff1))))))
+      (close-input fd)
+      (if fd1 (close-input fd1)))))
+
+;;; (with-sound (:statistics t :scaled-to .5 :srate 44100 :channels 2) (cnvrev "fy.snd" "fyow.snd"))

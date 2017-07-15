@@ -1,0 +1,72 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>io</title>
+</head>
+<body>
+<div id="content">
+
+
+<!-- Entry: "io" -->
+<dl class="dictsyntax">
+<dt>[Macro]</dt>
+<dd><code>(</code><code class="entry">io</code> <var>stream</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+<p>
+Initializes <var>stream</var> according to its keyword
+arguments. <var>Stream</var> can be an event stream or a string that
+names the stream.
+</p>
+
+<h4>Examples:</h4>
+
+<div class="float">
+<p class "captxt">
+<span class="floatlabel">Example 1.</span> Initializing a MIDI file.
+</p>
+<pre class="code">
+<span class="comment">;;; setting the tempo and time signature of a MIDI file.</span>
+(io <span class="string">"test.mid"</span> <span class="keyword">:tempo</span> 120
+    <span class="keyword">:time-signature</span> '(3 4))
+</pre>
+</div>
+
+<div class="float">
+<p class "captxt">
+<span class="floatlabel">Example 2.</span> Initializing a CLM audio file.
+</p>
+<pre class="code">
+<span class="comment">;;; setting the srate, channel and reverb of an AIFF file</span>
+
+(io <span class="string">"/tmp/piece.aiff"</span> <span class="keyword">:srate</span> 44100 <span class="keyword">:channels</span> 2
+    <span class="keyword">:reverb</span> 'nrev)
+<pre>
+</div>
+
+<!-- See also -->
+<h4>See also:</h4>
+<ul>
+<li><a href="audio-file-cls.html"><kbd>audio-file</kbd></a> [Class]</li>
+<li><a href="clm-file-cls.html"><kbd>clm-file</kbd></a> [Class]</li>
+<li><a href="cmn-file-cls.html"><kbd>cmn-file</kbd></a> [Class]</li>
+<li><a href="midi-stream-cls.html"><kbd>midi-stream</kbd></a> [Class]</li>
+<li><a href="sco-file-cls.html"><kbd>sco-file</kbd></a> [Class]</li>
+</ul>
+
+</div>
+<hr class="inv"/>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
+
+

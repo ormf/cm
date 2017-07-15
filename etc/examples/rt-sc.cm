@@ -1,0 +1,281 @@
+;;; **********************************************************************
+;;; $Name$
+;;; $Revision$
+;;; $Date$
+;;;
+;;; Supercollider examples, by Todd Ingalls. 
+
+(use-system :rts)
+
+(use-system :osc)
+
+
+(in-package :cm)
+
+(defobject simple (scsynth)
+  ((freq :initform 440)
+   (dur :initform 1)
+   (amp :initform .2)
+   (pan :initform 0))
+  (:parameters freq dur amp pan time))
+
+(defobject reverb1 (scsynth)
+  ((mix :initform .2)
+   (decaytime :initform 15)
+   (in :initform 0)
+   (out :initform 0))
+  (:parameters mix decaytime in out time))
+
+(defobject reverb2 (scsynth)
+  ((mix :initform .2)
+   (decaytime :initform 15))
+  (:parameters mix decaytime time))
+
+(defobject play-buffer (scsynth)
+  ((bufnum)
+   (amp :initform 1.0)
+   (rate :initform 1.0)
+   (looping :initform 1)
+   (out :initform 0))
+  (:parameters bufnum amp rate looping out time))
+
+(defobject granulate (scsynth)
+  ((dur :initform 1)
+   (amp :initform 1.0)
+   (bufnum)
+   (rate :initform 1.0)
+   (gdur :initform .1)
+   (speed :initform 1.0)
+   (out :initform 0))
+  (:parameters dur amp bufnum rate gdur speed out time))
+
+(defobject simple-osc (scsynth)
+  ((freq :initform 440)
+   (dur :initform 1)
+   (bufnum)
+   (amp :initform .2)
+   (pan :initform 0))
+  (:parameters freq dur amp pan bufnum time))
+
+(defobject fm-env (scsynth)
+  ((freq :initform 440)
+   (mratio :initform 1.0)
+   (index :initform 1.0)
+   (amp :initform 1.0)
+   (dur :initform 1)
+   (ampenv :initform nil)
+   (indexenv :initform nil))
+  (:parameters freq mratio index amp dur time ampenv indexenv))
+
+(defobject randomness1 (scsynth)
+  ((density :initform 1)
+   (id :initform 1))
+  (:parameters density id time))
+
+(defobject pitch-track (scsynth)
+  ((minfreq :initform 60)
+   (maxfreq :initform 2000.0)
+   (ampthresh :initform .02)
+   (id :initform 1))
+  (:parameters minfreq maxfreq ampthresh id))
+
+;;;
+;;; same as the nrt example
+;;;
+
+(define (sc-simple-1 num)
+  (process repeat num 
+	   output (new simple :time (now) 
+		       :freq (between 300 700)
+		       :dur (between 10 20)
+		       :amp .1
+		       :pan (pickl '(-1.0 0 1.0)))
+	   wait (between 2.0 3.0)))
+
+;;;
+;;; open up an sc-stream
+;;;
+;;; (define *sc* (sc-open))
+;;;
+;;; turn on printing out of messages on sc server
+;;;
+;;; (sc-dumposc t)
+;;;
+;;; start rts
+;;;
+;;; (rts *sc*)
+;;;
+;;; sprout example
+;;;
+;;; (sprout (sc-simple-1 10))
+;;;
+;;; (rts-stop)
+;;; (sc-close)
+
+(define (sc-fm-2 num)
+  (process repeat num for i from 0
+	   with envs = (new heap :of '((0 0.0 50 1.0 100 0.0)
+				       (0 0 1 1.0 20 .3 70 .2 100 0.0)
+				       (0 0 20 1.0 40 .2 60 1.0 100 0.0)
+				       (0 0 5 1.0 20 0.0 100 0.0)))
+	   when (= i 0)
+	   output (new reverb2 :time (now) 
+		       :node 500
+		       :decaytime 1.8
+		       :mix .1)
+	   output (new fm-env :freq (between 300 700) 
+		       :mratio (between .4 3.2) 
+		       :dur 4
+		       :index 1.0
+		       :amp .7
+		       :node (+ i 1000)
+                       :ampenv (new sc-env :envelope (next envs)
+                                    :duration 4)
+                       :indexenv (new sc-env :envelope (next envs)
+                                      :duration 4)
+		       :time (now)
+		       :add-action 0)
+	   wait 3))
+
+;;;
+;;; clear scheduler on sc server and free all nodes
+;;;
+;;; (sc-flush)
+;;;
+;;;
+;;; (sprout (sc-fm-2 10))
+;;;
+
+(define (simple-tendency1 num wai lo hi)
+  (process repeat num for i from 0
+	   when (= i 0)
+	   output (new reverb2 :node 300 :time (now))
+	   output (new simple :node (+ 1000 i) 
+		       :freq (tendency (/ i num) lo hi)
+				       
+		       :amp .1
+		       :time (now))
+	   wait wai))
+
+;;;
+;;; clear scheduler on sc server and free all nodes
+;;;
+;;; (sc-flush)
+;;;
+;;; (sprout (simple-tendency1 100 .05 '(0 0 .10 200 .4  800 .6 900 1.00 1000.0) '(0 0 .20 300 .4  900 1.00 2000.0)))
+;;;
+;;; (sprout (simple-tendency1 100 .01 '(0 400 .10 200 .4  400 .6 100 1.00 400.0) '(0 400 .10 1600 .4  400 .6 1700 1.00 400.0)))
+
+
+;;;
+;;; the following is an example of receiving data back from the server.
+;;; in this case a buffer is filled with a waveform and then 
+;;; repeated requests are sent to get a value from the buffer.
+;;; these are then used to scale a freq slot for a simple synth.
+;;;
+;;;
+;;;
+
+
+(define (sim num wai)
+  (process repeat num for i from 0
+	   when (= i 0)
+	   output (new sc-buffer :bufnum 11
+		       :time 0
+		       :frames 512
+		       :with-gen '(:sine1 (1 .1 .1 .1 .9 .01 .3 .1 1 1)))
+	   output (new buffer-get :time (now) :bufnum 11 :samples (mod i 512))
+	   wait wai))
+
+
+;;;
+;;; this is the receiver function that will be used.
+;;; notice that it is looking for replies to a buffer-get
+;;; message.
+
+(define (sim-reply m)
+  (let ((freq-scale 1.0))
+    (if (is-a? m 'buffer-get-reply)
+	(begin 
+	 (set! freq-scale (second (slot-value m 'samples-values)))
+	 (output (new simple :time (now) :amp .1 :dur .5 :freq (+ 400 (abs (* 440 freq-scale))))
+	       :to *sc*)))))
+
+
+;;; (set-receiver! #'sim-reply *sc*)
+;;; 
+;;; (sprout (sim 512 .02))
+;;; 
+;;; (sprout (sim 64 .4))
+;;;
+
+
+
+;;; 
+;;; this example uses an scsynth to generate random values
+;;; these values are sent back to cm and in this case trigger
+;;; a simple since with the random value as the freq.
+;;;
+;;;
+;;; in order for the sc server to send trigger messages back to cm
+;;; one must turn on notification:
+;;; 
+;;; (sc-notify t)
+
+
+(define (start-randomness1a)
+  (process repeat 1
+	   output (new randomness1 :time (now) :density 2 :id 100 :node 2000)))
+
+
+;;; remove previous receiver
+;;;
+;;; (remove-receiver! *sc*)
+;;;
+;;; 
+;;;
+;;;
+
+(define (trig-rep m)
+  (if (is-a? m 'trigger-reply)
+      (if (= (trigger-id m) 100)
+	  (output (new simple :amp .1 :dur 1 :freq (+ 100 (abs (trigger-value m)))
+		       :time (now))))))
+
+
+;;; (set-receiver! #'trig-rep *sc*)
+;;;
+;;; (sprout (start-randomness1a))
+;;;
+;;; (sc-flush)
+
+
+;;;
+;;; this is a simple pitch tracking example.
+;;; 
+;;;
+
+;;;
+;;; start the pitch tracker on the server.
+;;;
+
+; (output (new pitch-track :node 1000 :time 0 :ampthresh .2) :to *sc*)
+
+;;;
+;;; this is the reply function. it tries to double the detected pitch.
+;;;
+
+(define (pitch-track-rep m)
+  (if (is-a? m 'trigger-reply)
+      (if (= (trigger-id m) 1)
+	  (output (new simple :freq (hertz (floor (trigger-value m))) :time (now)) :to *sc*))))
+
+;;; (remove-receiver! *sc*)
+;;;
+;;; (set-receiver! #'pitch-track-rep *sc*)
+;;; 
+;;; now whistle a tune! probably a good idea to monitor through
+;;; headphones
+;;; 
+;;; this frees up the node that the pitch-tracker is running on
+;;; (output (new node-free :node 1000 :time 0) :to *sc*)

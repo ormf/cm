@@ -1,0 +1,79 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument kiprev (startime dur &key (dgain .95)
+				(lpfbg .45)
+				(atten .7)
+				(low-pass nil)
+				(outscale 1.0))
+  (let* ((beg (floor (* startime *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (combfactors (make-double-array 17 
+				  :initial-contents '(.841 .504 .491 .379 .380 .346 .289 .272 .192
+						      .193 .217 .181 .180 .181 .176 .142 .167)))
+	 (combdelays (make-array 17
+				 :element-type 'fixnum
+				 :initial-contents '(109 547 577 683 691 761 1171 1237 1459
+						     1499 1523 1567 1811 1861 1901 1931 2039)))
+	 (combs (make-array 17))
+	 (tmpr (make-double-array 22 :initial-element 0.0))
+
+	 (syncit (make-delay 652))
+	 (fbfact (make-double-array 6 :initial-contents '(.05797 .051759 .04751 .042625 .040257 .037160)))
+	 (delays (make-array 6))
+	 (delaysizes (make-array 6 :element-type 'fixnum
+				 :initial-contents '(1279 1433 1559 1741 1847 1997)))
+	 (filts (make-array 6))
+	 (allpasses (make-array 4))
+	 (allpassdlys (make-array 4 :element-type 'fixnum
+				  :initial-contents '(53 41 37 23)))
+	 (loopg (- 1.0 (abs lpfbg)))
+	 (tapout 0.0)
+	 (chan2 (> (mus-channels *output*) 1))
+	 (chan4 (= (mus-channels *output*) 4))
+	 (comb-sum 0.0)
+	 (comb-sum-1 0.0)
+	 (comb-sum-2 0.0)
+	 (outval 0.0)
+	 (cmbin 0.0)
+	 (outsm 0.0))
+    ;; initialization of filters, delays, and so on
+    (loop for i from 0 to 16 do 
+      (setf (aref combs i) (make-comb (aref combfactors i) (aref combdelays i))))
+    (loop for i from 0 to 5 do 
+      (setf (aref delays i) (make-delay (aref delaysizes i)))
+      (setf (aref filts i) (make-one-pole lpfbg (- lpfbg 1.0))))
+    (loop for i from 0 to 3 do 
+      (setf (aref allpasses i) (make-all-pass -.7 .7 (aref allpassdlys i))))
+    (run
+     (loop for i from beg to end do
+       (setf comb-sum-2 comb-sum-1)
+       (setf comb-sum-1 comb-sum)
+       (setf outval (ina i *reverb*))
+       (setf tapout 0.0)
+       (dotimes (k 17) (incf tapout (comb (aref combs k) outval)))
+       (setf cmbin (delay syncit tapout))
+       (do ((k 0 (+ k 1))
+	    (j 0 (+ j 3)))
+	   ((> k 5))
+	 (setf (aref tmpr j) (+ (* loopg dgain (aref tmpr (+ j 2))) 
+				(* cmbin atten (aref fbfact k))))
+	 (setf (aref tmpr (+ j 1)) (delay (aref delays k) (aref tmpr j)))
+	 (setf (aref tmpr (+ j 2)) (one-pole (aref filts k) (aref tmpr (+ j 1)))))
+       (setf outsm 0.0)
+       (do ((k 1 (+ k 3)))
+	   ((> k 16))
+	 (incf outsm (aref tmpr k)))
+       (dotimes (k 4) (setf outsm (all-pass (aref allpasses k) outsm)))
+       (setf comb-sum outsm)
+       (if low-pass
+	   (setf outval (* outscale (+ (* .25 (+ comb-sum comb-sum-2)) (* .5 comb-sum-1))))
+	 (setf outval (* outscale comb-sum)))
+       ;; "modified least squares low pass filter"
+       (outa i outval)
+       (if chan2 (outb i outval))
+       (when chan4
+	 (outc i outval)
+	 (outd i outval))))
+    ))
+
+;;; (with-sound (:reverb kiprev :reverb-data (:outscale 5.0)) (fm-violin 0 .1 440 .1))

@@ -1,0 +1,99 @@
+;;; mixer
+
+;;; changed 4-Feb-05
+;;;   if just a scaler is passed (as "matrix"), it now creates a diagonal matrix
+;;;   and reverb scaling now refers to the signal after it has been scaled for output
+
+(definstrument fullmix (in-file &optional beg outdur inbeg matrix srate reverb-amount)
+  ;; "matrix" can be a simple amplitude or a list of lists
+  ;;     each inner list represents one input channel's amps into one output channel
+  ;;     each element of the list can be a number, a list (turned into an env) or an env
+  ;;     see below for examples
+  (let* ((st (floor (* *srate* (or beg 0.0)))) ; nil as arg -- don't embed the 0.0 in the &optional above!
+	 (dur (or outdur
+		  (/ (- (sound-duration in-file) (or inbeg 0.0))
+		     (or (and srate (abs srate)) 1.0))))
+	 (nd (+ st (floor (* *srate* dur))))
+	 (in-chans (sound-chans in-file))
+	 (out-chans (mus-channels *output*))
+	 (inframe (make-empty-frame in-chans))
+	 (outframe (make-empty-frame out-chans))
+	 (file nil)
+	 (mx (if matrix
+		 (make-empty-mixer (max in-chans out-chans))
+	       (make-identity-mixer (max in-chans out-chans))))
+         (rev-chans (if *reverb* (mus-channels *reverb*) 0))
+	 (rev-mx-chans (max out-chans rev-chans)) ; out-chans because it is the output frame that is scaled for reverb input
+	 (rev-mx (if (and *reverb* reverb-amount (> reverb-amount 0.0))
+		     (let ((rmx (make-empty-mixer rev-mx-chans)))
+		       (loop for i from 0 below rev-mx-chans do
+			 (setf (mixer-ref rmx (mod i out-chans) (mod i rev-chans)) (double reverb-amount)))
+		       rmx)))
+	 (revframe (if rev-mx (make-empty-frame rev-mx-chans)))
+	 (envs nil)
+	 (srcs (make-array in-chans :initial-element nil))
+	 (inloc (floor (* (or inbeg 0.0) (sound-srate in-file)))))
+    (when matrix
+      (if (listp matrix)
+	  (loop for inp from 0 below in-chans and inlist in matrix do
+	    (loop for outp from 0 below out-chans and outn in inlist do
+	      (if outn
+		  (if (numberp outn)
+		      (setf (mixer-ref mx inp outp) (double outn))
+		    (if (or (env? outn) (listp outn))
+			(progn
+			  (if (not envs)
+			      (setf envs (make-array (list in-chans out-chans) :initial-element nil)))
+			  (if (env? outn)
+			      (setf (aref envs inp outp) outn)
+			    (setf (aref envs inp outp) (make-env outn :duration dur))))
+		      (warn "unknown element in matrix: ~A" outn))))))
+        (loop for i from 0 below (max in-chans out-chans) do
+	  (setf (mixer-ref mx (mod i in-chans) (mod i out-chans)) matrix))))
+    (if srate
+	(progn
+	  (loop for inp from 0 below in-chans do
+	    (setf (aref srcs inp) (make-src :input (make-readin in-file :start inloc :channel inp)
+					    :srate srate))))
+      (setf file (make-file->frame in-file)))
+    (run
+     (loop for i fixnum from st below nd do
+       (declare (type :integer inloc)
+		(type :mus-any file)
+		(type :mus-any* envs srcs))
+       (if envs
+	   (loop for inp from 0 below in-chans do
+	     (loop for outp from 0 below out-chans do
+	       (if (aref envs inp outp)
+		   (setf (mixer-ref mx inp outp) (env (aref envs inp outp)))))))
+       (if srate
+	   (progn
+	     (loop for inp from 0 below in-chans do
+	       (setf (frame-ref inframe inp) (src (aref srcs inp))))
+	     (frame->file *output* i (frame->frame inframe mx outframe))
+	     (if rev-mx (frame->file *reverb* i (frame->frame outframe rev-mx revframe))))
+	 (progn
+	   (file->frame file inloc inframe)
+	   (frame->file *output* i (frame->frame inframe mx outframe))
+	   (if rev-mx (frame->file *reverb* i (frame->frame outframe rev-mx revframe)))
+	   (incf inloc)))))))
+
+#|
+  (with-sound (:channels 2 :statistics t)
+    (fullmix "pistol.snd")
+    (fullmix "oboe.snd" 1 2 0 (list (list .1 (make-env '(0 0 1 1) :duration 2 :scaler .5)))))
+|#
+
+;;; make a clm-1 replacement, to some extent
+(defun mix-1 (in-file &rest args 
+		      &key (start-time 0.0)
+		      (input-file-start-time 0.0)
+		      (srate 1.0) matrix
+		      duration
+		      amplitude
+		      reverb-amount)
+  (fullmix in-file start-time duration input-file-start-time (or matrix amplitude) srate reverb-amount))
+
+;;; (with-sound (:channels 2 :statistics t) (mix-1 "oboe.snd" :srate 2 :matrix '((.5 .5))))
+;;; (with-sound (:channels 2 :statistics t) (mix-1 "oboe.snd" :srate 2 :matrix (list (list .25 (list 0 0 1 1)))))
+;;; (with-sound (:channels 2 :statistics t :reverb jc-reverb) (mix-1 "oboe.snd" :srate 2 :reverb-amount .1 :matrix '((2.5 .5))))

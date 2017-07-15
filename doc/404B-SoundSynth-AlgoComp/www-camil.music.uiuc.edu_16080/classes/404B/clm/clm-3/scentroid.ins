@@ -1,0 +1,234 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+
+;;; SCENTROID
+;;;
+;;; Common Lisp Music 2.X Instrument
+;;; by Bret Battey
+;;; Version 1.0 July 13, 2002
+;;;
+;;; March 30, 2004 - moved status bar intro text clm-print inside run loop
+;;;                - coerced final data to short-floats
+;;;
+;;; Returns the continuous spectral centroid envelope of a sound.
+;;; The spectral centroid is the "center of gravity" of the spectrum, and it
+;;; has a rough correlation to our sense of "brightness" of a sound. 
+;;;
+;;; [Beauchamp, J., "Synthesis by spectral amplitude and 'brightness' matching
+;;; analyzed musical sounds". Journal of Audio Engineering Society 30(6), 396-406]
+;;;
+;;; The formula used is:
+;;;    C = [SUM<n=1toj>F(n)A(n)] / [SUM<n=1toj>A(n)]
+;;;    Where j is the number of bins in the analysis, 
+;;;    F(n) is the frequency of a given bin,
+;;;    A(n) is the magnitude of the given bin.
+;;;
+;;; If a pitch envelope for the analyzed sound is available, the results
+;;; of SCENTROID can be used with the function NORMALIZE-CENTROID, below, 
+;;; to provide a "normalized spectral centroid". 
+;;;
+;;;
+;;; Parameters:
+;;;
+;;; DB-FLOOR -- Frames below this decibel level (0 dB = max) will be discarded
+;;; and returned with spectral centroid = 0
+;;;
+;;; RFREQ -- Rendering frequency. Number of  measurements per second.
+;;;
+;;; FFTSIZE -- FFT window size. Must be a power of 2. 4096 is recommended.
+;;;
+;;; STATUS -- If T, shows % complete during processing.
+;;; 
+
+(definstrument scentroid (file &key (beg 0.0) (dur NIL) (db-floor -40)
+                                   (rfreq 100) (fftsize 4096) (status T)
+                                   (debug NIL))
+  (let* ((fil (open-input* file)))
+    (unwind-protect
+      (let* ((incr (/ rfreq))
+             (fsr (sound-srate file))
+             (incrsamps (floor (* incr fsr)))
+             (start (floor (* beg fsr)))
+             (dur (if dur dur (- (sound-duration file) beg)))
+             (end (+ start (floor (* dur fsr))))
+             (fdr (make-double-float-array fftsize))
+             (fdi (make-double-float-array fftsize))
+             (windows (1+ (floor (/ (- end start) incrsamps))))
+             (resultsy (make-double-float-array windows))
+             (resultsx (make-double-float-array windows))
+             (fft2 (floor (/ fftsize 2)))
+             (filptr 0)
+             (numsum 0)
+             (densum 0)
+             (centroid 0)
+             (p-complete 0)
+             (binwidth (/ fsr fftsize))
+             (rms-divisor (sqrt fftsize))
+             (sum-of-squares)
+             (rms)
+             (i 0)
+             (j 0))
+        (setf i start)
+        (run* (resultsx resultsy)
+	      (loop while (<= i end) do
+                    (when (and status (not debug))
+                      (when (= i start)
+                        (clm-print "~%scentroid percent complete: "))
+                      (let ((nc (round (* (/ (1+ j) windows) 100))))
+                        (when (> nc p-complete)
+                          (clm-print "~D " nc)
+                          (setf p-complete nc))))
+                    (clear-array fdr)
+                    (clear-array fdi)
+                    (when debug
+                      (clm-print "Window ~D, file sample ~D, ~F s.~%" 
+                                 j i (/ i fsr)))
+                    ;; check frame amplitude
+                    (setf filptr i)
+                    (loop for filptr from i to (+ i fftsize) do
+                          (setf sum-of-squares 
+                                (+ sum-of-squares (expt (ina filptr fil) 2))))
+                    (setf rms (linear->db (/ sum-of-squares rms-divisor)))
+                    (if (>= rms db-floor)
+                      (progn
+                        (setf filptr i)
+                        (dotimes (k fftsize)
+                          (setf (aref fdr k) (ina filptr fil))
+                          (incf filptr))
+                        (fft fdr fdi fftsize)
+                        (rectangular->polar fdr fdi)
+                        (setf numsum 0)
+                        (setf densum 0)
+                        (dotimes (k fft2) 
+                          (setf numsum (+ numsum (* k binwidth (aref fdr k))))
+                          (setf densum (+ densum (aref fdr k))))
+                        (setf centroid (/ numsum densum))
+                        (when debug
+                          (clm-print "centroid = ~F.~%" centroid)))
+                      (progn
+                        (setf centroid 0)
+                        (when debug
+                          (clm-print "Amp below threshold. Centroid set to 0.~%"))))
+                    (setf (aref resultsx j) (/ i fsr))
+                    (setf (aref resultsy j) centroid)
+                    (incf i incrsamps)
+                    (incf j)))
+        (close-input fil)
+        (when status (format t "~%"))
+        (loop for x in (coerce resultsx 'list)
+              for y in (coerce resultsy 'list)
+              collect (coerce x 'single-float)
+              collect (coerce y 'single-float))))))
+
+;;; NORMALIZE-SCENTROID
+
+;;; Given the spectral centroid envelope provided by the scentroid instrument
+;;; and a pitch envelope of the same sound, calculates the
+;;; "normalized spectral scentroid", in which the spectral centroid is scaled by 
+;;; the inverse of the fundamental frequency. In theory, this provides a
+;;; brightness measurement that is relative to the fundamental.
+;;;
+;;; MAX is the maximum value of the returned curve. Values that would be above
+;;; MAX are truncated to MAX.
+;;;
+;;; If pitch is 0 at a given point, the normalized centroid will also be 0.
+
+(defun normalize-scentroid (scentroid-env pitch-env &optional (max 40))
+  (let ((newxlist '())
+        (newylist '()))
+    (loop for x in scentroid-env by #'cddr
+          for y in (cdr scentroid-env) by #'cddr do
+          (push x newxlist)
+          (let ((pitch (envelope-interp x pitch-env)))
+            (if (plusp pitch)
+              (let ((newy (* y (/ pitch))))
+                (push (if (> newy max) max (* y (/ pitch))) 
+                      newylist))
+              (push 0 newylist))))
+    (loop for x in (reverse newxlist)
+          for y in (reverse newylist)
+          collect x
+          collect y)))
+
+
+#| DEMO - COMPARISON OF STANDARD AND NORMALIZED CENTROID
+
+;;; stable pitch, rising bright
+
+(with-sound (:output "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm1")
+  (badd 0 5 440 .05 :ampfun '(0 1 1 1) :partials (append '(1 1) (loop for i from 2 to 20 collect i collect .05))
+        :fuzz 0 :pvibamp 0 :rvibamp 0
+        :power 1 :powerfun '(0 0 1 1)))
+
+;;; rising bright and pitch
+
+(with-sound (:output "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm2")
+  (badd 0 5 220 .05 :ampfun '(0 1 1 1) :partials (append '(1 1) (loop for i from 2 to 20 collect i collect .05))
+        :freqfun (envelope-exp '(0 1 1 12))
+        :fuzz 0 :pvibamp 0 :rvibamp 0 
+        :power 1 :powerfun '(0 .5 1 1)))
+
+;;; stable spectrum, rising pitch
+
+(with-sound (:output "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm3")
+  (badd 0 5 440 .05 :ampfun '(0 1 1 1) :partials (append '(1 1) (loop for i from 2 to 20 collect i collect .05))
+        :freqfun (envelope-exp '(0 1 1 12))
+        :fuzz 0 :pvibamp 0 :rvibamp 0 
+        :power 1 :powerfun '(0 .5 1 .5)))
+
+;;; centroid
+
+(defparameter fm1-bright (scentroid "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm1.aiff"))
+(plotter (new plot points (points fm1-bright) point-size (new point :x 0 :y 0)))
+
+(defparameter fm2-bright (scentroid "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm2.aiff"))
+(plotter (new plot points (points fm2-bright) point-size (new point :x 0 :y 0)))
+
+(defparameter fm3-bright (scentroid "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm3.aiff"))
+(plotter (new plot points (points fm3-bright) point-size (new point :x 0 :y 0)))
+
+;;; fundamental
+
+(defparameter fm1-fund (autoc "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm1.aiff"))
+(plotter (new plot points (points fm1-fund) point-size (new point :x 0 :y 0)))
+
+(defparameter fm2-fund (autoc "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm2.aiff"
+                              :min-freq 220 :max-freq 880 :max-ffts 3))
+(plotter (new plot points (points fm2-fund) point-size (new point :x 0 :y 0)))
+
+(defparameter fm3-fund (autoc "Macintosh HD:Battey:Studio:Research:PICACS:Tests:scentroid-response:fm3.aiff"
+                              :max-ffts 3))
+(plotter (new plot points (points fm3-fund) point-size (new point :x 0 :y 0)))
+
+;;; normed centroid
+
+(defparameter fm1-normed (normalize-scentroid fm1-bright fm1-fund))
+(plotter (new plot points (points fm1-normed) point-size (new point :x 0 :y 0)))
+
+(defparameter fm2-normed (normalize-scentroid fm2-bright fm2-fund))
+(plotter (new plot points (points fm2-normed) point-size (new point :x 0 :y 0)))
+
+(defparameter fm3-normed (normalize-scentroid fm3-bright fm3-fund))
+(plotter (new plot points (points fm3-normed) point-size (new point :x 0 :y 0)))
+
+;;; => fm3-normed demonstrates flat normed centroid even through pitch is rising
+|#
+
+#|
+
+(compile-file "/Users/bbattey/CMJ-Audio/picacs/clm/scentroid/scentroid.ins")
+(load "/Users/bbattey/CMJ-Audio/picacs/clm/scentroid/scentroid")
+(defparameter myfile 
+  "/Users/bbattey/CMJ-Audio/vk-yaman/vk-yaman-1-alap.aif")
+
+(defparameter vals '())
+(defparameter svals '())
+(defparameter pvals '())
+
+(setf svals  (scentroid myfile :dur 2))
+(setf pvals (autoc myfile :dur 2))
+(setf vals (normalize-scentroid svals pvals))
+
+
+
+|#

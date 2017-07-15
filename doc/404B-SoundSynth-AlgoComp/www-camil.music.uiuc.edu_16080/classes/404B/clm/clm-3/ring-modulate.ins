@@ -1,0 +1,248 @@
+;; ring-modulate-file --  A ring-modulating instrument.
+;;
+;; Programmer:    Craig Stuart Sapp <craig@ccrma.stanford.edu>
+;; Creation Date: Mon Oct 21 12:11:48 PDT 1996
+;; Last Modified: Mon Oct 21 20:53:41 PDT 1996
+;; Filename:      /Local/Lisp/clm-ins/ring-modulate/ring-modulate.ins
+;; Syntax:        GNU Common Lisp 2.2; Packages: CLM
+;; $Smake:        (compile-file "%f") (load "%b")
+;;
+;; Description: This CLM instrument will apply ring modulation to a 
+;;      sound file with a specified sinewave.  Ring modulation is
+;;      a fancy name for multiplying the two signals together.  When
+;;      you multiply the two sounds together in the time domain, you get
+;;      the sum and difference tones in the frequency domain.  For example, 
+;;      if you ring modulate the two sinewaves 300 and 100 Hz, this instrument 
+;;      will output the sinewaves 200 and 400 Hz (you have to add the 
+;;      originals back in if you want to hear them as well).
+;;
+;;      Karlheinz Stockhausen has used ring modulation in several of his
+;;      compositions.  See his compositions Kontakte, Mixtur, and Mantra
+;;      for example uses of ring modulation.
+;;
+#| Commands to load the instrument:
+(compile-file "/Lisp/clm-ins/ring-modulate/ring-modulate.ins")
+(load "/Lisp/clm-ins/ring-modulate/ring-modulate")
+|#
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+#| Description of parameters:
+
+Usage: 
+   (ring-modulate-file file-name &key :freq-env :freq :start :dur :file-start 
+                                  :amp :amp-env :channel :freq-skew)
+
+file-name:  Name of the sound-file to modulate.
+freq-env:   The frequency envelope of the sinewave to modulate with.
+               The default value is '(0 1  100 1) which means a constant-
+               valued sinwave of 1 Hz will be applied in the modulation.
+freq:       If you want just a steady-state ring modulation with a single
+               sinewave you can use this parameter.  This parameter overrides
+               the :freq-env parameter.  The default value is nil.
+start:      This is the start time in seconds of the output sound. 
+               Default is 0.0 seconds.
+dur:        This is the duration of the output sound in seconds.  If the 
+               input file ends before the specified duration, then that
+               shorter duration will be used.  If not specified, then the 
+               duration to the end of the input file will be used.  Default
+               is nil.
+file-start: The start time location in the input soundfile, i.e. the offset
+               time into the input soundfile.  The default is the beginning
+               of the file, 0.0 seconds.
+amp:        The amplitude gain for the sound.  1.0 will leave the sound
+               loudness unchanged.  0.5 will make the sound 3 dB quieter.
+               Be careful not to distort the sound by having the amp too large.
+               Default is 1.0.
+amp-env:    A time-varying amplitude value, where the envelope value 1.0 is
+               the amp: parameter value.  Default value is '(0 1 100 1).
+channel:    This instrument will only read one channel, so if you have a 
+               stereo file, you must choose which channel to input.  The
+               default is channel ':A.
+freq-skew:  Don't change this unless you want to change the meaning of the
+               freq-env values.  Default value of 1.0 means that freq-env
+               is an envelope in Hertz.
+|#
+            
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(definstrument ring-modulate-file
+   ( 
+      file-name                   ; name of soundfile to ring modulate
+   &key
+      (freq-env '(0 1 100 1))     ; the frequency envelope of the sinewave
+      (freq nil)                  ; overrides freq-env if used
+      (start 0.0)                 ; start time of output sound in seconds
+      (dur nil)                   ; duration of the sound in seconds
+      (file-start 0.0)            ; start time point of file in seconds
+      (amp 1.0)                   ; global loudness control
+      (amp-env '(0 1 100 1))      ; amplitude envelope
+      (channel 0)                 ; channel to read if multi-channel soundfile
+      (freq-skew 1.0)             ; freq-env means Hertz
+   )
+   (let* 
+      (
+         (sound-file (open-input* file-name))
+         (sound-file-duration (sound-duration file-name))
+         (duration (min (if (null dur) sound-file-duration dur)
+                        (- sound-file-duration file-start) ))
+
+         (start-sample (floor (* start *srate*)))
+         (end-sample (floor (+ start-sample (* duration *srate*))))
+
+         ; override freq-env if freq is specified:
+         (freq-env (if (null freq) freq-env (list 0 freq 100 freq)))
+
+         (input-sound (make-readin
+               :file sound-file
+               :channel channel
+               :start (round (* file-start (sound-srate sound-file)))))
+     
+         (oscillator (make-oscil :frequency 1.0 ))
+         (gliss-env (make-env
+               :envelope freq-env
+               :scaler (hz->radians freq-skew)
+               :duration duration ))
+
+         (amplitude-env (make-env 
+               :envelope amp-env
+               :scaler amp
+               :duration duration ))
+
+      ) ; end of let* variables
+      (run
+         (loop for i from start-sample to end-sample do
+            (outa i (* (env amplitude-env) 
+                       (ring-modulate (readin input-sound) 
+                                      (oscil oscillator (env gliss-env) ))))
+      )  )  
+)  )  
+   
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+#| Example calls to the instrument:
+
+(with-sound () 
+   (ring-modulate-file "/NextLibrary/Sounds/Rooster.snd" 
+      :freq-env '(0 440 25 440 26 220 50 220 51 3 75 5 76 100 100 0)
+   )
+
+   (ring-modulate-file "/NextLibrary/Sounds/Rooster.snd" :start 2.0
+      :freq-env '(0 880 25 920 26 440 50 440 51 6 75 5 76 100 100 50)
+   )
+)
+
+(with-sound () 
+   (ring-modulate-file "/LocalLibrary/Sounds/audio-tests/440Hz.snd" 
+      :freq-env '(0 440 25 440 26 220 50 220 51 3 75 5 76 100 100 10000)
+   )
+)
+
+(with-sound (:srate 8012) 
+   (ring-modulate-file "/Users/craig/sounds/meepmeep.snd" :amp 0.1 :freq 100)
+)
+
+(with-sound () 
+   (ring-modulate-file "/Users/craig/sounds/brook-mono.snd" 
+      :freq-env '(0 0 100 600))
+)
+
+
+
+(compile-file "/Lisp/clm-ins/ring-modulate/ring-modulate.ins")
+(load "/Lisp/clm-ins/ring-modulate/ring-modulate")
+
+
+|#
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun ring-modulate-help (&optional (key nil))
+   (let
+      (
+         (description
+"
+RING-MODULATE-FILE -- Multiply a sound-file and a sinewave together.
+Usage: 
+   (RING-MODULATE-FILE file-name &key :freq-env :freq :start :dur :file-start 
+                                  :amp :amp-env :channel :freq-skew)
+
+file-name:  Name of the sound-file to modulate.
+freq-env:   The frequency envelope of the sinewave to modulate with.
+               The default value is '(0 1  100 1) which means a constant-
+               valued sinwave of 1 Hz will be applied in the modulation.
+freq:       If you want just a steady-state ring modulation with a single
+               sinewave you can use this parameter.  This parameter overrides
+               the :freq-env parameter.  The default value is nil.
+start:      This is the start time in seconds of the output sound. 
+               Default is 0.0 seconds.
+dur:        This is the duration of the output sound in seconds.  If the 
+               input file ends before the specified duration, then that
+               shorter duration will be used.
+file-start: The start time location in the input soundfile, i.e. the offset
+               time into the input soundfile.  The default is the beginning
+               of the file, 0.0 seconds.
+amp:        The amplitude gain for the sound.  1.0 will leave the sound
+               loudness unchanged.  0.5 will make the sound 3 dB quieter.
+               Be careful not to distort the sound by having the amp too large.
+               Default is 1.0.
+amp-env:    A time-varying amplitude value, where the envelope value 1.0 is
+              the amp: parameter value.  Default value is '(0 1 100 1).
+channel:    This instrument will only read one channel, so if you have a 
+              stereo file, you must choose which channel to input.  The
+              default is channel ':A.
+freq-skew:  Don't change this unless you want to change the meaning of the
+               freq-env values.  Default value of 1.0 means that freq-env
+               is an envelope in Hertz.
+
+Type (ring-modulate-help 'examples) for example calls to the instrument.
+Type (ring-modulate-help 'parameters) for short list of instrument parameters.
+" 
+)
+         (parameters
+"
+   (RING-MODULATE-FILE file-name &key :freq-env :freq :start :dur :file-start 
+                                  :amp :amp-env :channel :freq-skew)
+"
+)
+         (examples
+" 
+; NB: You have to add quotes around the file names.
+
+(with-sound () 
+   (ring-modulate-file /NextLibrary/Sounds/Rooster.snd 
+      :freq-env '(0 440 25 440 26 220 50 220 51 3 75 5 76 100 100 0)
+   )
+)
+
+(with-sound ()
+   (ring-modulate-file /LocalLibrary/Sounds/audio-tests/440Hz.snd
+      :freq-env '(0 440 25 440 26 220 50 220 51 3 75 5 76 100 100 10000)
+   )
+)
+
+(with-sound (:srate 8012)
+   (ring-modulate-file /Users/craig/sounds/meepmeep.snd :freq 100)
+)
+
+(with-sound ()
+   (ring-modulate-file /Users/craig/sounds/brook-mono.snd
+      :freq-env '(0 0 100 600))
+)
+" 
+)
+      )
+      (cond
+         ((equal key 'parameters) (pprint parameters))
+         ((equal key 'examples)   (pprint examples))
+         (t                       (pprint description))
+      )
+)  )
+
+(defmacro ring-modulate-parameters () (ring-modulate-help 'parameters))
+(defmacro ring-modulate-examples () (ring-modulate-help 'examples))
+
+

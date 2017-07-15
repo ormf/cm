@@ -1,0 +1,11 @@
+(in-package :clm)
+
+(definstrument filtenv-noise (beg dur amp order env)
+  (let* ((beg (seconds->samples beg))
+         (end (+ beg (seconds->samples dur)))
+         (noi (make-rand :frequency (* .5 *srate*) :amplitude amp))
+         (flt (make-filter :xcoeffs
+                           (envelope->coeffs :order order :envelope env))))
+    (run
+     (loop for i from beg to end
+        do (outa i (filter flt (rand noi)))))))

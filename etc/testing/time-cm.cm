@@ -1,0 +1,90 @@
+;;; **********************************************************************
+
+(in-package :cm)
+
+(cond-expand
+ (guile
+  (define-macro (time form)
+    `(let ((a (get-internal-real-time)))
+       ,form
+       (format #t "~S sec.~%" 
+               (/ (- (get-internal-real-time) a)
+                  (* 1.0 internal-time-units-per-second)))
+       (values)))
+  )
+ (gauche
+  (define-macro (time form)
+    `(let ((a (time->seconds (current-time))))
+       ,form
+       (format #t "~S sec.~%"
+               (- (time->seconds (current-time)) a))
+       (values))))
+ (else #f  ))
+
+(define (avr . n)
+  (let ((l (length n)))
+    (/ (loop for x in n sum x) l)))
+
+
+;;;--------------------------- Timing Tests -----------------------------
+
+;;; #1 reading cyclic pattern 10000 times
+(define (timepat pat n)
+  (time (do ((i 0 (+ i 1)))
+            ((= i n) #f)
+          (next pat ))))
+(define a (new cycle :of (list 1 2 3 4 5 6 7 8 9 10)))
+(timepat a 10000)
+
+;;; #2 reading random pattern 10000 times
+(define a (new random :of (list 1 2 3 4 5 6 7 8 9 10)))
+(timepat a 10000)
+
+;;; #3 running process 10000 times
+(define zzz 0)
+(define (proc1 n)
+  (process for i below n do (set! zzz i)))
+(time (events (proc1 10000) #f))
+
+;;; #4 outputting 10000 midi notes to nowhere
+(define (proc2 n)
+  (process for i below n
+           output (new midi :time (now) :duration 1
+                       :keynum (between 60 90))))
+(time (events (proc2 10000) #f))
+
+;;; #5 appending 1000 midi notes to seq
+(define zzz (new seq ))
+(begin (remove-subobjects zzz)
+       (time (events (proc2 1000) zzz)))
+
+;;; #6 mixing 3 processes, 1000 MIDI notes with random waits to MIDI
+;;; file
+(define (proc3 n k)
+  (process repeat n
+           output (new midi :time (now) :duration 1
+                       :keynum k)
+           wait (between 0.0 10.0)))
+(time (events (list (proc3 1000 48) (proc3 1000 60) (proc3 1000 72))
+              "test.mid" :play #f))
+
+;;;-------------------------------------------------------------
+;;; MACHINE: Dual 1.8 GHz PPC/G5, 1GIG RAM, OS X 10.3.9
+;;;
+;;; #1 reading cyclic pattern 10000 times
+;;; #2 reading random pattern 10000 times
+;;; #3 running process 10000 times
+;;; #4 outputting 10000 midi notes to nowhere
+;;; #5 appending 1000 midi notes to seq
+;;; #6 3 processes to midifile, each 1000 notes/random waits 
+
+;;;                 #1      #2      #3      #4      #5      #6
+
+;;; Gauche 0.8.3    0.657   1.250   0.275   0.673   4.506   0.515  
+;;; Guile  1.7.1    1.000  36.000   7.666  18.000  17.333   6.333
+;;; STklos 0.61     0.360   1.555   0.340   0.786   1.383   ?????
+
+;;; CLISP 2.33      0.269   0.396   0.170   0.365   0.803   0.427
+;;; OpenMCL 0.14.2  0.047   0.117   0.150   0.222   0.438   0.235
+;;; SBCL 0.8.17     0.030   0.041   0.013   0.630   0.224   0.271
+

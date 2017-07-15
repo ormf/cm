@@ -1,0 +1,135 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; Perry Cook's maraca from CMJ vol 21 no 3 (Fall 97) p 44
+
+(definstrument maraca (beg dur &optional (amp .1) 
+			   (sound-decay 0.95) 
+			   (system-decay 0.999) 
+			   (probability .0625)
+			   (shell-freq 3200.0)
+			   (shell-reso 0.96))
+  (let* ((st (floor (* *srate* beg)))
+	 (nd (+ st (floor (* *srate* dur))))
+	 (temp 0.0)
+	 (shake-energy 0.0)
+	 (snd-level 0.0)
+	 (input 0.0)
+	 (output (make-double-array 2))
+	 (coeffs (make-double-array 2))
+	 (num-beans 64)
+	 (j 0)
+	 (sndamp (/ amp 16384.0))
+	 (srate4 (floor *srate* 4))
+	 (gain (/ (* (log num-beans 4) 40) num-beans)))
+    ;; gourd resonance filter
+    (setf (aref coeffs 0) (double (* -2.0 shell-reso (cos (hz->radians shell-freq)))))
+    (setf (aref coeffs 1) (double (* shell-reso shell-reso)))
+    (run
+     (loop for i from st to nd do
+       (when (< temp two-pi)
+	 ;; shake over 50msec and add shake energy
+	 (incf temp (hz->radians 20))
+	 (incf shake-energy (- 1.0 (cos temp))))
+       (when (= j srate4)		;shake 4 times/sec
+	 (setf temp 0.0)
+	 (setf j 0))
+       (incf j)
+       (setf shake-energy (* shake-energy system-decay))
+       ;; if collision, add energy
+       (if (< (random 1.0) probability) (incf snd-level (* gain shake-energy)))
+       ;; actual sound is random
+       (setf input (* snd-level (centered-random 1.0)))
+       ;; compute exponential sound decay
+       (setf snd-level (* snd-level sound-decay))
+       ;; gourd resonance filter calc
+       (setf input (- input 
+		      (* (aref output 0) (aref coeffs 0)) 
+		      (* (aref output 1) (aref coeffs 1))))
+       (setf (aref output 1) (double (aref output 0)))
+       (setf (aref output 0) (double input))
+       ;; extra zero for spectral shape, also fixup amp since Perry is assuming maxamp 16384
+       (outa i (* sndamp (- (aref output 0) (aref output 1))))))))
+
+;;; maraca: (with-sound () (maraca 0 5 .5))
+;;; cabasa: (with-sound () (maraca 0 5 .5 0.95 0.997 0.5 3000.0 0.7))
+
+(definstrument big-maraca (beg dur &optional (amp .1) 
+			       (sound-decay 0.95) 
+			       (system-decay 0.999) 
+			       (probability .0625)
+			       (shell-freqs '(3200.0))
+			       (shell-resos '(0.96))
+			       (randiff .01)
+			       (with-filters t))
+  ;; like maraca, but takes a list of resonances and includes low-pass filter (or no filter)			   
+  (let* ((st (floor (* *srate* beg)))
+	 (nd (+ st (floor (* *srate* dur))))
+	 (temp 0.0)
+	 (temp1 0.0)
+	 (resn (length shell-freqs))
+	 (shake-energy 0.0)
+	 (snd-level 0.0)
+	 (input 0.0)
+	 (sum 0.0)
+	 (last-sum 0.0)
+	 (last-diff 0.0)
+	 (diff 0.0)
+	 (output (make-double-array (list resn 2)))
+	 (coeffs (make-double-array (list resn 2)))
+	 (basesf (make-double-array resn))
+	 (num-beans 64)
+	 (j 0)
+	 (sndamp (/ amp (* 16384.0 resn)))
+	 (srate4 (floor *srate* 4))
+	 (gain (/ (* (log num-beans 4) 40) num-beans)))
+    ;; gourd resonance filters
+    (loop for i from 0 below resn and shell-freq in shell-freqs and shell-reso in shell-resos do
+      (setf (aref coeffs i 0) (double (* -2.0 shell-reso (cos (hz->radians shell-freq)))))
+      (setf (aref basesf i) (double (aref coeffs i 0)))
+      (setf (aref coeffs i 1) (double (* shell-reso shell-reso))))
+    (run
+     (loop for k from st to nd do
+       (when (< temp two-pi)
+	 ;; shake over 50msec and add shake energy
+	 (incf temp (hz->radians 20))
+	 (incf shake-energy (- 1.0 (cos temp))))
+       (when (= j srate4)		;shake 4 times/sec
+	 (setf temp 0.0)
+	 (setf j 0))
+       (incf j)
+       (setf shake-energy (* shake-energy system-decay))
+       ;; if collision, add energy
+       (when (< (random 1.0) probability) 
+	 (incf snd-level (* gain shake-energy))
+	 ;; randomize res freqs a bit
+	 (loop for i from 0 below resn do
+	   (setf (aref coeffs i 0) (double (+ (aref basesf i) (centered-random randiff))))))
+       ;; actual sound is random
+       (setf input (* snd-level (centered-random 1.0)))
+       ;; compute exponential sound decay
+       (setf snd-level (* snd-level sound-decay))
+       ;; gourd resonance filter calcs
+       (setf temp1 input)
+       (setf last-sum sum)
+       (setf sum 0.0)
+       (loop for i from 0 below resn do
+	 (setf input temp1)
+	 (setf input (- input 
+			(* (aref output i 0) (aref coeffs i 0)) 
+			(* (aref output i 1) (aref coeffs i 1))))
+	 (setf (aref output i 1) (double (aref output i 0)))
+	 (setf (aref output i 0) (double input))
+	 (incf sum input))
+       (if with-filters
+	   (progn
+	     (setf last-diff diff)
+	     (setf diff (- sum last-sum))
+	     (setf temp1 (+ last-diff diff)))
+	 (setf temp1 sum))
+       ;; extra zero for spectral shape, also fixup amp since Perry is assuming maxamp 16384
+       (outa k (* sndamp temp1))))))
+
+;;; tambourine: (with-sound () (big-maraca 0 1 .25 0.95 0.9985 .03125 '(2300 5600 8100) '(0.96 0.995 0.995) .01))
+;;; sleighbells: (with-sound () (big-maraca 0 2 .5 0.97 0.9994 0.03125 '(2500 5300 6500 8300 9800) '(0.999 0.999 0.999 0.999 0.999)))
+;;; sekere: (with-sound () (big-maraca 0 2 .5 0.96 0.999 .0625 '(5500) '(0.6)))
+;;; windchimes: (with-sound () (big-maraca 0 2 .5 0.99995 0.95 .001 '(2200 2800 3400) '(0.995 0.995 0.995) .01 nil))

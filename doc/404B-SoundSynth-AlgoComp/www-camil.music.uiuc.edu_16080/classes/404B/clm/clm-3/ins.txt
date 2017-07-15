@@ -1,0 +1,175 @@
+This is a description of all the instruments currently in the clm distribution files.
+I've divided them into a few categories (fm, additive synthesis, etc), not all of
+which are mutually exclusive.
+
+
+------------------------------------------------------------------------
+FREQUENCY MODULATION
+
+asy			clm.txt			asymmetric FM
+canter			canter.ins		chanter portion of Peter Commons' bagpipe (bag.clm)
+cascade			fm.html			cascade FM drum (Jan Mattox)
+cellon			cellon.ins		feedback fm (Stanislaw Krupowiecz)
+simple-fm		clm.txt			simple FM example
+fm			fm.html			simple FM example (John Chowning)
+fm			fm.html			simple FM with index envelope
+fm			fm.html			simple FM showing initial phase cancellations
+fm			fm.html			simple FM with phase changes
+fm			fm.html			single sideband FM
+fm			fm.html			multiple modulator FM
+fm-bell			bell.ins		fm bell (Michael McNabb)
+fm-bell			fmex.ins		same
+fm-drum			fmex.ins		FM drum (same as casade above)
+fm-insect		insect.ins		FM for insect simulations
+fm-noise		noise.ins		FM for ocean wave simulations
+fm-trumpet		trp.ins			Dexter Morrill's FM trumpet
+fm-violin		v.ins			fm violin (fm-violin.clm, cream.clm, popi.clm)
+fm-voice		jcvoi.ins		multiple carrier FM for vocal simulations (John Chowning)
+gong			fmex.ins		Paul Weineke's FM gong
+mlb-voice		mlbvoi.ins		Marc LeBrun's moving formants in FM
+metal                   prc96.ins               Perry Cook's "heavy metal" instrument
+pm			fm.html		 	phase modulation
+reson			reson.ins		multiple carrier FM for resonances (John Chowning)
+rhodey                  prc96.ins               Perry Cook's electric piano
+tubebell                prc96.ins               Perry Cook's tubular bell
+violin			fm.html			fm-violin pared down somewhat
+vox			fm.html			multiple carrier FM (Marc LeBrun)
+vox			vox.ins			same as mlbvoi.ins, apparently
+wurley                  prc96.ins               Perry Cook's Wurlitzer?
+
+------------------------------------------------------------------------
+ADDITIVE SYNTHESIS and WAVESHAPING
+
+badd			badd.ins		fancy additive synthesis (Doug Fulton)
+BigBird			clm.txt			waveshaping using polynomial unit generator
+bigbird			bigbird.ins		same as above (bird.clm)
+bigbird-2		bigbird.ins		same as above (different arguments)
+bird			bird.ins		sine wave (bird.clm)
+brighten		clm.txt			brighten a sound using waveshaping
+complete-add		add.ins			additive synthesis with examples from John Grey
+drone			drone.ins		Peter Commons' bagpipe drone (bag.clm)
+hammondoid              prc96.ins               Perry Cook's Hammond organ (sort of)
+lbj-piano		lbjPiano.ins		Doug Fulton's piano simulation using spectra of J.A.Moorer
+pqw			pqw.ins			phase quadrature waveshaping (single sideband spectra from waveshaping)
+pqw-vox			pqwvox.ins		same but implements moving formant regions
+spectrum		ugex.ins		wavetable output
+touch-tone-telephone	ugex.ins		implement touch tone telephone sounds
+two-tab			ugex.ins		interpolate between stored waveforms
+waveshaping		bessel.lisp		waveshaping again
+
+------------------------------------------------------------------------
+PHYSICAL MODELLING
+
+bow			prc-toolkit95.lisp	bowed sound (Perry Cook)
+brass			prc-toolkit95.lisp	brass sound (Perry Cook)
+clarinet		prc-toolkit95.lisp	clarinet sound (Perry Cook)
+flute			prc-toolkit95.lisp	flute sound (Perry Cook)
+maraca and big-maraca 	maraca.ins		maraca and other such sounds (Perry Cook)
+p                       piano.ins               piano (Scott Van Duyne)
+pluck			pluck.ins		plucked string sound (David Jaffe)
+plucky			prc-toolkit95.lisp      same but by Perry Cook
+singer			singer.ins		vocal sounds (Perry Cook)
+stereo-flute		flute.ins		flute sound (Nicky Hind)
+
+------------------------------------------------------------------------
+FILTERS and FFTS
+
+addflts			addflt.ins		filter various kinds of input (Richard Karpen, Xavier Serra)
+anoi                    anoi.ins                noise reduction
+cnv			cnv.ins			convolve file and impulse response
+convins			clm.txt			same
+cnvo			cnv.ins			same
+cross-synthesis		clm.txt			cross synthesis using ffts and formnt gens
+filter-noise		clm.txt			filter noise (example of fltdes.lisp funcs)
+filter-noise		fltdes.lisp		same
+filter-noise		fltnoi.ins		same
+filter-noise		fltnoi.ins		same
+filter-noise		filter-noise.ins, moog.lisp Moog filters (Fernando Lopez-Lezcano)
+filter-sound		fltsnd.ins		filter a sound file
+filter-white-noise	ugex.ins		formant in noise
+grapheq                 grapheq.ins             graphic equalizer (Marco Trevisani)
+inside-out		clm.txt			fft-based sound distortion
+noi-attempt		ugex.ins		formants sliding around in noise (C. Penrose)
+pins			san.ins			spectral modeling a la SMS (Xavier Serra)
+pvins			ugex.ins		fft with shifts
+pvoc                    pvoc.ins                phase vocoder (Michael Klingbeil and Michael Edwards)
+resflt			resflt.ins		filter various kinds of input (Richard Karpen, Xavier Serra)
+tc			tc.ins			similar to pvins
+zc			zd.ins			interpolating comb filters (phasing)
+zcomb			clm.txt			same
+zn			zd.ins			interpolating notch filters
+
+------------------------------------------------------------------------
+REVERBERATION
+
+cnv-reverb		cnv.ins			reverb via convolution with gaussian noise
+cnvrev			cnv.ins			convolves using overlap-add
+dlocnrev		dlocsig.lisp		moving sound source reverb
+echo                    clm.txt                 produce echoes
+jc-reverb		jcrev.ins		John Chowning's ancient reverb
+jl-reverb		jlrev.ins		a more cavernous version of the same
+kiprev			kiprev.ins		Kip Sheeline's ancient reverb
+nrev			nrev.ins		Michael McNabb's reverb
+preverb			preverb.ins		real-time version of jc-reverb
+revsnd                  useful.lisp             reverberate a sound file
+rev2                    rev2.ins                example of 2 reverbs running at once
+freeverb                freeverb/freeverb.ins   Fernando's translation of J. Wakefield's freeverb
+
+------------------------------------------------------------------------
+GRANULAR SYNTHESIS
+
+expand-sound		clm.txt			granulate gen example (sound input)
+expfil			expsrc.ins		granulate two files interleaved
+exps			clm.txt			granulate gen example
+expsnd			expsrc.ins		granulate gen with envelopes on various fields
+expsrc			expsrc.ins		granulate and src to mimic phase vocoder tricks
+gran-synth		ugex.ins		grains using wave-train gen
+grani			grani.ins		granular synthesis (Fernando Lopez-Lezcano)
+interleave-files        expsrc.ins		grains from successive files
+
+------------------------------------------------------------------------
+SOUND PROCESSING
+
+add-sound		addsnd.ins		mix in sound
+backandforth		clm.txt			read a sound back and forth until time is used up
+cross-fade,dissolve-fade fade.ins               cross-fades using spectral sweep, split, dissolve
+dissolve                fade.ins                sound analog to graphical dissolve fade
+env-sound		clm.txt			apply envelope to sound (readin)
+fullmix                 fullmix.ins             mixer
+hello-dentist		clm.txt			rand-interp to make a voice quaver
+ring-modulate-file      ring-modulate.ins       ring modulate a sound (Craig Sapp)
+scratch                 ug1.ins                 fancier version of backandforth
+simp 			clm.txt                 src as all-purpose sound effect
+zipper                  zipper.ins              The 'digital zipper' effect.
+
+------------------------------------------------------------------------
+OTHER
+
+airy-x			bessel.lisp		Airy functions for sound synthesis
+attract			clm.txt			brass tones from "Rossler Attractor" (James McCartney)
+auto			clm.txt			example of CLM instrument outside with-sound
+bes-fm			bessel.lisp		Bessel functions imitating FM for synthesis
+bessel-convolve		bessel.lisp		convolution in bessel function space
+call-c			clm.txt			example of user-defined C generator
+fofins			clm.txt			FOF implementation (Perry Cook)
+formnt-noise            balance.html            balance/rms/gain gens (Sam Heisz)
+fractal			clm.txt			fractals for synthesis
+sinewave		dlocsig/index.html	example of dlocsig gen
+mapenv			clm.txt			arbitrary connecting curves for envelopes
+p			clm.txt			example of run*
+simp			clm.txt			example of sine wave using no unit generators
+simp			clm.txt			example of sine using oscil
+simp			clm.txt			example of oscil with an envelope
+simp			clm.txt			example of waveshape gen
+simp			clm.txt			example of src gen
+simp			clm.txt			example of def-clm-struct
+simp			clm.txt			same but fancier
+simp			clm.txt			same but fancier
+simp                    cmus.lisp               example of string (formatted) output to file
+space			clm.txt			example of panning between speakers
+ss			clm.txt			sine summation synthesis
+track-rms		rmsp.ins		return RMS profile of sound (Michael Edwards)
+
+
+
+There are also many examples in ug.ins and ug1.ins, normally used as test cases.

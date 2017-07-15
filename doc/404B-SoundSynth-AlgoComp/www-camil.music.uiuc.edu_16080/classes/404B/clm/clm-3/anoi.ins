@@ -1,0 +1,73 @@
+(definstrument anoi (infile dur &optional (fftsize 128) (amp-scaler 10.0) (r two-pi))
+  ;; a kind of noise reduction -- on-going average spectrum is squelched to some extent
+  ;; obviously aimed at intermittent signal in background noise
+  ;; this is based on Perry Cook's Scrubber.m
+  (let* ((freq-inc (floor fftsize 2))
+	 (fdi (make-double-array fftsize))
+	 (fdr (make-double-array fftsize))
+	 (spectr (make-double-array freq-inc))
+	 (scales (make-double-array freq-inc))
+	 (diffs (make-double-array freq-inc))
+	 (win (make-fft-window blackman2-window fftsize))
+	 (k 0)
+	 (amp 0.0)
+	 (incr (/ (* amp-scaler 4) *srate*))
+	 (end (floor (* dur *srate*)))
+	 (file (open-input* infile))
+	 (radius (- 1.0 (/ r fftsize)))
+	 (bin (float (/ *srate* fftsize)))
+	 (fs (make-array freq-inc)))
+
+    (loop for ctr from 1 below freq-inc do 
+      (setf (aref fs ctr) (make-formant radius (* ctr bin))))
+    (dotimes (ctr freq-inc) 
+      (setf (aref spectr ctr) 1.0)
+      (setf (aref scales ctr) 1.0))
+    
+    (run 
+     (loop for i from 0 below end do
+       (declare (optimize (safety 1)))
+       (let ((inval (ina i file)))
+	 (setf (aref fdr k) inval)
+	 (incf k)
+	 (if (< amp amp-scaler) (incf amp incr))
+	 (when (>= k fftsize)
+	   (setf k 0)
+	   (spectrum fdr fdi win 1)
+	   (dotimes (ctr freq-inc)
+	     (setf (aref spectr ctr) (+ (* .9 (aref spectr ctr)) (* .1 (aref fdr ctr))))
+	     (if (>= (aref spectr ctr) (aref fdr ctr)) 
+		 (setf (aref diffs ctr) (/ (aref scales ctr) (- fftsize)))
+	       (setf (aref diffs ctr)
+		 (/ (- (/ (- (aref fdr ctr) (aref spectr ctr)) (aref fdr ctr)) (aref scales ctr)) fftsize)))))
+	 (let ((outval 0.0))
+	   (loop for ctr from 1 below freq-inc do
+	     (let ((cur-scale (aref scales ctr)))
+	       (incf outval (* cur-scale (formant (aref fs ctr) inval)))
+	       (incf (aref scales ctr) (aref diffs ctr))))
+	   (outa i (* amp outval))))))
+    (close-input file)))
+
+
+#|
+Date: Fri, 25 Sep 1998 09:56:41 +0300
+From: Matti Koskinen <mjkoskin@sci.fi>
+To: linux-audio-dev@ginette.musique.umontreal.ca
+Subject: [linux-audio-dev] Announce: alpha version of denoising
+[...]
+	I wrote a simple denoiser called anoi after it's parent
+	clm-instrument anoi.ins.
+
+	anoi tries to remove white noise like tape hiss from wav-
+	files. Removing of noise succeeds ok, but depending of the
+	original sound, some distortion can be audible.
+
+	If someone is interested, http://www.sci.fi/~mjkoskin
+	contains tarred and gzipped file.
+
+	Now only monophonic wav-files can be denoised, but adding
+	others isn't too difficult. 
+
+-matti
+mjkoskin@sci.fi
+|#

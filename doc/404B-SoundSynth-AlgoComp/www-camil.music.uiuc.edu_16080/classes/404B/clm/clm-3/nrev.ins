@@ -1,0 +1,76 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+;;; NREV (the most popular Samson box reverb)
+
+(defun prime (val)
+  (or (= val 2)
+      (and (oddp val)
+	   (do ((i 3 (+ i 2))
+		(lim (sqrt val)))
+	       ((or (= 0 (mod val i)) (> i lim))
+		(> i lim))))))
+       
+(definstrument nrev (startime dur &key (reverb-factor 1.09)
+			      (lp-coeff 0.7)
+			      (output-scale 1.0)
+			      (volume 1.0) amp-env)
+
+  ;; reverb-factor controls the length of the decay -- it should not exceed (/ 1.0 .823)
+  ;; lp-coeff controls the strength of the low pass filter inserted in the feedback loop
+  ;; output-scale can be used to boost the reverb output
+
+  (let* ((srscale (/ *srate* 25641))
+	 (val 0)
+	 (envA (if amp-env (make-env :envelope amp-env :scaler output-scale :duration dur)))
+	 (dly-len (make-array 15 :element-type 'fixnum 
+			      :initial-contents '(1433 1601 1867 2053 2251 2399 347 113 37 59 53 43 37 29 19))))
+    ; was backwards??? --  19 29 37 43 53 59 37 113 347 2399 2251 2053 1867 1601 1433
+    (loop for i below 15 do
+      (setf val (floor (* srscale (aref dly-len i))))
+      (if (= 0 (mod val 2)) (incf val))
+      (loop while (not (prime val)) do (incf val 2))
+      (setf (aref dly-len i) val))
+    (let* ((comb1 (make-comb (* .822 reverb-factor) (aref dly-len 0)))
+	   (comb2 (make-comb (* .802 reverb-factor) (aref dly-len 1)))
+	   (comb3 (make-comb (* .773 reverb-factor) (aref dly-len 2)))
+	   (comb4 (make-comb (* .753 reverb-factor) (aref dly-len 3)))
+	   (comb5 (make-comb (* .753 reverb-factor) (aref dly-len 4)))
+	   (comb6 (make-comb (* .733 reverb-factor) (aref dly-len 5)))
+	   (low (make-one-pole lp-coeff (- lp-coeff 1.0)))
+	   (chan2 (> (mus-channels *output*) 1))
+	   (chan4 (= (mus-channels *output*) 4))
+	   (allpass1 (make-all-pass -0.700 0.700 (aref dly-len 6)))
+	   (allpass2 (make-all-pass -0.700 0.700 (aref dly-len 7)))
+	   (allpass3 (make-all-pass -0.700 0.700 (aref dly-len 8)))
+	   (allpass4 (make-all-pass -0.700 0.700 (aref dly-len 9))) ; 10 for quad
+	   (allpass5 (make-all-pass -0.700 0.700 (aref dly-len 11)))
+	   (allpass6 (if chan2 (make-all-pass -0.700 0.700 (aref dly-len 12))))
+	   (allpass7 (if chan4 (make-all-pass -0.700 0.700 (aref dly-len 13))))
+	   (allpass8 (if chan4 (make-all-pass -0.700 0.700 (aref dly-len 14))))
+	   (rev 0.0)
+	   (outrev 0.0)
+	   (beg (floor (* startime *srate*)))
+	   (end (+ beg (floor (* dur *srate*)))))
+      (run
+       (loop for i from beg to end do
+	 (setf rev (* volume (ina i *reverb*)))
+	 (setf outrev
+	   (all-pass allpass4
+		     (one-pole low
+			       (all-pass allpass3
+					 (all-pass allpass2
+						   (all-pass allpass1
+							     (+ (comb comb1 rev)
+								(comb comb2 rev)
+								(comb comb3 rev)
+								(comb comb4 rev)
+								(comb comb5 rev)
+								(comb comb6 rev))))))))
+	 (if envA (setf output-scale (env envA)))
+	 (outa i (* output-scale (all-pass allpass5 outrev)))
+	 (if chan2 (outb i (* output-scale (all-pass allpass6 outrev))))
+	 (if chan4 (outc i (* output-scale (all-pass allpass7 outrev))))
+	 (if chan4 (outd i (* output-scale (all-pass allpass8 outrev))))))
+      )))
+
+

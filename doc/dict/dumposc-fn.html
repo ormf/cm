@@ -1,0 +1,84 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>dumposc</title>
+</head>
+
+<body>
+<div id="content"> 
+<!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">dumposc</code> <var>oscfile</var> . <var>stream</var><code>)</code></dd>
+</dl>
+
+<p>
+Prints the contents of <a href="supercollider-topic.html"><var>oscfile</var></a> to <var>stream</var>, which defaults to the standard output. Returns <var>stream</var>.
+</p>
+
+</dl>
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Printing the contents of an
+.osc file to the standard output.
+</p>
+<pre class="code">
+(<a href="defobject-fn.html">defobject</a> simple (scsynth)
+  ((freq <span class="keyword">:initform</span> 440)
+   (dur <span class="keyword">:initform</span> 1)
+   (amp <span class="keyword">:initform</span> .2)
+   (pan <span class="keyword">:initform</span> 0))
+  (<span class="keyword">:parameters</span> freq dur amp pan time))
+
+(<span class="special">define</span> (<span class="defined">sc-simple-1</span> num)
+  (<a href="process-mac.html">process</a> repeat num 
+	   output (<a href="new-mac.html">new</a> simple <span class="keyword">:time</span> (<a href="now-fn.html">now</a>) 
+		       <span class="keyword">:freq</span> (<a href="between-fn.html">between</a> 300 700)
+		       <span class="keyword">:dur</span> (<a href="between-fn.html">between</a> 10 20)
+		       <span class="keyword">:amp</span> .1
+		       <span class="keyword">:pan</span> (<a href="pickl-fn.html">pickl</a> '(-1.0 0 1.0)))
+	   wait (<a href="between-fn.html">between</a> 2.0 3.0)))
+
+(<a href="events-fn.html">events</a> (sc-simple-1 10) <span class="string">"sc-simple-1.osc"</span> )
+<span class="result">&rArr;</span> <span class="string">"sc-simple-1.osc"</span>
+
+(dumposc <span class="string">"sc-simple-1.osc"</span>)
+[
+[0.0, [/s_new, simple, -1, 1, 0, freq, 393, dur, 12, amp, 0.1, pan, 1.0]],
+[2.0071507, [/s_new, simple, -1, 1, 0, freq, 344, dur, 13, amp, 0.1, pan, 0]],
+[5.004827, [/s_new, simple, -1, 1, 0, freq, 603, dur, 13, amp, 0.1, pan, 0]],
+[8.002115, [/s_new, simple, -1, 1, 0, freq, 648, dur, 17, amp, 0.1, pan, -1.0]],
+[10.004819, [/s_new, simple, -1, 1, 0, freq, 618, dur, 18, amp, 0.1, pan, 1.0]],
+[12.007147, [/s_new, simple, -1, 1, 0, freq, 507, dur, 10, amp, 0.1, pan, 1.0]],
+[15.000254, [/s_new, simple, -1, 1, 0, freq, 344, dur, 11, amp, 0.1, pan, 1.0]],
+[17.00118, [/s_new, simple, -1, 1, 0, freq, 356, dur, 18, amp, 0.1, pan, -1.0]],
+[19.001633, [/s_new, simple, -1, 1, 0, freq, 462, dur, 19, amp, 0.1, pan, 0]],
+[21.007278, [/s_new, simple, -1, 1, 0, freq, 386, dur, 14, amp, 0.1, pan, 0]],
+[26.007278, [/c_set, 0, 0]]
+]
+<span class="result">&rArr;</span> #t
+
+</pre>
+</div>
+<h4>See also:</h4>
+<ul>
+<li><a href="supercollider-topic.html">Supercollider</a> [Topic]</li>
+<li><a href="midi-file-print-fn.html"><code>midi-file-print</code></a> [Function]</li>
+<li><a href="import-events-fn.html"><code>import-events</code></a> [Function]</li>
+</ul>
+
+</div> 
+<!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

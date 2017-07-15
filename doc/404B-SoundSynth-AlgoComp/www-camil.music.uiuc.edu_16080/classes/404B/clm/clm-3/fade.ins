@@ -1,0 +1,165 @@
+;;; cross fade instruments
+;;;
+;;; cross-fade sweeps up, down, or from mid-spectrum outwards,
+;;; dissolve-fade chooses randomly -- like a graphical dissolve
+;;; neither is exactly spectacular, but they work -- use similar sounds if possible (speech is problematic)
+
+(definstrument cross-fade (beg dur amp file1 file2 ramp-beg ramp-dur ramp-type &optional (bank-dur .1) (fs 256) (fwidth two-pi))
+  ;; ramp-type 0=sweep up, 1=sweep down, 2=split from middle
+  (let* ((fil1 (open-input* file1))
+         (fil2 (and fil1 (open-input* file2))))
+    (when fil1
+      (if (not fil2)
+          (close-input fil1)
+        (unwind-protect
+	    (let* ((start (floor (* beg *srate*)))
+		   (end (+ start (floor (* dur *srate*))))
+		   (ramp 0.0)
+		   (bank1 0.0)
+		   (bank2 1.0)
+		   (half-fs (/ fs 2))
+		   (ramp-samps (floor (* *srate* ramp-dur)))
+		   (bank-samps (floor (* *srate* bank-dur)))
+		   (ramp-incr (/ 1.0 ramp-samps))
+		   (ramp-start (+ start (floor (* *srate* ramp-beg))))
+		   (bank1-start (- ramp-start bank-samps))
+		   (bank-incr (/ 1.0 bank-samps))
+		   (ramp-end (+ ramp-start ramp-samps))
+		   (bank2-start ramp-end)
+		   (bank2-end (+ bank2-start bank-samps))
+		   (ctr1 0)
+		   (ctr2 0)
+		   (bin (float (/ *srate* (* 2 fs))))
+		   (radius (- 1.0 (/ fwidth (* 2 fs))))
+		   (fs1 (make-array fs))
+		   (val 0.0)
+		   (ifs (/ 1.0 fs))
+		   )
+	      (loop for k from 1 below fs do (setf (aref fs1 k) (make-formant radius (* k bin))))
+	      (run
+	       (loop for i from start to end do
+		 (declare (type :integer bank1-start bank2-start bank2-end ctr1 ctr2 ramp-type ramp-end fs)
+			  (type :float bank-incr val ifs ramp-incr amp ramp)
+			  (type :mus-any* fs1))
+	         (if (< i bank1-start)
+		     ;; in first section -- just mix in file1
+		     (progn
+		       (setf val (ina ctr1 fil1))
+		       (incf ctr1))
+		   (if (> i bank2-end)
+		       ;; in last section -- just mix file2
+		       (progn
+			 (setf val (ina ctr2 fil2))
+			 (incf ctr2))
+		     (if (< i ramp-start)
+			 ;; in bank1 section -- fire up the resonators
+			 (let ((inval (ina ctr1 fil1))
+			       (outval 0.0))
+			   (incf ctr1)
+			   (incf bank1 bank-incr)
+			   (dotimes (k (1- fs)) (incf outval (formant (aref fs1 (1+ k)) inval)))
+			   (setf val (+ (* bank1 outval) (* (- 1.0 bank1) inval))))
+		       (if (> i ramp-end)
+			   ;; in bank2 section -- ramp out resonators
+			   (let ((inval (ina ctr2 fil2))
+				 (outval 0.0))
+			     (incf ctr2)
+			     (decf bank2 bank-incr)
+			     (dotimes (k (1- fs)) (incf outval (formant (aref fs1 (1+ k)) inval)))
+			     (setf val (+ (* bank2 outval) (* (- 1.0 bank2) inval))))
+			 ;; in the fade section
+			 (let ((inval1 (ina ctr1 fil1))
+			       (inval2 (ina ctr2 fil2))
+			       (outval 0.0))
+			   (incf ctr1)
+			   (incf ctr2)
+			   ;; now the choice of spectral fade -- we should end with all bank1 0.0 and all bank2 1.0
+			   (incf ramp ramp-incr)
+			   (if (= ramp-type 0)
+			       (let ((r2 (* 2 ramp)))
+				 ;; sweep up so low freqs go first
+				 (dotimes (k (1- fs))
+				   (let ((rfs (max 0.0 (min 1.0 (- r2 (* k ifs))))))
+				     (incf outval (formant (aref fs1 (1+ k)) (+ (* rfs inval2) (* (- 1.0 rfs) inval1))))))
+				 (setf val outval))
+			     (if (= ramp-type 1)
+				 (let ((r2 (* 2 ramp)))
+				   ;; sweep up so high freqs go first
+				   (dotimes (k (1- fs))
+				     (let ((rfs (max 0.0 (min 1.0 (- r2 (* (- fs k) ifs))))))
+				       (incf outval (formant (aref fs1 (1+ k)) (+ (* rfs inval2) (* (- 1.0 rfs) inval1))))))
+				   (setf val outval))
+			       ;; sweep from midpoint out
+			       (let ((r2 (* 2 ramp)))
+				 (dotimes (k half-fs)
+				   (let ((rfs (max 0.0 (min 1.0 (- (+ r2 0.5) (* (- fs k) ifs))))))
+				     (incf outval (formant (aref fs1 (1+ k)) (+ (* rfs inval2) (* (- 1.0 rfs) inval1))))))
+				 (dotimes (k (1- half-fs))
+				   (let ((rfs (max 0.0 (min 1.0 (- r2 (/ k half-fs))))))
+				     (incf outval (formant (aref fs1 (+ k 1 half-fs)) (+ (* rfs inval2) (* (- 1.0 rfs) inval1))))))
+				 (setf val outval)))))))))
+		 (outa i (* amp val)))))
+	  (progn
+	    (close-input fil1)
+	    (close-input fil2)))))))
+
+;;; (with-sound () (cross-fade 0 4 1 "oboe" "trumpet" 1.0 .5 0 .1 256 2))
+;;;
+;;; these fades seem more successful to me when done relatively quickly (the opposite of the dissolve below
+;;; which is best if done as slowly as possible).  I like the sweep up best -- a sort of "evaporation" effect.
+
+
+(definstrument dissolve-fade (beg dur amp file1 file2 &optional (fsize 128) (r two-pi) (lo 2) (hi nil))
+  (let* ((fil1 (open-input* file1))
+         (fil2 (and fil1 (open-input* file2))))
+    (when fil1
+      (if (not fil2)
+          (close-input fil1)
+        (unwind-protect
+          (let* ((start (floor (* beg *srate*)))
+                 (end (+ start (floor (* dur *srate*))))
+                 (freq-inc (floor fsize 2))
+		 (bin (float (/ *srate* fsize)))
+                 (radius (- 1.0 (/ r fsize)))
+		 (spectrum (make-double-array freq-inc :initial-element 1.0))
+		 (ramp-inc (/ 1.0 1024.0))
+		 (ctr 0)
+		 (trigger (/ (* dur *srate*) freq-inc))
+                 (fs (make-array freq-inc)))
+            (if (null hi) (setf hi freq-inc))
+            (loop for k from lo below hi do (setf (aref fs k) (make-formant radius (* k bin))))
+            (run
+             (loop for i from start to end do
+	       (declare (type integer ctr freq-inc bin lo hi)
+			(type :double* spectrum)
+			(type :float trigger ramp-inc freq-inc))
+               (let ((outval 0.0)
+                     (inval1 (ina i fil1))
+		     (inval2 (ina i fil2)))
+		 ;; once a ramp is set in motion, it takes care of itself -- we need only choose which to trigger
+		 (incf ctr)
+		 (when (> ctr trigger)
+		   ;; find next randomly chosen resonator to flip
+		   (let ((next (floor (random freq-inc))))
+		     (when (/= (aref spectrum next) 1.0)
+		       (loop for j integer from next by 1 and k integer from next by -1 do
+			 (if (and (< j freq-inc) (= (aref spectrum j) 1.0)) (progn (setf next j) (loop-finish)))
+			 (if (and (>= k 0) (= (aref spectrum k) 1.0)) (progn (setf next k) (loop-finish)))
+			 (if (and (< k 0) (>= j freq-inc)) (error "oops"))))
+		     (decf (aref spectrum next) ramp-inc)
+		     (setf ctr 0)))
+		 (loop for k integer from lo below hi do
+		   (let ((sp (aref spectrum k)))
+		     (incf outval (formant (aref fs k) (+ (* sp inval1) (* (- 1.0 sp) inval2))))
+		     (when (> 1.0 sp 0.0)
+		       (decf (aref spectrum k) ramp-inc))))
+                 (outa i (* amp outval))))))
+        (progn
+          (close-input fil1)
+          (close-input fil2)))))))
+
+;;; (with-sound () (dissolve-fade 0 10 1 "/snd/sounds/press.snd" "/snd/sounds/rain.snd" 4096 2))
+;;;
+;;; another neat effect here is to simply let the random changes float along with no
+;;; direction -- if the hit is 1.0 send it toward 0.0 and vice versa -- strange
+;;; pitches emerge from noises etc

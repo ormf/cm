@@ -1,0 +1,104 @@
+;;; -*- Mode: LISP; Syntax: Common-lisp; Base: 10 -*-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Copyright (c) 92, 93, 94, 98, 99, 2000, 2001 Fernando Lopez Lezcano. 
+;;; All rights reserved.
+;;; Use and copying of this software and preparation of derivative works
+;;; based upon this software are permitted and may be copied as long as 
+;;; no fees or compensation are charged for use, copying, or accessing
+;;; this software and all copies of this software include this copyright
+;;; notice. Suggestions, comments and bug reports are welcome. Please 
+;;; address email to: nando@ccrma.stanford.edu
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Moving a source using dlocsig
+
+(definstrument move (start-time file
+                     &key 
+		     (amp 1.0)
+		     (paths '()))
+  (let* ((in-file (open-input file))
+	 (in-file-dur (sound-duration file))
+	 (in-file-sr (sound-srate file))
+	 (in-file-chans (sound-chans file))
+	 (npaths (if (> in-file-chans (length paths))
+		     (progn
+		       (warn "less paths [~s] than input channels [~s], extra channels ignored" 
+			     (length paths) in-file-chans)
+		       (length paths))
+		   (if (< in-file-chans (length paths))
+		       (progn
+			 (warn "less input channels [~s] than paths [~s], extra paths ignored" 
+			       in-file-chans (length paths))
+			 in-file-chans)
+		     (length paths))))
+	 ;; file readers bank, one for each channel spatialized
+	 (in (make-array npaths))
+	 ;; dlocsig bank, one for each channel spatialized
+	 (loc (make-array npaths))
+	 (beg (make-array npaths))
+	 (end (make-array npaths))
+	 ;; variables used inside the run loop
+	 (min-beg)
+	 (max-end))
+    ;; warn user if sample rates don't match
+    (if (/= in-file-sr *srate*)
+	(warn "input file sampling rate ~s does not match output sampling rate ~s"
+	      in-file-sr *srate*))
+    ;; create the input readers for each channel
+    (loop 
+      for f from 0 below npaths do
+      (setf (aref in f)(make-readin :file in-file :channel f)))
+    ;; create the dlocsig unit generators
+    (loop 
+      for d from 0 below npaths do
+      (multiple-value-bind (dloc dbeg dend)
+	  (make-dlocsig :path (pop paths)
+			:start-time start-time
+			:duration in-file-dur
+			:scaler amp)
+	(setf (aref loc d) dloc
+	      (aref beg d) dbeg
+	      (aref end d) dend)
+	(if (or (null min-beg)
+		(< dbeg min-beg))
+	    (setf min-beg dbeg))
+	(if (or (null max-end)
+		(> dend max-end))
+	    (setf max-end dend))))
+    ;; localize the input soundfile
+    (run
+     (loop for i from min-beg to max-end do
+       (declare (type (array dlocs) loc))
+       (loop for c from 0 below npaths do
+	 (if (and (>= i (aref beg c))
+		  (<= i (aref end c)))
+	     (dlocsig (aref loc c) i (readin (aref in c)))))))
+    (close-input in-file)))
+
+
+;;; Wrap a moving sound instrument around arbitrary clm code
+
+(defmacro move-sound ((&key 
+		       (path nil)
+		       (paths nil)
+		       (srate *srate*)
+		       (channels nil)) &body body)
+  (if (or path paths)
+      ;; only spatialize if paths were supplied
+      `(sound-let ((to-move (:srate ,srate 
+			     :channels (if ,channels ,channels (if ,path 1 (length ,paths))))
+			    ,.body))
+         (format t ";;; moving sound on ~d channels...~%" 
+		 (if ,channels ,channels (if ,path 1 (length ,paths))))
+	 (move 0 to-move 
+	       :paths (if ,path (list ,path) ,paths)))
+    ;; otherwise just evaluate the body
+    body))
+
+
+#|
+(with-sound(:channels 4 :play nil)
+  (move-sound (:path (make-path '((-10 10)(0.1 0.1)(10 -10))))
+    (fm-violin 0 1 440 0.1)
+    (fm-violin 0.3 2 1020 0.05)))
+|#

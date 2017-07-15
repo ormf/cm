@@ -1,0 +1,539 @@
+;;; -*- Mode: LISP; Syntax: Common-lisp; Base: 10 -*-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;  Bowed string physical model with stiffness.
+;  CLM version adapted from the Matlab and C versions
+;  courtesy of JOS and Stefania Serafin from code revised on 7/14/01
+;  added delay-line vibrato 12/10/03
+;
+;  
+;  clm version by Juan  Reyes  
+;  
+;  
+;  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro bowfilt (inharm)
+  `(let* (
+	  (inharmon ,inharm)) ;;harmonicity
+     ;;
+     ;;   Initialize Coefficients
+     ;;
+     (setf ynb (- (- (+ (* b0b vib) (* b1b xm1b) (* b2b xm2b))
+		   (* a1b ym1b)) (* a2b ym2b)))
+     ;;
+     (setf xm2b  xm1b)
+     (setf xm1b  vib)
+     (setf ym2b  ym1b)
+     (setf ym1b  ynb)
+     ;;       
+     (setf ynn (- (- (+ (* b0n vin) (* b1n xm1n) (* b2n xm2n))
+		     (* a1n ym1n)) (* a2n ym2n)))
+     
+     ;;
+     (setf xm2n  xm1n)
+     (setf xm1n  vin)
+     (setf ym2n  ym1n)
+     (setf ym1n  ynn)
+	  ;;	       
+	      ;;;FILTERS FOR TORSIONAL WAVES
+	  ;;
+     (setf ynbt (- (- (+ (* b0bt vibt) (* b1bt xm1bt) (* b2bt xm2bt))
+		      (* a1bt ym1bt)) (* a2bt ym2bt)))
+	  ;;       
+     (setf xm2bt xm1bt)
+     (setf xm1bt vibt)
+     (setf ym2bt ym1bt)
+     (setf ym1bt ynbt)
+	  ;;
+     (setf ynnt (- (- (+ (* b0nt vint) (* b1nt xm1nt) (* b2nt xm2nt))
+		     (* a1nt ym1nt)) (* a2nt ym2nt)))
+     ;;
+     (setf xm2nt  xm1nt)
+     (setf xm1nt  vint)
+     (setf ym2nt  ym1nt)
+     (setf ym1nt  ynnt)
+     ;;
+     ;;
+     ;;
+     (if (<= inharmon 0.00001)
+	 (progn
+	   (setf inharmon 0.00001)
+	   ))
+     (if (>= inharmon 0.9999)
+	 (progn
+	   (setf inharmon 0.9999)
+	   ))
+     ;;
+     ;;
+     (setf y1nb (+ (* -1 (* inharmon ynb)) ynba1 (* inharmon ya1nb)))
+     ;
+     (setf ya1nb y1nb)
+     (setf ynba1 ynb)
+     ;;
+     ;;
+     (setf y1nb (* -1 y1nb))
+     (setf ynn (* -1 ynn))
+     (setf ynbt (* -1 ynbt))
+     ;; (setf ynnt (* -1 ynnt)) ;; <---- this is a hack
+     ;;
+     ;;  calculate the incoming velocity at the bow point
+     ;;
+     ;;(setf vh (+ (+ ynn y1nb) (+ ynbt ynnt)))
+     ;;(setf vh (+ ynbt ynnt))
+     ))
+;;
+;;
+(defmacro friedlander (vvhh)
+  `(let* (
+	  (vh ,vvhh)
+	  )
+	  	  ;;
+	  (setf aa zslope)
+	  (setf bb1 (- (- (+ (* 0.2 zslope) (* 0.3 fb)) (* zslope vb)) (* zslope vh)))
+	  (setf cc1 (- (- (+ (* 0.06 fb) (* (* zslope vh) vb)) (* 0.2 zslope vh)) (* 0.3 vb fb)))
+	  (setf delta1 (- (* bb1 bb1) (* 4 aa cc1)))
+	  ;;
+	  (setf bb2 (- (- (- (* -0.2 zslope) (* 0.3 fb)) (* zslope vb)) (* zslope vh)))
+	  (setf cc2 (+ (+ (+ (+ (* 0.06 fb) (* zslope vh vb))(* 0.2 zslope vh)) (* 0.3 vb fb)) (* 0.1 fb)))
+	  (setf delta2 (- (* bb2 bb2) (* 4 aa cc2)))
+	  ;;
+	  (if (or (= vb 0) (= fb 0))
+	 ;; if we are not in contact with the string
+	      (progn
+		(setf v vh))
+	    (progn ;;  solve bow string interaction
+	      (cond 
+	       ((= vh vb)
+		(progn
+		  (setf v vb)
+		  (setf stick 1)))
+	       (t ;; not middle of string
+		(progn
+		  (if (> vh vb)
+		      (progn ;; use right hand friction curve
+			(setf lhs 0)
+			(setf rhs 1))
+		    (progn
+		      (setf rhs 0)
+		      (setf lhs 1)))
+		  (cond  ;; right hand side or left hand side
+		   ((= rhs 1)
+		    (progn
+		      ;;
+		      (cond
+		  ((< delta1 0)
+		   (progn
+		     (setf v vb)
+		     (setf stick 1)))
+		  (t
+		   (progn
+		     (cond
+		      ((= stick 1)
+		       (progn
+			 (setf vtemp vb)
+			 (setf f (* (* 2 zslope) (- vtemp vh)))
+			 (if (>= f (* -1 (* mus fb)))
+			     (progn
+			       (setf v vtemp))
+			   (progn
+			     (setf v1 (/ (+ (* -1 bb1 ) (sqrt delta1)) (* 2 aa)))
+			     (setf v2 (/ (- (* -1 bb1) (sqrt delta1)) (* 2 aa)))
+			     (setf v (min v1 v2))
+			     (setf stick 0)))))
+		      (t
+		       (progn
+			 (setf v1 (/ (+ (* -1 bb1 ) (sqrt delta1)) (* 2 aa)))
+			 (setf v2 (/ (- (* -1 bb1) (sqrt delta1)) (* 2 aa)))
+			 (setf v (min v1 v2))
+			 (setf stick 0)))
+		      )
+		     )))
+		 ))
+	      ((= lhs 1)
+	       (progn
+		 (cond
+		  ((< delta2 0)
+		   (progn
+		     (setf v vb)
+		     (setf stick 1)))
+		  (t
+		   (progn
+		     (cond
+		      ((= stick 1)
+		       (progn
+			 (setf vtemp vb)
+			 (setf f (* zslope (- vtemp vh)))
+			 (if (and (<= f (* mus fb)) (> f 0))
+			     (progn
+			       (setf v vtemp))
+			   (progn
+			     (setf v1 (/ (- (* -1 bb2 ) (sqrt delta2)) (* 2 aa)))
+			     (setf v2 (/ (+ (* -1 bb2) (sqrt delta2)) (* 2 aa)))
+			     (setf vtemp (min v1 v2))
+			     (setf stick 0)
+			     (if (> vtemp vb)
+				 ;; we don't want v > vt
+				 (progn
+				   (setf v vb)
+				   (setf stick 1))
+			       (progn
+				 (setf v vtemp)
+				 (setf f (* zslope (- v vh) ))))
+			     )) ))
+		      (t
+		       (progn
+			 (setf v1 (/ (- (* -1 bb2 ) (sqrt delta2)) (* 2 aa)))
+			 (setf v2 (/ (+ (* -1 bb2) (sqrt delta2)) (* 2 aa)))
+			 (setf v (min v1 v2))
+			 (setf stick 0))))
+		     
+		      ))) ;; delta <0
+		 (if (> v vb) ;;; we stay in slip if v not > vb
+		     (progn
+		       (setf v vb)
+		       (setf stick 1)))
+		 )) ;; lhs=1 
+		 ;;
+	      
+		 ))))
+	 (setf f (* zslope (- v vh)))
+	 ;;
+	 (setf xnn (+ y1nb (/ f (* 2 stringImpedance))))
+	 (setf xnb (+ ynn (/ f (* 2 stringImpedance))))
+	 ;;(setf xnnt (+ ynbt (/ f (* 2 stringImpedancet))))
+	 ;;(setf xnbt (+ ynnt (/ f (* 2 stringImpedancet))))
+	 ;;
+	 ;;(setf lhs 0) (setf rhs 0)
+	 ))
+     ))
+;;
+;; DC- Blocker
+;;
+(def-clm-struct dcb (input 0.0) (output 0.0))
+(defmacro dcblock (b sample0) 
+  `(let ((sample ,sample0))
+     (prog1
+	 (setf (dcb-output ,b) (+ sample (- (* 0.99 (dcb-output ,b)) (dcb-input ,b))))
+       (setf (dcb-input ,b) sample))))
+;;
+;; Actual instrument
+;;
+(definstrument bow (beg dur frq amplitude &key
+			(bufsize 2205);;*srate* 22050
+			(fb 0.25)  ;; bow force: between 0.0 and 1.0
+			(vb 0.05) ;; bow velocity: between 0.0 and 0.8
+			(bp 0.08) ;; bow position: 0.0=bridge; 0.5=middle of string; 1.0=Nut 
+			(inharm 0.1)  ;; inharmonicity: 0.0 harmonic; 1.0 not harmonico
+			(ampenv '(0 0 45 1 80 .75  98 0.00 100 0))
+			(vibamp 1.0) ;; 0.0 No vibrato  2.0 max realistic amplitude 
+			(vibenv '(0 0 30 0.25 40 1  65 .15  97 0 100 0))
+			(vibfrq 7)
+			(degree 45) (dist 0.0025)
+			(reverb 0.005)
+			)
+  (let* ( 
+	 (st (floor (* beg *srate*)))
+	 (nd (+ st (floor (* dur *srate*))))
+	 (ampf (make-env :envelope ampenv :scaler amplitude
+                         :start st :end nd))
+	 (loc (make-locsig :degree degree :distance dist 
+                           :reverb reverb))
+	 (dcblocker (make-dcb))
+	 ;;
+	 ;;
+	 (vinut      (make-double-array bufsize   :initial-element 0.0d0)) 
+	 (vinbridge  (make-double-array bufsize   :initial-element 0.0d0))
+	 (vinutt     (make-double-array bufsize   :initial-element 0.0d0))
+	 (vinbridget (make-double-array bufsize   :initial-element 0.0d0))
+	 (vib 0) (vin 0) (vibt 0) (vint 0)
+	 ;;
+	 (freq frq) ;; (freq 147)
+	 ;;
+	 (mus 0.8) ;;friction coeff
+	 (twavespeedfactor 5.2)
+	 ;;	 
+	 (posl 0) (posr 0) 
+	 (poslt 0) (posrt 0)
+	 (indexl 0) (indexr 0)
+	 (indexlt 0) (indexrt 0)
+	 (indexl_1 0) (indexr_1 0)
+	 (indexlt_1 0) (indexrt_1 0)
+	 (indexl_2 0) (indexr_2 0)
+	 (indexlt_2 0) (indexrt_2 0)
+	 ;;
+	 (updl 0) (updr 0)
+	 (updlt 0) (updrt 0)
+	 ;;
+	 ;;
+	 ;;
+	 ;; biquad coefficients from jos follow
+	 ;;
+	 (b0b 0.859210)
+	 (b1b -0.704922)
+	 (b2b 0.022502)
+	 (a1b -0.943639)
+	 (a2b  0.120665)
+	 ;;			;
+	 (b0n  7.0580050e-001)
+	 (b1n -5.3168461e-001)
+	 (b2n  1.4579750e-002)
+	 (a1n  -9.9142489e-001)
+	 (a2n   1.8012052e-001)
+	 ;;			;
+	 ;;; BRIDGE SIDE, TORSIONAL WAVES
+	 ;;			;
+	 (b0bt 9.9157155e-001)
+	 (b1bt -8.2342890e-001)
+	 (b2bt  8.8441749e-002)
+	 (a1bt -8.3628218e-001)
+	 (a2bt  9.2866585e-002)
+	 ;;			;
+	 ;;; FINGER SIDE, TORSIONAL WAVES
+	 ;;			;
+	 (b0nt 4.3721359e-001)
+	 (b1nt -2.7034968e-001)
+	 (b2nt -5.7147560e-002)
+	 (a1nt -1.2158343e+000)
+	 (a2nt  3.2555068e-001)
+	 ;;			;
+	 ;;
+	 ;; initializations for the filters
+	 ;;			;
+	 ;;
+	 (xm1bt 0.0d0) (xm2bt 0.0d0)
+	 (xm1nt 0.0d0)(xm2nt 0.0d0)
+	 (ym1bt 0.0d0) (ym2bt 0.0d0) 
+	 (ym1nt 0.0d0) (ym2nt 0.0d0)
+	 ;;			;
+	 (xm1b 0.0d0) (xm2b 0.0d0)(ym1b 0.0d0) (ym2b 0.0d0)
+	 (xm1n 0.0d0) (xm2n 0.0d0)(ym1n 0.0d0) (ym2n 0.0d0)
+	 ;;
+	 (ynb 0.0d0) (ynbt 0.0d0)
+	 (ynn 0.0d0) (ynnt 0.0d0)
+	 (ya1nb 0.0d0) (ynba1 0.0d0)
+	 (y1nb 0.0d0) 
+	 ;;
+	 ;;
+	 (vh 0.0d0)
+	 ;;
+	 ;; Friedlander friction inits
+	 ;;
+	 (aa 0.0d0) (bb1 0.0d0) (cc1 0.0d0) (delta1 0.0d0)
+	 (bb2 0.0d0) (cc2 0.0d0) (delta2 0.0d0)
+	 (v 0.0d0) (v1 0.0d0) (v2 0.0d0)
+	 (rhs 0.0d0) (lhs 0.0d0)
+	 (vtemp 0.0d0)
+	 (f 0.0d0)
+	 (stringImpedance 0.55) ;;0.55
+	 (stringImpedancet 1.8) ;; 1.8
+	 (stick 0)
+	 ;;
+	 (zslope (/ 1 (+ (/ 1 (* 2 stringImpedance)) (/ 1 (* 2 stringImpedancet)))))
+	 ;;
+	 (xnn 0.0d0) (xnb 0.0d0)
+	 (xnnt 0.0d0) (xnbt 0.0d0)
+	 ;;
+	 ;;
+	 ;;
+	 (alphar 0) (alphal 0)
+	 (alphart 0) (alphalt 0)
+	 (len (- (/ *srate* freq ) 2))
+	 (lent (/ (- (/ *srate* freq) 2) twavespeedfactor))
+	 ;;
+	 (del_right (* len bp))
+	 (del_left (* len (- 1 bp)))
+	 ;;
+	 (del_leftt (* lent (- 1 bp)))
+	 (del_rightt (* lent bp))
+	 ;;
+	 (samp_rperiod (floor del_right))
+	 (samp_lperiod  (floor del_left))
+	 ;;
+	 (samp_lperiodt (floor del_leftt))
+	 (samp_rperiodt (floor del_rightt))
+	 ;;
+	 ;;  Extra delay line for vibrato:
+	 ;;       changing length of delay line on the time domain
+	 ;;       makes a sort of doppler effect which is the
+	 ;;       basis for some vibrato (change in freq is proportional 
+	 ;;       to distance). See JOS and D. Jaffe famous Extensions to
+	 ;;       Karplus-Strong article.
+	 ;;       This seems to be a rather efficient solution because of
+	 ;;       less multiplies.
+	 
+	 (viblen (* 0.25 len))
+	 (del1 (make-delay viblen :max-size (round (* 5.0 (/ *srate* 10)))))
+	 (del2 (make-delay (* viblen 4) :max-size (round (* 5.0 (/ *srate* 10)))))
+	 (length-chg (make-triangle-wave :frequency vibfrq :amplitude  .75))
+	 (ampv (make-env :envelope vibenv :scaler 1.00
+                         :start st :end nd))
+	 (lengthscaler 1.00)
+	 (samplex 0.00)
+	 ;;
+	 ;;
+	 ) ;;;------> end let bindings
+    ;;
+    ;;
+    (if (< samp_rperiod 0) (setf samp_rperiod 0))
+    (if (> samp_rperiod (- bufsize 1))
+	(setf samp_rperiod (- bufsize 1)))
+    ;;
+    (if (< samp_lperiod 0) (setf samp_lperiod 0))
+    (if (> samp_lperiod (- bufsize 1))
+	(setf samp_lperiod (- bufsize 1)))
+    ;;
+    (setf alphar (float (- del_right samp_rperiod)))
+    (setf alphal (float (- del_left samp_lperiod)))
+    ;;
+    ;;
+    (if (< samp_rperiodt 0)(setf samp_rperiodt 0))
+    (if (> samp_rperiodt (- bufsize 1))
+	(setf samp_rperiodt (- bufsize 1)))
+    ;;
+    (if (< samp_lperiodt 0) (setf samp_lperiodt 0))
+    (if (> samp_lperiodt (- bufsize 1))
+	(setf samp_lperiodt (- bufsize 1)))
+    ;;
+    (setf alphart (float (- del_rightt samp_rperiodt)))
+    (setf alphalt (float (- del_leftt samp_lperiodt)))
+    ;;
+    (setf posr (mod (+ nd posr ) bufsize))
+    (setf posl (mod (+ nd posl ) bufsize))
+    (setf posrt (mod (+ nd posrt ) bufsize))
+    (setf poslt (mod (+ nd poslt ) bufsize))
+    ;;
+    ;; run loop follows
+    ;;
+    (run
+     (loop for i from st to nd do
+       ;;
+       ;;
+       ;;
+       (setf indexl  (mod (- (+ i posl  bufsize)  samp_lperiod) bufsize))
+       (setf indexr  (mod (- (+ i posr  bufsize)  samp_rperiod) bufsize))
+       (setf indexlt (mod (- (+ i poslt bufsize)  samp_lperiodt) bufsize))
+       (setf indexrt (mod (- (+ i posrt bufsize)  samp_rperiodt) bufsize))
+       ;;
+       (setf indexl_1   (mod (- (- (+ i posl bufsize) samp_lperiod)  1) bufsize))
+       (setf indexr_1   (mod (- (- (+ i posr bufsize) samp_rperiod)  1) bufsize))
+       (setf indexlt_1  (mod (- (- (+ i poslt bufsize) samp_lperiodt) 1) bufsize))
+       (setf indexrt_1  (mod (- (- (+ i posrt bufsize) samp_rperiodt) 1) bufsize))
+       ;;
+       (setf indexl_2   (mod (- (- (+ i posl bufsize) samp_lperiod)  2) bufsize))
+       (setf indexr_2   (mod (- (- (+ i posr bufsize) samp_rperiod)  2) bufsize))
+       (setf indexlt_2  (mod (- (- (+ i poslt bufsize) samp_lperiodt) 2) bufsize))
+       (setf indexrt_2  (mod (- (- (+ i posrt bufsize) samp_rperiodt) 2) bufsize))
+       ;;
+       ;; Integer delay lines:
+       ;;
+       ;;(setf vib  (aref vinbridge indexl))
+       ;;(setf vin  (aref vinut indexr))
+       ;;(setf vibt (aref vinbridget indexlt))
+       ;;(setf vint (aref vinutt indexrt))
+       ;;
+       ;; Fractional delay lines
+       ;;
+       (setf vib (+ (/ (* (aref vinbridge indexl_2) (- alphal 1)(- alphal 2)) 2)
+		    (* (aref vinbridge indexl_1) (* alphal -1) (- alphal 2))
+		    (/ (* (aref vinbridge indexl) alphal (- alphal 1)) 2)))
+     ;;;;
+       (setf vin (+ (/ (* (aref vinut indexr_2) (- alphar 1)(- alphar 2)) 2)
+		    (* (aref vinut indexr_1) (* alphar -1) (- alphar 2))
+		    (/ (* (aref vinut indexr) (- alphar 1) alphar) 2)))
+     ;;;;
+       (setf vibt (+ (/ (* (aref vinbridget indexlt_2) (- alphalt 1)(- alphalt 2)) 2)
+		     (* (aref vinbridget indexlt_1) (* alphalt -1) (- alphalt 2))
+		     (/ (* (aref vinbridget indexlt) alphalt (- alphalt 1)) 2)))
+       		       ;;;
+       (setf vint (+ (/ (* (aref vinutt indexrt_2) (- alphart 1)(- alphart 2)) 2)
+		     (* (aref vinutt indexrt_1) (* alphart -1) (- alphart 2))
+		     (/ (* (aref vinutt indexrt) (- alphart 1) alphart) 2)))
+       ;;
+       ;; Biquad filters
+       ;;
+       (bowfilt inharm)
+       ;;
+       (setf vh (+ (+ ynn y1nb) (+ ynnt ynbt)))
+       ;;
+       ;; NOW SOLVE SET OF SIMULTANEOUS EQUATIONS for v and f.
+       ;;
+       (friedlander  vh)
+       ;;
+       ;;
+       (setf f (* zslope (- v vh)))
+       ;;(setf xnn (+ y1nb (/ f (* 2 stringImpedance))))
+       ;;(setf xnb (+ ynn (/ f (* 2 stringImpedance))))
+       (setf xnnt (+ ynbt (/ f (* 2 stringImpedancet))))
+       (setf xnbt (+ ynnt (/ f (* 2 stringImpedancet))))
+       ;;
+       ;;
+       (setf  updl (mod (+ i  posl bufsize) bufsize))
+       (setf  updr (mod (+ i posr bufsize) bufsize))
+       (setf  updlt (mod (+ i poslt bufsize) bufsize))
+       (setf  updrt (mod (+ i posrt bufsize) bufsize))
+       ;;
+       ;;
+       (setf (aref vinbridge updl) xnb)
+       (setf (aref vinut updr) xnn)
+       (setf (aref vinbridget updlt) xnbt)
+       (setf (aref vinutt updrt) xnnt)
+       ;;
+       ;; Set vibrato delay-line scalar
+       ;;
+       (setf lengthscaler (* 1.00 (triangle-wave length-chg)))
+       ;;
+       ;;  output samples
+       ;;
+       (setf samplex (* (env ampf) (dcblock dcblocker xnb)))
+       (locsig loc i
+	       (+ (* .605 samplex)
+			(progn
+			  (* (env ampv)
+			     (+ 
+			      (* .78 (delay  del1
+					    (* (* lengthscaler vibamp) 
+					       (+ (tap del1)
+						  samplex))))
+			      (* .65 (delay  del2
+					    (* 
+					     (* vibamp lengthscaler)
+					     (+ (tap del2)  
+						samplex)))))
+			     ))
+			) ;; mixed: dry + vibrato signal
+	       ) ;;; locsig
+       ;;
+       ;;
+       ;;
+       (setf lhs 0) (setf rhs 0)
+      )
+     )
+        
+    ))
+
+;;; 
+;;; 
+
+;;; (with-sound () (bow 0 3 400 0.5 ))
+;;; (with-sound () (bow 0 3 400 0.5 :vibamp 0.0)) ;; example with no vibrato
+;;;
+;;; (with-sound (:channels 2 ) (bow 0 3 400 0.5 :vb 0.15 :fb 0.1 :inharm 0.25))
+;;;
+;;(with-sound (:channels 2 ) (bow 0 3 400 0.5 :vb 0.15 :fb 0.1 :inharm 0.25))
+;;;(with-sound (:channels 2) (bow 0 2 440 0.5  :fb 0.25))
+;;;(with-sound (:channels 2) (bow 0 4 600 0.8))
+			   
+;;;(with-sound (:channels 2 ) (bow 0 6 147 2 :fb 0.035 :vb 0.1))		       
+;;;(with-sound (:channels 2 ) (bow 0 3 1100 0.5 :vb 0.45 :fb 0.9 :inharm 0.3))	     			  
+;;;(with-sound (:channels 2 ) (bow 0 3 1500 0.5 :vb 0.25 :fb 0.9 :inharm 0.3))
+
+;;;(with-sound (:channels 2 ) (bow 0 3 1525 0.5 :vb 0.25 :fb 0.9 :inharm 0.3))
+
+;; load jcrev.ins
+;;;(with-sound (:channels 2 :reverb jc-reverb ) (bow 0 1 400 0.5 :reverb 0.0051))
+;;;
+;;; (with-sound (:channels 2 :reverb jc-reverb)
+;;;   (bow 0 3 366 0.5  :degree 0)
+;;;   (bow 0 3 422 0.5  :degree 90)
+;;;   (bow 4 6 147 2 :fb 0.035 :vb 0.1 :reverb 0.051))

@@ -1,0 +1,31 @@
+;;; examples of interpolating delay
+
+(definstrument zc (time dur freq amp length1 length2 feedback)
+  (multiple-value-bind
+      (beg end) (times->samples time dur)
+    (let ((s (make-pulse-train :frequency freq))
+          (d0 (make-comb :size length1 :max-size (max length1 length2) :scaler feedback))
+          (zenv (make-env :envelope '(0 0 1 1) :scaler (- length2 length1) :duration dur)))
+      (run
+       (loop for i from beg to end do
+	 (outa i (comb d0 (* amp (pulse-train s)) (env zenv))))))))
+
+;;(with-sound () (zc 0 3 100 .1 20 100 .5) (zc 3.5 3 100 .1 90 100 .95))
+
+
+(definstrument zn (time dur freq amp length1 length2 feedforward)
+  ;; notches are spaced at srate/len, feedforward sets depth thereof
+  ;; so sweep of len from 20 to 100 sweeps the notches down from 1000 Hz to ca 200 Hz 
+  ;; so we hear our downward glissando beneath the pulses.
+  (multiple-value-bind
+      (beg end) (times->samples time dur)
+    (let ((s (make-pulse-train :frequency freq))
+          (d0 (make-notch :size length1 :max-size (max length1 length2) :scaler feedforward))
+          (zenv (make-env :envelope '(0 0 1 1) :scaler (- length2 length1) :duration dur)))
+      (run
+       (loop for i from beg to end do
+	 (outa i (notch d0 (* amp (pulse-train s)) (env zenv))))))))
+
+
+	
+

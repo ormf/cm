@@ -1,0 +1,238 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>map-objects</title>
+</head>
+
+<body>
+<div id="content">
+<!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">map-objects</code> <var>function</var> <var>objects</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+<p>
+Maps a <var>function</var> of one argument over a list
+or <a href="seq-cls.html">seq</a> of <var>objects</var> according to the specified keyword
+arguments. Returns no values.
+</p>
+
+<p id="args"><code class="entry">map-objects</code> supports the following keyword arguments:
+</p>
+
+<dl>
+
+<dt>
+<code class="keyword">:start</code> <var>number</var>
+</dt>
+<dd>
+The initial index in  <var>objects</var> to begin mapping.
+The default value is 0.</dd>
+
+<dt>
+<code class="keyword">:end</code> <var>number</var>
+</dt>
+<dd>
+The index in <var>objects</var> to stop mapping.  The last object
+mapped is at <var>end-1</var>.  Defaults to the length
+of <var>objects</var>.
+</dd>
+
+<dt>
+<code class="keyword">:step</code> <var>number</var>
+</dt>
+<dd>
+The increment between mapped objects. For example, a value of 2 maps
+<var>function</var> over every other object between the starting and
+ending indices in <var>objects</var>. The default value is 1.
+</dd>
+
+<dt>
+<code class="keyword">:width</code> <var>number</var>
+</dt>
+<dd>
+If the value is greater than one then <var>function</var> is passed
+lists containing length <var>number</var> of adjacent objects
+in <var>objects</var>.  The default value is 1.
+</dd>
+
+<dt>
+<code class="keyword">:at</code> <var>list</var>
+</dt>
+<dd>
+If specified then <var>list</var> contains the explicit positions in <var>objects</var> to map <var>function</var> over and any <code class="keyword">:start</code>, <code class="keyword">:step</code> or <code class="keyword">:end</code> values are ignored.
+</dd>
+
+<dt>
+<code class="keyword">:class</code> <var>class</var>
+</dt>
+<dd>
+If specified then only objects of type <var>class</var> are
+mapped. The value must be an actual class object, not the name
+of a class.
+</dd>
+<dt>
+
+<code class="keyword">:test</code> <var>testfn</var>
+</dt>
+<dd>
+If specified then <var>testfn</var> is a predicate of one
+argument that is applied to each mapped object to determine if <var>function</var>
+should be called.
+</dd>
+
+<dt>
+<code class="keyword">:key</code> <var>keyfn</var>
+</dt>
+<dd>
+If specified then <var>keyfn</var> is a function of one argument that is applied to each mapped object to produce the value passed to <var>function</var>.
+</dd>
+
+<dt>
+<code class="keyword">:slot</code> <var>symbol</var>
+</dt>
+<dd>
+If specified, then <var>symbol</var> names a slot in each mapped
+object whose value is passed to <var>function</var>
+<!-- Equivalent to the <code class="keyword">:key</code>
+function: <code>(<span class="special">lambda</span> (x)
+(<a href="sv-mac.html">sv</a> x <var>symbol</var>))</code> -->.  In
+this case <code>map-objects</code> is effectively mapping slot values
+rather than objects.
+</dd>
+
+<dt>
+        <code class="keyword">:slot!</code> <var>symbol</var>
+</dt>
+<dd>
+Like <code class="keyword">:slot</code> except that the slot
+ is assigned the value returned
+by <var>function</var> for each mapped object.
+</dd>
+
+</dl>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Positional mapping.
+</p>
+<pre class="code">
+<span class="comment">;;; define some random midi events to demonstrate mapping</span>
+(<span class="special">define</span> <span class="defined">midis</span>
+  (<span class="special">loop</span> for i below 100
+        collect (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> i <span class="keyword">:keynum</span> (<a href="between-fn.html">between</a> 20 100)
+                     <span class="keyword">:amplitude</span> (<a href="between-fn.html">between</a> .1 .9)
+                     <span class="keyword">:duration</span> (<a href="pick-fn.html">pick</a> .2 .4 .6 .8))))
+
+<span class="comment">;;; Print first 10 objects</span>
+(map-objects #'print midis <span class="keyword">:end</span> 10)
+
+#i(midi time 0 keynum 33 duration 0.2 amplitude 0.18030289) 
+#i(midi time 1 keynum 80 duration 0.6 amplitude 0.2407172) 
+#i(midi time 2 keynum 89 duration 0.6 amplitude 0.5423868) 
+#i(midi time 3 keynum 83 duration 0.8 amplitude 0.23549244) 
+#i(midi time 4 keynum 20 duration 0.6 amplitude 0.37683246) 
+#i(midi time 5 keynum 78 duration 0.4 amplitude 0.11127909) 
+#i(midi time 6 keynum 67 duration 0.4 amplitude 0.4439199) 
+#i(midi time 7 keynum 85 duration 0.6 amplitude 0.84430504) 
+#i(midi time 8 keynum 56 duration 0.2 amplitude 0.16837305) 
+#i(midi time 9 keynum 31 duration 0.4 amplitude 0.15747735) 
+
+<span class="comment">;;; print every other midi event</span>
+(map-objects #'print midis <span class="keyword">:end</span> 10 <span class="keyword">:step</span> 2)
+
+#i(midi time 0 keynum 33 duration 0.2 amplitude 0.18030289) 
+#i(midi time 2 keynum 89 duration 0.6 amplitude 0.5423868) 
+#i(midi time 4 keynum 20 duration 0.6 amplitude 0.37683246) 
+#i(midi time 6 keynum 67 duration 0.4 amplitude 0.4439199) 
+#i(midi time 8 keynum 56 duration 0.2 amplitude 0.16837305) 
+
+<span class="comment">;;; print just durations in first 10 objects</span>
+(map-objects #'print midis <span class="keyword">:end</span> 10 <span class="keyword">:slot</span> 'duration)
+
+0.2 
+0.6 
+0.6 
+0.8 
+0.6 
+0.4 
+0.4 
+0.6 
+0.2 
+0.4 
+
+<span class="comment">;;; print time values, map four objects at a time</span>
+(map-objects #'print midis <span class="keyword">:start</span> 10 <span class="keyword">:end</span> 20 <span class="keyword">:step</span> 2
+             <span class="keyword">:width</span> 4 <span class="keyword">:slot</span> 'time)
+
+(10 11 12 13) 
+(12 13 14 15) 
+(14 15 16 17) 
+(16 17 18 19) 
+(18 19 20 21) 
+
+<span class="comment">;;; print only even keynums</span>
+(map-objects #'print midis <span class="keyword">:end</span> 10 <span class="keyword">:slot</span> 'keynum <span class="keyword">:test</span> #'even?)
+
+80 
+20 
+78 
+56
+
+<span class="comment">;;; print the 49th and 50th keynums</span>
+(map-objects #'print midis <span class="keyword">:at</span> '(49 50) <span class="keyword">:slot</span> 'keynum)
+
+77
+82
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Slot Editing.
+</p>
+<pre class="code">
+<span class="comment">;;; now transpose objects with even keynums by one octave</span>
+(map-objects (<span class="special">lambda</span> (x) (+ x 12))
+             midis <span class="keyword">:test</span> #'even? <span class="keyword">:slot!</span> 'keynum)
+
+<span class="comment">;;; print the new even keynum values</span>
+(map-objects #'print midis <span class="keyword">:end</span> 10 <span class="keyword">:slot</span> 'keynum <span class="keyword">:test</span> #'evenp)
+<span class="result">&rArr;</span>
+92 
+32 
+90 
+68 
+
+<span class="comment">;;; double the duration of loud events</span>
+(map-objects (lambda (x) (<a href="svstar-mac.html">sv*</a> x <span class="keyword">:duration</span> 2))
+             midis
+             <span class="keyword">:test</span> (<span class="special">lambda</span> (x) (> (<a href="sv-mac.html">sv</a> x <span class="keyword">:amplitude</span>) .7)))
+</pre>
+</div>
+
+
+<h4>See also:</h4>
+<ul>
+<li><a href="fold-objects-fn.html"><code>fold-objects</code></a> [Function]</li>
+<li><a href="subobjects-fn.html"><code>subobjects</code></a> [Function]</li>
+<li><a href="sv-mac.html"><code>sv</code></a> [Macro]</li>
+</ul>
+
+</div>
+
+<!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

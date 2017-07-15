@@ -1,0 +1,90 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+    <style type="text/css" media="all">
+      @import "../css/cm.css";
+    </style>
+    <title>OSC</title>
+  </head>
+  
+  <body>
+    <div id="content">
+      <dl class="dictsyntax">
+	<dt>[Topic]</dt>
+	<dd><span class="syntax">OSC</span></dd>
+      </dl>
+      <p>
+        Common Music supports the sending and receiving of OSC messages
+      </p>
+      
+      
+      <dl class="dictsyntax">
+	<dt>[Method]</dt>
+	<dd><a name="send-msg"></a><code class="entry">(send-msg message osc-stream)</code></dd>
+      </dl>
+      <dl>
+	<dd>Converts a list, <var>message</var>, to osc format and sends out <var>osc-stream</var>.
+      </dl>
+      <div class="float">
+        <pre class="code">
+(send-msg '(1 2 3 4 5.1 "foo" "bar" 'baz) *osc-stream*)
+	</pre>
+      </div>
+      
+       <dl class="dictsyntax">
+	<dt>[Method]</dt>
+	<dd><a name="send-bundle"></a><code class="entry">(send-bundle offset message osc-stream)</code></dd>
+       </dl>
+
+       <dl>
+	 <dd>Converts a list,<var>message</var>, to osc format and sends out <var>osc-stream</var> with a timestamp of current time plus offset. Message may be a list of lists.
+	 </dd>
+	 <div class="float">
+           <pre class="code">
+(send-bundle 1.4 '(1 2 3 4 5.1 "foo" "bar" 'baz) *osc-stream*)
+(send-bundle .2 '(10 120 10 4.0 .2 'bar) (1 2 3 4 5.1 "foo" "bar" 'baz)) *osc-stream*)
+	   </pre>
+	 </div>
+       </dl>
+       
+       <h4>Example</h4>
+       <div class="float">
+         <pre class="code">
+(<span class="special">define</span> *osc-stream* (<a href="new-mac.html">new</a> osc-stream :remote-host "127.0.0.1" :remote-port 5400))
+
+(open-io *osc-stream*)
+
+(send-msg '("Mr. Watson, come here; I want you.") *osc-stream*)
+
+(<span class="special">define</span> (trigger msg)
+  (format t "osc message : ~s ~%timestamep : ~s~%" (first msg) (second msg)))
+
+(<a href="set-receiver-fn.html">set-receiver!</a> #'trigger *osc-stream*)
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *osc-stream*)
+
+(close-io *osc-stream*)
+	 </pre>
+       </div>
+
+
+      <h4>See also:</h4>
+      
+      <ul>
+	<li><a href="receive-fn.html"><code>receive</code></a> [Function]</li>
+
+      </ul>
+      
+      <!-- End content -->
+    </div>
+    <!-- Footer -->
+    <div id="footer">
+      <div id="version">
+	$Name$</div>
+      <div id="cvs-info">
+	($Revision$, $Date$)</div>
+    </div>
+  </body>
+</html>
+

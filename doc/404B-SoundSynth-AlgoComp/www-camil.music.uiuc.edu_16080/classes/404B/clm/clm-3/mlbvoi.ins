@@ -1,0 +1,146 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; translation from MUS10 of MLB's waveshaping voice instrument (using FM here)
+
+(definstrument mlb-voice (beg dur freq amp ampfun freqfun freqscl 
+			  frmfreq10 frmfreq11 frmfreqfun1
+			  frmfreq20 frmfreq21 frmfreqfun2
+			  frmfreq30 frmfreq31 frmfreqfun3 index vibscl
+			  &optional (sc1 .8) (sc2 .15) (sc3 .05) (isc1 .2) (isc2 .5) (isc3 1.0))
+  (let* ((start (floor (* *srate* beg)))
+	 (end (+ start (floor (* *srate* dur))))
+	 (car-os (make-oscil :frequency 0))
+	 (of0 (make-oscil :frequency 0))
+	 (of1 (make-oscil :frequency 0))
+	 (of2 (make-oscil :frequency 0))
+	 (of3 (make-oscil :frequency 0))
+	 (of4 (make-oscil :frequency 0))
+	 (of5 (make-oscil :frequency 0))
+	 (ampf (make-env :envelope ampfun :scaler amp :duration dur))
+	 (frmf1 (make-env :envelope frmfreqfun1 :duration dur
+			 :scaler (- frmfreq11 frmfreq10)
+			 :offset frmfreq10))
+	 (frmf2 (make-env :envelope frmfreqfun2 :duration dur
+			 :scaler (- frmfreq21 frmfreq20)
+			 :offset frmfreq20))
+	 (frmf3 (make-env :envelope frmfreqfun3 :duration dur
+			 :scaler (- frmfreq31 frmfreq30)
+			 :offset frmfreq30))
+	 (freqf (make-env :envelope freqfun :duration dur
+			  :scaler (* freqscl freq)
+			  :offset freq))
+	 (per-vib (make-triangle-wave :frequency 6 :amplitude (* freq vibscl)))
+	 (ran-vib (make-rand-interp :frequency 20 :amplitude (* freq .01)))
+	 (car 0.0)
+	 (frq 0.0)
+	 (frm-int 0)
+	 (frm0 0.0)
+	 (frm 0.0)
+	 (frq0 0.0) (frq1 0.0) (frq2 0.0) (frq3 0.0) (frq4 0.0) (frq5 0.0)
+	 (amp0 0.0) (amp1 0.0) (amp2 0.0) (amp3 0.0) (amp4 0.0) (amp5 0.0))
+    (run
+     (loop for i from start to end do
+       (setf frq (+ (env freqf) (triangle-wave per-vib) (rand-interp ran-vib)))
+       (setf car (* index (oscil car-os (hz->radians frq))))
+       (setf frm (env frmf1))
+       (setf frm0 (/ frm frq))
+       (setf frm-int (floor frm0))
+       (if (evenp frm-int)
+	   (progn
+	     (setf frq0 (hz->radians (* frm-int frq)))
+	     (setf frq1 (hz->radians (* (+ frm-int 1) frq)))
+	     (setf amp1 (- frm0 frm-int))
+	     (setf amp0 (- 1.0 amp1)))
+	 (progn
+	     (setf frq1 (hz->radians (* frm-int frq)))
+	     (setf frq0 (hz->radians (* (+ frm-int 1) frq)))
+	     (setf amp0 (- frm0 frm-int))
+	     (setf amp1 (- 1.0 amp0))))
+       (setf frm (env frmf2))
+       (setf frm0 (/ frm frq))
+       (setf frm-int (floor frm0))
+       (if (evenp frm-int)
+	   (progn
+	     (setf frq2 (hz->radians (* frm-int frq)))
+	     (setf frq3 (hz->radians (* (+ frm-int 1) frq)))
+	     (setf amp3 (- frm0 frm-int))
+	     (setf amp2 (- 1.0 amp3)))
+	 (progn
+	     (setf frq3 (hz->radians (* frm-int frq)))
+	     (setf frq2 (hz->radians (* (+ frm-int 1) frq)))
+	     (setf amp2 (- frm0 frm-int))
+	     (setf amp3 (- 1.0 amp2))))
+       (setf frm (env frmf3))
+       (setf frm0 (/ frm frq))
+       (setf frm-int (floor frm0))
+       (if (evenp frm-int)
+	   (progn
+	     (setf frq4 (hz->radians (* frm-int frq)))
+	     (setf frq5 (hz->radians (* (+ frm-int 1) frq)))
+	     (setf amp5 (- frm0 frm-int))
+	     (setf amp4 (- 1.0 amp5)))
+	 (progn
+	     (setf frq5 (hz->radians (* frm-int frq)))
+	     (setf frq4 (hz->radians (* (+ frm-int 1) frq)))
+	     (setf amp4 (- frm0 frm-int))
+	     (setf amp5 (- 1.0 amp4))))
+       (outa i (* (env ampf)
+		  (+ (* sc1 (+ (* amp0 (oscil of0 (+ frq0 (* isc1 car))))
+			       (* amp1 (oscil of1 (+ frq1 (* isc1 car))))))
+		     (* sc2 (+ (* amp2 (oscil of2 (+ frq2 (* isc2 car))))
+			       (* amp3 (oscil of3 (+ frq3 (* isc2 car))))))
+		     (* sc3 (+ (* amp4 (oscil of4 (+ frq4 (* isc3 car))))
+			       (* amp5 (oscil of5 (+ frq5 (* isc3 car)))))))))))))
+
+;;;  (with-sound (:output "/user/bil/cl/test.snd") (pqw-voice 0 .51 140 .1 '(0 0 25 1 75 1 100 0) '(0 0 100 1) .15 520 490 intrp 1190 1350 intrp 2390 1690 intrp .01 .05))
+
+(defvar formants 
+    '((I 390 1990 2550)  (E 530 1840 2480)  (AE 660 1720 2410)
+      (UH 520 1190 2390) (A 730 1090 2440)  (OW 570 840 2410)
+      (U 440 1020 2240)  (OO 300 870 2240)  (ER 490 1350 1690)
+      (W 300 610 2200)   (LL 380 880 2575)  (R 420 1300 1600)
+      (Y 300 2200 3065)  (EE 260 3500 3800) (LH 280 1450 1600)
+      (L 300 1300 3000)  (I2 350 2300 3340) (B 200 800 1750)
+      (D 300 1700 2600)  (G 250 1350 2000)  (M 280 900 2200)
+      (N 280 1700 2600)  (NG 280 2300 2750) (P 300 800 1750)
+      (T 200 1700 2600)  (K 350 1350 2000)  (F 175 900 4400)
+      (TH 200 1400 2200) (S 200 1300 2500)  (SH 200 1800 2000)
+      (V 175 1100 2400)  (THE 200 1600 2200)(Z 200 1300 2500)
+      (ZH 175 1800 2000) (ZZ 900 2400 3800) (VV 565 1045 2400)))
+                   ;;formant center frequencies for a male speaker
+
+(defun find-phoneme (phoneme form)
+  (loop for i in form do
+    (if (eq phoneme (first i))
+	(return-from find-phoneme (rest i)))))
+
+(defun vox-fun (phons)
+  (let ((phdata nil)
+	(f1 nil)
+	(f2 nil)
+	(f3 nil))
+    (loop for x in phons by #'cddr and
+              phoneme in (cdr phons) by #'cddr do
+      (setf phdata (find-phoneme phoneme formants))
+      (push x f1)
+      (push (first phdata) f1)
+      (push x f2)
+      (push (second phdata) f2)
+      (push x f3)
+      (push (third phdata) f3))
+    (values (nreverse f1) (nreverse f2) (nreverse f3))))
+
+(defun vox-1 (beg dur freq amp ampfun freqfun freqscl voxfun index vibscl
+	    &optional (sc1 .8) (sc2 .15) (sc3 .05) (isc1 .2) (isc2 .5) (isc3 1.0))
+  (multiple-value-bind 
+      (f1 f2 f3)
+      (vox-fun voxfun)
+    (mlb-voice beg dur freq amp ampfun freqfun freqscl 
+	       0 1 f1 0 1 f2 0 1 f3
+	       index vibscl
+	       sc1 sc2 sc3 isc1 isc2 isc3)))
+      
+;;; (with-sound () (vox 0 2 110 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 UH 25 UH 35 ER 65 ER 75 UH 100 UH) .025 .1))
+;;; (with-sound () (vox 0 2 170 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 E 25 AE 35 ER 65 ER 75 I 100 UH) .05 .1))
+;;; (with-sound () (vox 0 2 300 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 I 5 OW 10 I 50 AE 100 OO) .02 .1))
+;;; (with-sound () (vox 0 5 600 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 I 5 OW 10 I 50 AE 100 OO) .01 .1))

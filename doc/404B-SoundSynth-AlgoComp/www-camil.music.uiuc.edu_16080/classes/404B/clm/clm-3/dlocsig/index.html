@@ -1,0 +1,712 @@
+<html>
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/clm/clm-3/dlocsig/index.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:46:28 GMT -->
+<head>
+<title>"dlocsig" dynamic spatial location unit generator</title>
+</head>
+
+<body bgcolor="#ffffff">
+
+<p><table width=100% bgcolor="#e0e0e0"><tr><td>
+<!-- <img src="/CCRMA/Images/LogoM.gif" border=0 alt="CCRMA"> -->
+<h1><a href="dlocsig.lisp">dlocsig</a>: a dynamic spatial location unit generator for CLM-2</h1></table></p>
+
+<p><font size="-1">by <a href="http://www-ccrma.stanford.edu/~nando/">Fernando Lopez-Lezcano</a>, <a href="mailto:nando@ccrma.stanford.edu">nando@ccrma.stanford.edu</a></font>
+
+<p><a href="dlocsig.lisp">dlocsig.lisp</a> is a unit generator that dynamically moves a sound source in 2d or 3d space and can be used as a replacement for the standard <em>locsig</em> in new or existing CLM-2 instruments (this is a new and much improved version of the old dlocsig). </p>
+
+<p><em><strong>Caveat:</strong> this version of dlocsig only works under clm-2!.</em></p>
+
+<p><strong>Change Log</strong>:</p>
+<ul>
+<li><em>01/21/2001</em>: various bugfixes, dlocsig can now output to multichannel reverb streams for all rendering methods, reverb-amount can be an envelope, transform-path can do 3d transforms. 
+</ul>
+
+<p><em>dlocsig</em> can generate spatial positioning cues for any number of speakers which can be <a href="#arrange-speakers">arbitrarily arranged</a> in 2d or 3d space. There are two speaker arrangements for each possible number of speakers, one in 2d and another in 3d space. The number of output channels of the current output stream (usually defined by the <em>:channels</em> keyword in the enclosing <em>with-sound</em>) and the value of <a href="#dlocsig-3d">dlocsig-3d</a> will determine which speaker arrangement is used. In pieces which can be recompiled from scratch this feature allows the composer to easily create several renditions of the same piece, each one optimized for a particular number, spatial configuration of speakers and rendering technique. Each user-defined speaker arrangement can also include fixed delays for some or all speakers and can map each speaker to an arbitrary output channel. </p>
+
+<p><em>dlocsig</em> can render the output soundfile with different techniques. The default is to use plain vanilla amplitude panning between adyacent speakers (between two speakers in 2d space or three speaker groups in 3d space). <em>dlocsig</em> can also create an <a href="http://www.york.ac.uk/inst/mustech/3d_audio/ambison.htm">Ambisonics</a> encoded four channel output soundfile suitable for feeding into an appropriate decoder for multiple speaker reproduction. Or it can decode the Ambisonics encoded information to an arbitrary number of output channels if the speaker configuration is known in advance. In the (near?) future <em>dlocsig</em> will also be able to render to stereo soundfiles with hrtf generated cues for heaphone or speaker listening environments. In all cases doppler shift is also generated as well as amplitude scaling due to distance with user-defined exponents and ratio of direct to reverberated sound. </p>
+
+<p>The movement of sound sources is described through <em>paths</em>. These are CLOS (Common Lisp Object System) objects that hold the information needed by <em>dlocsig</em> to move the source in space and are independent of the unit generator itself. Paths can be reused across many calls to <em>dlocsig</em> and can be translated, scaled and rotated in space as needed. There are several ways to describe a path in space. Bezier paths are described by a set of discrete points in 2d or 3d space that are latter joined by smoothly curved bezier segments. This description is very compact and easy to specify. A few points can describe a complex trajectory in 3d space. Paths can also be specified in geometric terms and one such implementation (spirals) is currently provided (more to come). </p>
+
+<p>The <em>dlocsig</em> unit generator uses the same interface as all other CLM unit generators. <em>make-dlocsig</em> creates a structure for a given path and returns (as multiple values) the structure and the beginning and ending samples of the note. <em>dlocsig</em> is the macro that gets compiled inside the run loop and localizes the samples in space. </p>
+
+<h2>Contents</h2>
+
+<dl>
+<dt>Source code: <a href="dlocsig.lisp">dlocsig.lisp</a>
+<dt><a href="#rendering">Rendering techniques</a>
+<dt><a href="#global-params">Global parameters</a>
+<dt><a href="#speaker-config">Speaker configuration</a>
+<dt><a href="#paths">Paths</a>
+  <dd><a href="#bezier-paths">Bezier paths</a>
+  <dd><a href="#geometric-paths">Geometric paths</a>
+  <dd><a href="#transformations">Transformations</a>
+  <dd><a href="#visualization">Visualization</a>
+<dt><a href="#dlocsig-ug">Dlocsig (the unit generator)</a>
+<dt><a href="#dlocsig-examples">Examples</a>
+</dl>
+
+<p><table width="100%" cellpadding="5">
+
+<tr valign="top"><td bgcolor="#e0e0e0" colspan="2">
+<a name="global-params"><font size="+2">Rendering techniques</font></a>
+</td>
+<tr><td bgcolor="#e0e0e0" width="20%"></td>
+
+<td>
+<p>Several different techniques can be selected to render the output samples. Each one has advantages and disadvantages and there's no reason not to mix them in a piece. The value of the special variable <a href="#dlocsig-render-using"><font color="b01010">dlocsig-render-using</font></a> or the <a href="#render-using"><font color="b01010">render-using</font></a> <em>make-dlocsig</em> parameter defines which one is used:</p>
+
+<dl>
+
+<dt><strong>amplitude-panning</strong> [1]
+<dd><p>Generates amplitude panning between adyacent speakers. In two-dimensional speaker configurations panning is done between adyacent speakers. Three-dimensional speaker configurations split space in non-overlapping triangles with vertices at the speaker positions. Panning is done within each three speaker group. Transitions between two or three speaker groups define new breakpoints in the trajectory so that the proper speakers reache zero amplitude when transitioning between groups. </p>
+
+<dt><strong>b-format-ambisonics</strong> [2]
+<dd><p>Generates a four channel first order b-format encoded soundfile (an error will be generated if the current output stream is not four channels). The Ambisonics b-format has four discrete channels with information encoded as follows:</p>
+
+<table border>
+<tr><td><strong>W</strong></td><td>(* signal 0.707) (omnidirectional component)</td>
+<tr><td><strong>X</strong></td><td>(* signal (cos A)(cos B))</td>
+<tr><td><strong>Y</strong></td><td>(* signal (sin A)(cos B))</td>
+<tr><td><strong>Z</strong></td><td>(* signal (sin B))</td>
+</table>
+
+<p>A is the counter-clockwise angle of rotation from the front center and B is the angle of elevation above the horizontal plane. Note that our coordinate system is different. The <strong>X</strong> component is in the direction of our y axis (positive values in front of the listener) and the <strong>Y</strong> component is in the direction of our -x axis (to the left of the listener). </p>
+
+<dt><strong>decoded-ambisonics</strong> [3]
+<dd><p>The Ambisonics encoded information is decoded to an arbitrary number of speakers as defined by the currently selected speaker configuration. The decoded channels have higher amplitudes than the equivalent amplitude panning rendering, <a href="#dlocsig-ambisonics-scaler"><font color="b01010">dlocsig-ambisonics-scaler</font></a> is used to (approximately) equalize the amplitude. The default value is a quite arbitrary (but seems to do the trick) 0.707. </p>
+
+<dt><strong>stereo-hrtf</strong> [4]
+<dd><p>Not implemented yet... </p>
+
+
+<tr valign="top"><td bgcolor="#e0e0e0" colspan="2">
+<a name="global-params"><font size="+2">Global parameters</font></a>
+</td>
+
+<tr><td bgcolor="#e0e0e0" width="20%"></td>
+
+<td>
+
+<p>The following parameters are global bindings (special variables) that control the global behavior of dlocsig:</p>
+
+<p><table>
+
+<tr valign=top>
+<td><a name="dlocsig-one-turn"><font color="b01010">dlocsig-one-turn</font></a><br>[number]<br>360</td>
+<td><p>A number that defines the units used to represent angles. By default angles are measured in degrees. Change the variable to represent one turn in the units of interest (for example, setting it to 1.0 will represent angles in turns). </p></td>
+
+<tr valign=top>
+<td><a name="dlocsig-speed-of-sound"><font color="b01010">dlocsig-speed-of-sound</font></a><br>[number]<br>344</td>
+<td><p>A number that defines the units used to represent distances through the value of the speed of sound. The default measures distances in meters. Change the variable to represent the speed of sound in the desired units (ie: <tt>(setf dlocsig-speed-of-sound 1128)</tt> will enable you to measure all distances in feet). </p>
+
+<tr valign=top>
+<td><a name="dlocsig-3d"><font color="b01010">dlocsig-3d</font></a><br>[t|nil]<br>nil</td>
+<td><p>A boolean value that defines what speaker configuration will be used for a given number of channels. Speakers can be arranged in two or three-dimensional patterns. Together with the number of channels of the current output stream <em>dlocsig-3d</em> is used to select a configuration. </p>
+
+<tr valign=top>
+<td><a name="path-3d"><font color="b01010">path-3d</font></a><br>[t|nil]<br>t</td>
+<td><p>A boolean value that defines how bezier paths are going to be parsed. </p>
+
+<tr valign=top>
+<td><a name="dlocsig-render-using"><font color="b01010">dlocsig-render-using</font></a><br>[num]<br>1</td>
+<td><p>A number selected from predefined constants that defines which rendering technique will be used. The default is <strong>amplitude-panning</strong>. Currently available rendering technique constants are: <strong>amplitude-panning</strong>, <strong>b-format-ambisonics</strong>, <strong>decoded-ambisonics</strong></p>
+
+</table>
+
+</td>
+
+<tr valign="top"><td bgcolor="#e0e0e0" colspan="2">
+<a name="speaker-config"><font size="+2">Speaker configuration</font></a>
+</td>
+
+<tr><td bgcolor="#e0e0e0" width="20%"></td>
+
+<td>
+
+<p>The following functions are used to arrange speaker configurations in 2 or 3d space. <a href="#arrange-speakers">arrange-speakers</a> creates a new configuration for a given number of speakers. The configuration includes the position of the speakers in space, optional delays for some or all speakers and a mapping from speakers to output channels. The configurations are stored in <a href="#dlocsig-speaker-configs">dlocsig-speaker-configs</a>, a special variable that holds a bidimensional array. The first index of the array has dimension 2 and is used to differenciate between 2d and 3d configurations (a given number of speakers can be arranged both in 2d or 3d patterns). The second index is by default of dimension 9 and represent the number of speakers of a given configuration. <a href="#set-speaker-configuration">set-speaker-configuration</a> and <a href="#get-speaker-configuration">get-speaker-configuration</a> can be used to store and retrieve a configuration. </p>
+
+<p><table>         
+<tr><td bgcolor="#e0e0e0"><a name="arrange-speakers"><strong>arrange-speakers</strong></a></td><td> &amp;optional-key
+<tr><td></td><td>(<i>speakers</i> '())<br>
+                 (<i>groups</i> '())<br>
+                 (<i>distances</i> '())<br>
+                 (<i>delays</i> '())<br>
+                 (<i>map</i> '())<br>
+</table></p>
+
+<p><em>arrange-speakers</em> returns a speaker configuration structure for a particular number of speakers and associated output channels. It defines the location of all speakers in two or three dimensional space, groups the speakers for panning purposes and optionally adds fixed delays to some speakers and maps individual speakers to output channels. </p>
+
+<p><table>
+
+<tr valign=top>
+<td><a name="speakers"><font color="b01010">speakers</font></a><br>[list]</td>
+<td><p>A list that specifies the location of all speakers in space containing either: sub-lists with azimut and elevation angles (for three dimensional speaker distributions) or just numbers that represent azimut angles (for two dimensional speaker distributions). </p></td>
+
+<tr valign=top>
+<td><a name="groups"><font color="b01010">groups</font></a><br>[list]</td>
+<td><p>A list of lists that describes the grouping of speakers for the purposes of amplitude panning (the signal will be panned between speakers that belong to the same group). Each group can be composed of either two or three speakers and all groups for a given speaker configuration have to have the same length. This parameter <strong>can</strong> be ommited if the speakers are arranged in a two dimensional configuration (and thus have no elevation angles). Each speaker in a group is represented by an integer that is the zero based index of the speaker in the previously defined <a href="#speakers"><font color="b01010">speakers</font></a> list. This is the definition for a simple two dimensional grouping of four speakers:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(arrange-speakers :speakers '((-45 0)(45 0)(135 0)(225 0))
+                  :groups '((0 1)(1 2)(2 3)(3 0)))
+</pre></font></table>
+
+<p>The elevation angles and the group information can be ommited in this case:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(arrange-speakers :speakers '(-45 45 135 225))
+</pre></font></table>
+
+<p>This is another example where the same four speakers are rearranged in a 3d pattern:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(arrange-speakers :speakers '((1 -60 0)(1 60 0)(1 180 0)(1 0 90))
+                  :groups '((0 1 3)(1 2 3)(2 0 3)
+                            ;; floor
+                            (0 1 2)))
+</pre></font></table>
+
+<p>All angles are measured by default in degrees, 0 degrees is right in front of the listener and angles increment clockwise. The unit used to represent angles can be changed by setting <a href="#dlocsig-one-turn">dlocsig-one-turn</a> to the number that represents one turn in the desired unit (ie: <tt>(setf dlocsig-one-turn 1)</tt> will enable you to express all angles in fractions of a turn). </p></td>
+
+<tr valign=top>
+<td><a name="distances"><font color="b01010">distances</font></a><br>[list]</td>
+<td><p>A list of relative distances between the listener and all speakers. This parameter can be used to specify relative fixed delays between speakers to compensate for arrangements where not all speakers are equidistant from the listener. Distances are measured in meters by default. This example configuration will add 14.5mSeconds of delay (5 meters at 344m/s) to the two back channels of a four speaker configuration:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(arrange-speakers :speakers '(-45 45 135 225)
+                  :distances '(0 0 5 5)
+</pre></font></table>
+
+<p>The unit used to represent distances can be changed by setting <a href="#dlocsig-speed-of-sound">dlocsig-speed-of-sound</a> to a number that represents the speed of sound in the desired unit (ie: <tt>(setf dlocsig-speed-of-sound 1128)</tt> will enable you to express all distances in feet). Delays can also be specified directly by using the <a href="#delays"><font color="b01010">delays</font></a> keyword. </p></td>
+
+<tr valign=top>
+<td><a name="delays"><font color="b01010">delays</font></a><br>[list]</td>
+<td><p>A list of relative delays of all speakers. Delays are specified in seconds and must be zero or positive. A fixed delay line of the appropriate length is inserted on all channels that have a non-zero delay. </p></td>
+
+<tr valign=top>
+<td><a name="map"><font color="b01010">map</font></a><br>[list]</td>
+<td><p>A list that maps the speakers to output channels. Each number of the list defines the zero-based output channel where that speaker will be sent. The following configuration of four speakers will generate a soundfile where left front and back speakers have even channel numbers and right front and back speakers have odd channel numbers:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(arrange-speakers :speakers '(-45 45 135 225)
+                  :map '(0 1 3 2)
+</pre></font></table>
+
+</td>
+</table>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="set-speaker-configuration"><strong>set-speaker-configuration</strong></a></td>
+<td> <em>config</em>
+</table></p>
+
+<p><em>set-speaker-configuration</em> sets a speaker configuration for a particular number of output channels. The argument <em>config</em> must be a configuration structure created by <a href="#arrange-speakers"><font color="b01010">arrange-speakers</font></a>. The configuration will be stored at the appropriate index in the global configuration array depending on the number of speakers it defines. This example will store a new configuration in the slot corresponding to four output channels:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(set-speaker-configuration (arrange-speakers :speakers '(-45 45 135 225)
+                                             :map '(0 1 3 2)
+</pre></font></table>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="get-speaker-configuration"><strong><strong>get-speaker-configuration</strong></a></td>
+<td> <em>channels</em>
+</table></p>
+
+<p><em>get-speaker-configuration</em> retrieves a speaker configuration definition from the global configuration array. The returned configuration will have the number of channels specified by <em>channels</em> and will be either two or three dimensional depending on the value of <a href="#dlocsig-3d"><font color="b01010">dlocsig-3d</font></a>. <a href="#make-dlocsig">make-dlocsig</a> uses this function to retrieve the configuration that matches the number of channels of the enveloping with-sound. </p>
+
+</td>
+</tr>
+
+<tr valign="top"><td bgcolor="#e0e0e0" colspan="2">
+<p><a name="paths"><font size="+2">Paths</font></a></p>
+</td>
+
+<tr><td></td>
+<td>
+
+<p>Paths are used to describe the trajectory of the moving sound source in space. </p>
+
+<p><table width="100%">
+<tr><td bgcolor="#e0e0e0"><a name="bezier-paths"><strong>Bezier paths</strong></a></td></tr>
+</table>
+
+<table width="100%"><tr valign="top"><td><p>Bezier paths are defined by a list of points in 2d or 3d space that the sound source will move through. The bezier path classes will create a curved trajectory that passes through all the specified points and is composed of bezier segments, one segment for each two points in the original description of the path.</p>
+
+<p>The trajectory pictured on the right was created by evaluating the following lisp code:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(make-path 
+ '((-10 10 0 1)(0 5 0 0)(10 10 5 1.5)))
+</pre></font></table>
+
+<p>All the intermediate points that create the smooth trajectory were rendered from the bezier segments fitted by <em>make-path</em> to the three supplied points. </p>
+</td>
+
+<td><img src="images/fig1.png"></td>
+
+<tr valign="top">
+<td><img src="images/fig2.png"></td>
+<td><p>The fourth optional parameter controls the relative velocity of the movement. In our example the sound source slows down to zero velocity on the second point and reaches the third point at 1.5 times the speed it started it. </p>
+
+<p>These are the corresponding graphs of average velocity, acceleration and doppler shift for each segment of the trajectory. </p>
+
+</table>
+
+<p>This rendition of the trajectory in terms of a smooth curve is necessary for a perceptually convincing rendition of the doppler frequency effect. A trajectory composed of straigh lines connecting the points would imply a sudden change of the velocity vector at each inflection point. Any such change in the radial velocity component will produce a sudden jump in doppler shift which will translate perceptually in a jump in pitch instead of a jump in doppler shift. This is one way in which the illusion of a moving sound source can be easily destroyed. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="make-path"><strong>make-path</strong></a></td><td> &amp;optional-key
+<tr><td></td><td>(<i>3d</i> path-3d)<br>
+                 (<i>path</i> '())<br>
+                 (<i>polar</i> nil)<br>
+                 (<i>closed</i> nil)<br>
+                 (<i>curvature</i> nil)<br>
+                 (<i>error</i> 0.01)<br>
+                 (<i>initial-direction</i> '())<br>
+                 (<i>final-direction</i> '())<br>
+</table></p>
+
+<p><em>make-path</em> returns a bezier path object that can be used as an argument to the <em>make-dlocsig</em> unit generator creation function. </p>
+
+<p><table>
+
+<tr valign=top>
+<td><a name="bezier-3d"><font color="b01010">3d</font></a><br>[t|nil]</td>
+<td><p>Defines how the <a href="#bezier-path"><font color="b01010">path</font></a> parameter will be parsed. If <em>t</em> the path will be interpreted as containing points in 3d space. If <em>nil</em> it will be interpreted as containing 2d points. The default for <em>3d</em> is defined by the <a href="#path-3d">path-3d</a> special variable (normally <em>t</em>. </p>
+
+<tr valign=top>
+<td><a name="bezier-path"><font color="b01010">path</font></a><br>[list]</td>
+<td><p>A list that contains the points in 2d or 3d space the sound source will have to move through and the optional relative velocity of the source at each of those points. Points can be defined in cartesian (the default) or <a href="#bezier-polar"><font color="b01010">polar</font></a> coordinates. To be rendered as a set of bezier segments the path description has to contain at least three points (four points if the path is <a href="#bezier-closed"><font color="b01010">closed</font></a>). Paths with only two points will be rendered as a straight line. Paths with only one point define stationary sound sources. </p>
+
+<p>These are the recognized formats for each point if the components of <a href="#bezier-path"><font color="b01010">path</font></a> are lists and <a href="#bezier-3d"><font color="b01010">3d</font></a> is <em>t</em>: </p>
+
+<dl>
+
+<dt><strong>(x y z v)</strong>
+<dd>x, y, z are the coordinates of the point, v is a relative velocity value
+
+<dt><strong>(x y z)</strong>
+<dd>x, y, z are the coordinates of the point, velocity is <em>nil</em>
+
+<dt><strong>(x y) </strong>
+<dd>x and y are the coordinates of the point, z is 0.0 and velocity is <em>nil</em>
+
+</dl>
+
+<p>If <a href="#bezier-3d"><font color="b01010">3d</font></a> is <em>nil</em>:</p>
+
+<dl>
+
+<dt><strong>(x y v)</strong>
+<dd>x, y are the coordinates, z is 0.0 and v is a relative velocity value
+
+<dt><strong>(x y) </strong>
+<dd>x and y are the coordinates, z is 0.0 and velocity is <em>nil</em>
+
+</dl>
+
+<p>This will move the sound source from left to the right and up and the source's velocity will be zero right in front of the listener's position:</p>
+
+<pre>  (make-path :path '((-10 10 0 1)(0 5 0 0)(10 10 10 1)))</pre>
+
+<tr valign=top>
+<td><a name="bezier-polar"><font color="b01010">polar</font></a><br>[nil|t]</td>
+<td><p>If <em>polar</em> is <em>t</em> <a href="#bezier-path"><font color="b01010">path</font></a> will be interpreted as a list of points in polar coordinates. The formats recognized are the same except the first coordinate is the distance from the source to the listener, the second is the azimut angle and the third (and optional) is the elevation angle. </p>
+
+<tr valign=top>
+<td><a name="bezier-closed"><font color="b01010">closed</font></a><br>[nil|t]</td>
+<td><p>Defines a path as closed. The first and last points of a closed path have to have the same coordinates. Because of limitations in the bezier curve fitting algorithm closed paths have to have at least 4 points. </p>
+
+
+<tr valign=top>
+<td><a name="bezier-curvature"><font color="b01010">curvature</font></a><br>[number|list]</td>
+<td><p>The curvature parameter can be used to affect the transitions between consecutive bezier segments. The default value of 1.0 does not change the fitted value of the bezier segment control points. Values above 1.0 will result in more open transitions between segments. Values below 1.0 will create faster transitions between bezier segments. <em>curvature</em> can be a number in which case it will affect all transitions or it can be a list with one component for each pair of points in the trajectory. In this case each component can be a number (both ends of the segment will have the same curvature) or a list with two numbers (each end of the segment can have a different curvature). </p>
+
+<p>The figure on the left was created by <tt>(make-path '((-10 10)(0 5)(10 10)) :curvature '(0.4 1))</tt>. The first segment of the trajectory changes direction more abruptly than the second that uses the default of 1 for the parameter. The second was created by <tt>(make-path '((-10 10)(0 5)(10 10)) :curvature 0.4)</tt>, now both segments share the same curvature. </p>
+
+<p><table cellpadding="5"><tr>
+<td><img src="images/c0.png"><br><br>:curvature '(0.4 1)</td>
+<td><img src="images/c1.png"><br><br>:curvature 0.4</td>
+</table></p>
+
+<tr valign=top>
+<td><a name="bezier-error"><font color="b01010">error</font></a><br>[number]</td>
+<td><p>The bezier curves that represent the trajectory are rendered into a straight line representation. This parameter defines the maximum error allowed between the ideal bezier curve and the midpoint of each rendered linear segment. </p>
+
+<p>The following figures illustrate the effect of the <a href="#bezier-error">error</a> parameter. All figures represent the same path in 2d space <tt>'((-10 10)(0 5)(10 10))</tt>. The one on the left was created with <tt>(make-path '((-10 10)(0 5)(10 10)) :error 3)</tt>. The error bound is so large that no points are actually interpolated between the three supplied points (even though internally the bezier curve control points were calculated). The one on the center was created with <tt>(make-path '((-10 10)(0 5)(10 10)) :error 0.3)</tt>. Two intermediate points are calculated between each of the three supplied points. The one on the right was created with <tt>(make-path '((-10 10)(0 5)(10 10)) :error 0.01)</tt> and closely approaches the ideal bezier curve. </p>
+
+<p><table cellpadding="5"><tr>
+<td><img src="images/e0.png"><br><br>:error 3</td>
+<td><img src="images/e1.png"><br><br>:error 0.3</td>
+<td><img src="images/e2.png"><br><br>:error 0.01</td>
+</table></p>
+
+<tr valign=top>
+<td><a name="initial-direction"><font color="b01010">initial-direction</font></a><br>[list]</td>
+<td><p>If the path is not closed this list defines the initial direction of the movement. The list specifies the direction as a vector expressed in x, y, z coordinates. </p></td>
+
+<tr valign=top>
+<td><a name="final-direction"><font color="b01010">final-direction</font></a><br>[list]</td>
+<td><p>If the path is not closed this list defines the final direction of the movement. The list specifies the direction as a vector expressed in x, y, z coordinates. </p></td>
+
+</table>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="make-polar-path"><strong>make-polar-path</strong></a></td><td> &amp;optional-key
+<tr><td></td><td>(<i>3d</i> path-3d)<br>
+                 (<i>path</i> '())<br>
+                 (<i>closed</i> nil)<br>
+                 (<i>curvature</i> nil)<br>
+                 (<i>error</i> 0.01)<br>
+                 (<i>initial-direction</i> '())<br>
+                 (<i>final-direction</i> '())<br>
+</table></p>
+
+<p><em>make-polar-path</em> returns a bezier path object that can be used as an argument to the <em>make-dlocsig</em> unit generator creation function. It will automatically parse the trajectory points as being represented in polar coordinates. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="make-closed-path"><strong>make-closed-path</strong></a></td><td> &amp;optional-key
+<tr><td></td><td>(<i>3d</i> path-3d)<br>
+                 (<i>path</i> '())<br>
+                 (<i>polar</i> nil)<br>
+                 (<i>curvature</i> nil)<br>
+                 (<i>error</i> 0.01)<br>
+                 (<i>initial-direction</i> '())<br>
+                 (<i>final-direction</i> '())<br>
+</table></p>
+
+<p><em>make-polar-path</em> returns a bezier path object that can be used as an argument to the <em>make-dlocsig</em> unit generator creation function. It will create a closed path. </p>
+
+<p><table width="100%">
+<tr><td bgcolor="#e0e0e0"><a name="geometric-paths"><strong>Geometric paths</strong></a></td></tr>
+</table>
+
+<p>Geometric paths are defined by a description of the path in terms of geometry. For now only one type of geometric path has been defined as an extension to 3d of the old spiral-path of the old dlocsig implementation. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="make-spiral-path"><strong>make-spiral-path</strong></a></td><td> &amp;optional-key
+<tr><td></td><td>(<i>start-angle</i> 0d0)<br>
+                 (<i>total-angle</i> nil)<br>
+                 (<i>step-angle</i> (/ <a href="#dlocsig-one-turn">dlocsig-one-turn</a> 100))<br>
+                 (<i>turns</i> nil)<br>
+                 (<i>distance</i> '(0 10 1 10))<br>
+                 (<i>height</i> '(0 0 1 0))<br>
+                 (<i>velocity</i> '(0 1 1 1))<br>
+</table></p>
+
+<p><em>make-spiral-path</em> returns a spiral trajectory centered around the listener's position. </p>
+
+<p><table>
+
+<tr valign=top>
+<td><a name="start-angle"><font color="b01010">start-angle</font></a><br>[number]</td>
+<td><p>The start angle for the spiral. </p></td>
+
+<tr valign=top>
+<td><a name="total-angle"><font color="b01010">total-angle</font></a><br>[number]</td>
+<td><p>The total angle for the spiral. </p></td>
+
+<tr valign=top>
+<td><a name="step-angle"><font color="b01010">step-angle</font></a><br>[number]</td>
+<td><p>The step angle that will be used to render the spiral. The default is 1/100 of a turn. </p></td>
+
+<tr valign=top>
+<td><a name="turns"><font color="b01010">turns</font></a><br>[number]</td>
+<td><p>An alternative way of specifying the total angle comprised by the spiral. Mutually exclusive with <a href="#total-angle"><font color="b01010">total-angle</font></a></p></td>
+
+<tr valign=top>
+<td><a name="distance"><font color="b01010">distance</font></a><br>[envelope]</td>
+<td><p>Distance from the source to xy = 0,0 expressed as an envelope. </p></td>
+
+<tr valign=top>
+<td><a name="height"><font color="b01010">height</font></a><br>[envelope]</td>
+<td><p>Height of the source expressed as an envelope. </p></td>
+
+<tr valign=top>
+<td><a name="velocity"><font color="b01010">velocity</font></a><br>[envelope]</td>
+<td><p>Relative velocity of the source expressed as an envelope. </p></td>
+
+</table></p>
+
+<p><table width="100%">
+<tr><td bgcolor="#e0e0e0"><a name="transformations"><strong>Path transformations</strong></a></td></tr>
+</table>
+
+<p>Not written yet...</p>
+
+<p><table width="100%">
+<tr><td bgcolor="#e0e0e0"><a name="visualization"><strong>Path visualization</strong></a></td></tr>
+</table>
+
+<p>Ahem, there is no graphical path editor... yet. If your system includes the <em>gnuplot</em> utility you can use the following functions to graphically visualize the path and its properties. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="plot"><strong>plot</strong></a></td><td> <i>path</i>
+</table></p>
+
+<p>This will plot two views, one containing the trajectory and the other containing overlapping plots of the velocity, acceleration and doppler shift of the moving sound source. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="plot-trajectory"><strong>plot-trajectory</strong></a></td><td> <i>path</i>
+</table></p>
+
+<p>Plots the trajectory of the moving sound source. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="plot-velocity"><strong>plot-velocity</strong></a></td><td> <i>path</i>
+</table></p>
+
+<p>Plots the velocity of the moving sound source. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="plot-acceleration"><strong>plot-acceleration</strong></a></td><td> <i>path</i>
+</table></p>
+
+<p>Plots the acceleration of the moving sound source. </p>
+
+<p><table>
+<tr><td bgcolor="#e0e0e0"><a name="plot-doppler"><strong>plot-doppler</strong></a></td><td> <i>path</i>
+</table></p>
+
+<p>Plots the doppler shift of the moving sound source. </p>
+
+</td>
+</tr>
+
+<tr valign="top"><td bgcolor="#e0e0e0" colspan="2">
+<p><a name="dlocsig-ug"><font size="+2">DLOCSIG</font></a></p>
+</td>
+
+<tr><td></td>
+<td>
+
+<p><table>         
+<tr><td bgcolor="#e0e0e0"><strong>make-dlocsig</strong></td><td> &amp;optional-key<br>
+<tr><td></td><td>(<i>start-time</i> nil)<br>
+                 (<i>duration</i> nil)<br>
+                 (<i>path</i> dlocsig-path)<br>
+                 (<i>scaler</i> dlocsig-scaler)<br>
+                 (<i>direct-power</i> dlocsig-direct-power)<br>
+                 (<i>reverb-power</i> dlocsig-reverb-power)<br>
+                 (<i>inside-radius</i> dlocsig-inside-radius)<br>
+                 (<i>inside-direct-power</i> dlocsig-inside-direct-power)<br>
+                 (<i>inside-reverb-power</i> dlocsig-inside-reverb-power)<br>
+                 (<i>reverb-amount</i> dlocsig-reverb-amount)<br>
+                 (<i>initial-delay</i> dlocsig-initial-delay)<br>
+                 (<i>unity-gain-dist</i> dlocsig-unity-gain-dist)<br>
+                 (<i>minimum-segment-size</i> dlocsig-minimum-segment-size)<br>
+                 (<i>render-using</i> dlocsig-render-using)<br>
+
+</table></p>
+
+<p><em>make-dlocsig</em> creates a dlocsig structure that can be used as parameter to <em>dlocsig</em> in the Run loop. It returns three values, the first one the structure itself, the second the starting absolute sample in the output soundfile and the third the end sample in the output soundfile. A <em>multiple-value-bind</em> can be used to bind to all three values: </p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(multiple-value-bind (<font color="000000">dloc beg end</font>)
+    (<font color="000000">make-dlocsig</font> :start-time start-time
+                  :duration duration
+                  :path path)
+...
+    (run
+      (loop for i from <font color="000000">beg</font> below <font color="000000">end</font> do
+        (<font color="000000">dlocsig dloc</font> i sample)))
+</pre></font></table>
+
+<p>All default values are asigned to special variables named <font color="b01010">dlocsig-xxx</font>, where <font color="b01010">xxx</font> stands for the name of the parameter. This enables calls to the instrument to be surrounded by let statements so that local bindings can be established for default parameters. In the following example the first two notes are rendered using amplitude panning between speakers (if the default has not been changed before) and the second two are rendered using ambisonics because they are within the enclosing let that rebinds the special variable dlocsig-render-using:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(with-sound(:channels 8)
+  (some-instrument 0 1 440 0.1)
+  (another-instrument 2.33 0.4 880 0.18)
+  (let* ((dlocsig-render-using decoded-ambisonics))
+    (some-instrument 2 2.5 1000 0.07)
+    (some-instrument 4 2.2 1002 0.05)))
+</pre></font></table>
+
+
+<font size="-1">
+<dl>
+<dt><a href="#dlocsig-reqparms">Required parameters</a>
+<dd><a href="#start-time"><font color="b01010">start-time</font></a>, <a href="#duration"><font color="b01010">duration</font></a>, <a href="#path"><font color="b01010">path</font></a>
+<dt><a href="#dlocsig-keyparms">Optional parameters</a>
+<dd><a href="#scaler"><font color="b01010">scaler</font></a>, <a href="#direct-power"><font color="b01010">direct-power</font></a>, <a href="#reverb-power"><font color="b01010">reverb-power</font></a>, <a href="#inside-radius"><font color="b01010">inside-radius</font></a>, <a href="#inside-direct-power"><font color="b01010">inside-direct-power</font></a>, <a href="#inside-reverb-power"><font color="b01010">inside-reverb-power</font></a>, <a href="#reverb-amount"><font color="b01010">reverb-amount</font></a>, <a href="#initial-delay"><font color="b01010">initial-delay</font></a>, <a href="#unity-gain-distance"><font color="b01010">unity-gain-distance</font></a>, <a href="#minimum-segment-size"><font color="b01010">minimum-segment-size</font></a>, <a href="#render-using"><font color="b01010">render-using</font></a>
+</dl>
+</font>
+
+<p><table>
+
+<tr valign=top><td><a name="start-time"><font color="b01010">start-time</font></a><br>[num]</td>
+<td>Start time of the note in the output soundfile. <p></td>
+
+<tr valign=top><td><a name="duration"><font color="b01010">duration</font></a><br>[num]</td>
+<td><p>Duration of the note. Actually this is <em>not</em> going to be the real duration of the note. This is the duration of the note at the moving source's position. Depending on the net change of distance from the source to the listener the actual duration of the note can be shorter (ending distance is less than starting distance) or longer (ending distance longer than starting distance). The doppler effect due to radial movement of the source translates into a sample rate change of the source which directly leads to the change in duration. The actual duration of the note is returned (indirectly) through the second and third values returned by <em>make-dlocsig</em>. Those numbers (absolute starting and ending samples of the note) should be used to control the main iteration loop inside the run macro. </p></td>
+
+<tr valign=top><td><a name="path"><font color="b01010">path</font></a><br>[path]</td>
+<td><p>A <a href="#paths">path object</a> that describes the movement of the sound source in space. </p></td>
+
+<tr valign=top><td><a name="scaler"><font color="b01010">scaler</font></a>
+<br>[num]<br>1.0</td>
+
+<td><p>Overall amplitude scaler. This number scales the gain envelopes for all output and reverb channels. </p></td>
+
+<tr valign=top><td><a name="direct-power"><font color="b01010">direct-power</font></a>
+<br>[num]<br>1.5</td>
+<td><p>The amplitude of the sound normally decreases as <em>(/ dist)</em> where <em>dist</em> is the distance between the source and the listener. This number can alter the exponent of the denominator so that the law of change becomes <em>(/ (expt dist direct-power)</em>. Positive numbers will make the attenuation with distance increase faster than what would be normal. </p></td>
+
+<tr valign=top><td><a name="reverb-power"><font color="b01010">reverb-power</font></a>
+<br>[num]<br>0.5</td>
+<td><p>Defines how the amplitude of the signal sent to the reverberator output channels changes in amplitude with distance. </p></td>
+
+<tr valign=top><td><a name="inside-radius"><font color="b01010">inside-radius</font></a>
+<br>[num]<br>1.0</td>
+<td><p>Rendering cues are calculated differently when the sound source is inside the sphere delimited by <a href="#inside-radius"><font color="b01010">inside-radius</font></a> (ie: when the sound is somehow "inside" the head of the listener). The exact difference depends on the rendering method used but the general idea is that within that sphere all speakers emit signal which is proportional to the distance to the center of the sphere (the listener's position). </p></td>
+
+<tr valign=top><td><a name="inside-direct-power"><font color="b01010">inside-direct-power</font></a>
+<br>[num]<br>1.5</td>
+<td><p>Within the sphere delimited by <a href="#inside-radius"><font color="b01010">inside-radius</font></a> and when rendering to amplitude panning all speakers output signal proportional to the distance to the listeners position. </p></td>
+
+<tr valign=top><td><a name="inside-reverb-power"><font color="b01010">inside-reverb-power</font></a>
+<br>[num]<br>0.5</td>
+<td><p>This number controls the exponent of the attenuation curve for the revererated sound when inside the sphere delimited by <a href="#inside-radius"><font color="b01010">inside-radius</font></a>. </p></td>
+
+<tr valign=top><td><a name="reverb-amount"><font color="b01010">reverb-amount</font></a>
+<br>[num|env]<br>0.04</td>
+<td>How much signal is sent to the reverberator output channel. Can be a number or an envelope. </p></td>
+
+<tr valign=top><td><a name="initial-delay"><font color="b01010">initial-delay</font></a>
+<br>[t|nil]<br>nil</td>
+<td><p>If set to <em>nil</em> the minumum time delay between the source and the listener is substracted from the delay line. This will reduce but not necessarily eliminate the initial delay from the start of the note at the position of the source and the arrival of the sound at the listener's position. </p></td>
+
+<tr valign=top><td><a name="unity-gain-distance"><font color="b01010">unity-gain-distance</font></a>
+<br>[t|nil|num]<br>nil</td>
+<td><p>If a number is specified it represents the distance at which dlocsig processes the samples with unity gain. If set to <em>nil</em> the minimum distance between source and listener is used as the unity gain distance. If set to <em>t</em> no amplitude normalization is done and the attenuation will accurately represent the object's distance. </p></td>
+
+<tr valign=top><td><a name="minimum-segment-size"><font color="b01010">minimum-segment-size</font></a>
+<br>[num]<br>1.0</td>
+<td><p>Defines the minimum distance between segment breakpoints. If a segment is longer than this distance it is split into smaller segments until the condition is satisfied. Otherwise long segments would not properly render the attenuation versus distance curve (ie: it would be just a linear curve instead of the specified power curve). </p></td>
+
+<tr valign=top><td><a name="render-using"><font color="b01010">render-using</font></a>
+<br>[num]<br>1</td>
+<td><p>Defines the rendering technique used to generate the output samples. Acceptable values are the following predefined constants: <strong>amplitude-panning</strong> (1) for speaker group amplitude panning, <strong>b-format-ambisonics</strong> (2) for four channel ambisonics encoded output and <strong>decoded-ambisonics</strong> (3) for a multichannel decoding of the ambisonics components.  </p></td>
+
+</table>
+
+<p><table>         
+<tr><td bgcolor="#e0e0e0"><strong>dlocsig</strong></td><td> <i>dloc</i> <i>i</i> <i>sample</i>
+</table></p>
+
+<p>Localizes a sample and merges it into the output file at absolute sample number i. </p>
+
+<p><table>
+
+<tr valign=top><td><a name="dloc"><font color="b01010">dloc</font></a><br>[dlocs]</td>
+<td>dlocsig structure created with <a href="#make-dlocsig">make-dlocsig</a>. <p></td>
+
+<tr valign=top><td><a name="i"><font color="b01010">i</font></a><br>[integer]</td>
+<td><p>Absolute sample number in the output soundfile, normally the loop counter of the run loop. </p></td>
+
+<tr valign=top><td><a name="sample"><font color="b01010">sample</font></a><br>[sample]</td>
+<td><p>The sample to be localized. </p></td>
+
+</table>
+
+</td>
+</tr>
+
+<tr valign="top"><td bgcolor="#e0e0e0" colspan="2">
+<p><a name="dlocsig-examples"><font size="+2">Examples</font></a></p>
+</td>
+
+<tr><td></td>
+<td>
+
+<p>This is a very <a href="sinetest.ins">simple instrument</a> that dynamically moves a sine wave in space using dlocsig:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(definstrument sinewave (start-time duration freq amp 
+		         &key
+			 (amp-env '(0 1 1 1))
+			 (path (make-path :path '(-10 10 0 5 10 10))))
+  (multiple-value-bind (dloc beg end)
+      (make-dlocsig :start-time start-time
+		    :duration duration
+		    :path path)
+    (let* ((osc (make-oscil :frequency freq))
+	   (aenv (make-env :envelope amp-env :scaler amp)))
+      (run
+       (loop for i from beg below end do
+	 (dlocsig dloc i (* (env aenv)(oscil osc))))))))
+</pre></font></table>
+
+<p>Note how the starting and ending samples of the main loop in the run macro are provided by the second and third values returned by make-dlocsig. Other than that this a very simple example. This instrument can be called as follows (in a four channel environment): </p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(with-sound(:channels 4)
+  (sinetest 0 1 440 0.5 :path (make-path '((-10 10)(0 5)(10 10)))))
+</pre></font></table>
+
+<p>This will select the default 2d speaker configuration for four channels (if the default value of dlocsig-3d is not changed to t). The same instrument could be used to render a 3d soundfile for eight channels by calling it with the following parameters:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+;; tell the system I want to use the 3d speaker configuration
+(setf dlocsig-3d t)
+;; render the sound with a 3d path
+(with-sound(:channels 8)
+  (sinetest 0 1 440 0.5 :path (make-path '((-10 10 0)(0 5 10)(10 10 5)))))
+</pre></font></table>
+
+<p>Existing instruments can be easily converted to use <em>dlocsig</em>: </p>
+
+<ul>
+<li>add parameters to the <em>definstrument</em> definition. You will need at least one additional parameter to supply the path. 
+<li>replace the calculation of the run loop begin and end samples with the second and third values that are returned by <em>make-dlocsig</em>. Use a <em>multiple-value-bind</em> to get them (see the example above) instead of basing the calculation solely on the starting time and duration of the note (which must be supplied to <em>make-dlocsig</em>). 
+<li>replace the current output code with a call to <em>dlocsig</em>. Look for either the standard <em>locsig</em> or <em>outa</em>. 
+</ul>
+
+<p><em>dlocsig</em> assumes it receives time-ordered samples from the instrument. It will not work in instruments like <a href="http://www-ccrma.stanford.edu/~nando/clm/grani/">grani</a>, a granular synthesis instrument that can randomly splatter samples all over the duration of the note. It will also not work in instruments that generate more than one output channel (ie: <em>dlocsig</em> needs a mono source). In those cases you can use a second instrument which contains dlocsig and a <em>sound-let</em> to hold the rendered sound until it is spatialized. This solution can also be used to spatialize arbitrary instruments when you want to avoid modifying the instrument code (of course, at the expense of having to create the temporary soundfile). Obviously you can also modify your multichannel instrument to use an array of dlocsig structures and spatialize each channel independently!. </p>
+
+<p>Take a look at the <a href="move-sound.ins">move-sound.ins</a> example instrument. The file includes an instrument (<em>move</em>) that can spatialize multichannel soundfiles and a macro (<em>move-sound</em>) that can wrap arbitrary lisp code and will spatialize the resulting soundfile. Before trying the example compile and load <em>dlocsig</em>, <em>move-sound</em> and Bill's <em>fm-violin</em>:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(with-sound(:channels 4 :play nil)
+  (move-sound (:path (make-path '((-10 10)(0.1 0.1)(10 -10))))
+    (fm-violin 0 1 440 0.1)
+    (fm-violin 0.3 2 1020 0.05)))
+</pre></font></table>
+
+<p>The preceding code fragment will create a temporary soundfile with the output of the two fm-violin notes and then will spatialize it using the supplied path. The body of the macro could be made to generate a multichannel soundfile in which case you would have to supply as many paths as channels are generated (each channel is independently spatialized). This rather pointless example illustrates this. The first call to fm-violin outputs to the left channel of the temporary file and the second to the right channel:</p>
+
+<table bgcolor="e0e0e0" width=100%><tr><td><pre><font color="101080">
+(with-sound(:channels 4 :play nil)
+  (move-sound (:channels 2 
+               :paths (list (make-path '((-10 10)(0.1 0.1)(10 -10)))
+                            (make-spiral-path :turns 2)))
+    (fm-violin 0 1 440 0.1 :degree 0)
+    (fm-violin 0.3 2 1020 0.05 :degree 90)))
+</pre></font></table>
+
+</td>
+</tr>
+
+</table></p>
+
+<p><table width=100% bgcolor="#e0e0e0"><tr><td>
+<a name="history"><font size="+2">History</font></a></table>
+
+<p>The original "dlocsig" was born in 1992 while I was working at Keio University in Japan. It was originally written to create localization cues for a four channel environment, the hardware being the QuadBox, a four channel D/A that attached to the DSP port of a NeXT computer. The hardware was originally built by Atau Tanaka at CCRMA while I worked on the software in Japan (mainly a 56K DSP program to play four channel soundfiles on the NeXT and an accompaining c code player - quadplay). </p>
+
+<p>Thanks to Juan Pampin for prodding me to write this second version and for his help in the first stages of the project. </p>
+
+<hr>
+
+<table><tr><td><!--- <img src="/CCRMA/Images/Logo:Small.gif" alt=""> -->
+  <td><font size="2">&copy;1999, 2000, 2001 Fernando Lopez-Lezcano. All Rights Reserved.<br>
+  Created and mantained by Fernando Lopez-Lezcano, 
+  <a href="mailto:nando@ccrma.stanford.edu">nando@ccrma.stanford.edu</a></font><p>
+</table>
+
+</body>
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/clm/clm-3/dlocsig/index.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:46:29 GMT -->
+</html>

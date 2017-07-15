@@ -1,0 +1,180 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>rts</title>
+</head>
+
+<body>
+<div id="content"> <!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts</code> [<var>to</var>] {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+<p>
+Starts the real time scheduler according to optional and keyword arguments. Returns no values.  You must load the <a href="../install.html#rts">RTS system</a> before calling the function.
+</p>
+
+<p id="args"><code class="entry">rts</code> supports the following optional arguments:
+</p>
+
+<dl>
+
+<dt>
+<var>to</var> {<var>stream</var> | <var>false</var>}
+</dt>
+<dd>The default destination output stream, defaults
+to <code>*out*</code>. If the
+value is a stream then it must already be open and initialized.  If
+the value is false then no output stream is assumed and the caller is
+expected to manage stream IO directly using the <code class="keyword">:to</code> argument to <a href="output-fn.html">output</a>.
+</dd>
+</dl>
+
+<p id="args"><code class="entry">rts</code> supports the following keywor arguments:
+</p>
+
+<dl>
+<dt><code class="keyword">:time-format</code> {<code class="keyword">:sec</code> | <code class="keyword">:msec</code> | <code class="keyword">:usec</code>}</dt>
+<dd>The format of time values returned by <a href="now-fn.html">now</a> . If the value is <code class="keyword">:sec</code> then floating point seconds are returned, <code class="keyword">:msec</code> returns integer milliseconds (1000 msec equals 1 sec) and <code class="keyword">:usec</code> returns microseconds (1000000 usec equals 1 sec). The default value is <code class="keyword">:sec</code>.  Use <code class="keyword">:msec</code> or <code class="keyword">:usec</code> to avoid float consing in some Lisps. Note that event durations and wait values must agree with the time format.</dd>
+
+  <dt><code class="keyword">:resolution</code> {<var>usecs</var>}</dt>
+  <dd>The duty cycle of the scheduling loop in microseconds (usec), where 1000000 usec equals 1 second. The default value is 100, or 1/10 of a millisecond.
+  <dt><code class="keyword">:priority</code> {<var>number</var>}</dt>
+  <dd>The pthread priorty that the scheduler runs under. The value should be an integer between 1 and 100. The default value is 20.</dd>
+  <dt><code class="keyword">:policy</code> {<var>number</var>}</dt>
+  <dd>The pthread policy that the scheduler runs under. The value 2 is <code>SCHED_RR</code> and 4 is <code>SCHED_FIFO</code>. This value is currently ignored.
+</dl>
+
+</dl>
+
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1. </span> Starting <code>rts</code> and sprouting from the REPL.
+</p>
+<pre class="code">
+(<span class="special">define</span> <span class="defined">*pm*</span>
+  (<a href="portmidi-topic.html#portmidi-open">portmidi-open</a> <span class="keyword">:output</span> 3 <span class="keyword">:latency</span> 0))
+
+(<span class="special">define</span> (<span class="defined">zzz</span> len lb ub wai amp)
+  (<a href="process-mac.html">process</a> repeat len
+           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>)
+                       <span class="keyword">:duration</span> .1 <span class="keyword">:amplitude</span> amp
+                       <span class="keyword">:keynum</span> (<a href="between-fn.html">between</a> lb ub))
+           wait wai))
+
+(rts *pm*)
+  
+<span class="comment">;;; eval to add stuff</span>
+
+(<span class="special">let</span> ((k (<a href="between-fn.html">between</a> 20 100))
+      (n (<a href="pick-fn.html">pick</a> 3 5 7 11)))
+  (<a href="sprout-fn.html">sprout</a> (zzz (* n (<a href="pick-fn.html">pick</a> 2 3 4))
+               k
+               (+ k 7)
+               (/ 1 n)
+               .75)))
+
+<span class="comment">;;; stop when you are done.</span>
+
+(<a href="rts-stop-fn.html">rts-stop</a>)
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2. </span>Endless Fluff. Stops only when <a href="rts-stop-fn.html">rts-stop</a> is called. (Todd Ingalls)
+</p>
+<pre class="code">
+(<span class="special">define</span> <span class="defined">fluff</span> '(60 62 64 67 72 65 69 48 50))
+
+(<span class="special">define</span> (<span class="defined">endless-fluff</span> num dur knums)
+  (<a href="process-mac.html">process</a> repeat num for i from 0 
+	   output
+           (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>) 
+                <span class="keyword">:duration</span> (* 2 dur)
+                <span class="keyword">:amplitude</span> .5
+                <span class="keyword">:keynum</span> (<a href="pickl-fn.html">pickl</a> fluff))
+	   wait (<a href="pick-fn.html">pick</a> dur (/ dur 2) (/ dur 4))
+	   when (= i (1- num))
+	   sprout (<a href="process-mac.html">process</a> repeat 4
+                           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>) 
+                                       <span class="keyword">:duration</span> 5
+                                       <span class="keyword">:amplitude</span> .5 
+                                       <span class="keyword">:keynum</span> (<a href="pickl-fn.html">pickl</a> knums)))
+	   and
+	   sprout (endless-fluff 20 1 knums)))
+
+(rts *pm*)
+
+(sprout (endless-fluff 20 1 fluff))
+
+<span class="comment">;;; stop when you are done.</span>
+
+(<a href="rts-stop-fn.html">rts-stop</a>)
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 3. </span>Sprouting into the scheduler from a receive hook.
+</p>
+<pre class="code">
+(<span class="special">define</span> <span class="defined">*pm*</span> (<a href="portmidi-topic.html#portmidi-open">portmidi-open</a> <span class="keyword">:input</span> 1 <span class="keyword">:output</span> 3 <span class="keyword">:latency</span> 0))
+
+(<span class="special">define</span> (<span class="defined">major-thirds</span> len knum)
+  (<a href="process-mac.html">process</a> with d = .1
+           for i below len
+           for k = (+ knum (* (mod i 5) 4))
+           output (<a href="midi-topic.html#make-note-on">make-note-on</a> 0 k 90) at (<a href="now-fn.html">now</a>)
+           sprout (<a href="midi-topic.html#make-note-off">make-note-off</a> 0 k 125) at (+ (<a href="now-fn.html">now</a>) .5)
+           wait d))
+
+(rts *pm*)
+
+(<a href="set-receiver-fn.html">set-receiver!</a> (<span class="special">lambda</span> (mm ms) ms
+                 (<span class="special">if</span> (<a href="midi-topic.html#note-on-p">note-on-p</a> mm)
+                   (<a href="sprout-fn.html">sprout</a> (major-thirds 20 (<a href="midi-topic.html#note-on-key">note-on-key</a> mm)))))
+               *pm*)
+
+<span class="comment">;;; stop receiving and scheduling.</span>
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *pm*)
+
+(<a href="rtsqmk-fn.html">rts?</a>)
+<span class="result">&rArr;</span> :running
+
+(<a href="rts-stop-fn.html">rts-stop</a>)
+
+(<a href="rtsqmk-fn.html">rts?</a>)
+<span class="result">&rArr;</span> #f
+</pre>
+</div>
+
+
+<h4>See also:</h4>
+<ul>
+<li><a href="rtsqmk-fn.html"><code>rts?</code></a> [Function]</li>
+<li><a href="rts-pause-fn.html"><code>rts-pause</code></a> [Function]</li>
+<li><a href="rts-continue-fn.html"><code>rts-continue</code></a> [Function]</li>
+<li><a href="rts-stop-fn.html"><code>rts-stop</code></a> [Function]</li>
+<li><a href="set-receiver-fn.html"><code>set-receiver!</code></a> [Function]</li>
+<li><a href="sprout-fn.html"><code>sprout</code></a> [Function]</li>
+
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Rtster -->
+<div id="rtster">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

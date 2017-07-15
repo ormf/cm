@@ -1,0 +1,124 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+
+(defun ppolar-b1 (r freq) (- (* 2.0 r (cos (hz->radians freq)))))
+(defun ppolar-b2 (r) (* r r))
+
+(definstrument addflts (start dur numfilts driver freqfun freq0 freq1 ampfun amp cosnum 
+			inloc degree distance reverb-amount &rest filts)
+
+  ;; numfilts: number of second order pole sections used.
+  ;; driver: 1=white noise, 2=sum-of-cosines, 3=inloc (a sound file name)
+  ;; filts: list of lists of filter data: '(freq-fun r-fun frq0 frq1 r0 r1 scaler)
+
+  (let* ((beg (floor (* start *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (rfs (make-array numfilts))
+	 (ffs (make-array numfilts))
+	 (pps (make-array numfilts))
+	 (scs (make-double-array numfilts))
+	 (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	 (rn (if (= driver 1)
+		 (make-rand :frequency freq0)
+	       (if (= driver 2)
+		   (make-sum-of-cosines :frequency freq0 :cosines cosnum)
+		 (make-readin :file inloc :start 0))))
+	 (ampf (make-env ampfun amp dur))
+	 (frqf (make-env freqfun (hz->radians (- freq1 freq0)) dur)))
+    (loop for i in filts and k from 0 below numfilts do
+      (let* ((frqfun (nth 0 i))
+	     (r0 (nth 4 i))
+	     (r1 (nth 5 i))
+	     (g (nth 6 i))
+	     (f0 (nth 2 i))
+	     (f1 (nth 3 i))
+	     (b1-bot (ppolar-b1 r0 f0))
+	     (b1-top (ppolar-b1 r1 f1))
+	     (b2-bot (ppolar-b2 r0))
+	     (b2-top (ppolar-b2 r1))
+	     (rfun (nth 1 i)))
+	(setf (aref pps k) (make-ppolar r0 f0))
+	(setf (aref ffs k) (make-env frqfun :duration dur :offset b1-bot :scaler (- b1-top b1-bot)))
+	(setf (aref rfs k) (make-env rfun :duration dur :offset b2-bot :scaler (- b2-top b2-bot)))
+	(setf (aref scs k) (double g))))
+    (run
+     (loop for i from beg to end do
+       (let ((outsig 0.0)
+	     (insig (* (env ampf) (if (rand? rn) (rand rn (env frqf))
+				    (if (sum-of-cosines? rn) (sum-of-cosines rn (env frqf))
+				      (readin rn))))))
+	 (dotimes (k numfilts)
+	   (incf outsig (two-pole (aref pps k) (* (aref scs k) insig)))
+	   (setf (mus-ycoeff (aref pps k) 1) (env (aref ffs k)))
+	   (setf (mus-ycoeff (aref pps k) 2) (env (aref rfs k))))
+	 (locsig loc i outsig))))))
+#|
+  (with-sound ()
+     (addflts 0 1.0 2 2 '(0 0 100 1) 100 120 '(0 0 50 1 100 0) .25 30 0 0 1.0 0.01
+	      '((0 0 100 1) (0 0 100 1) 1200 2400 .9 .995 .005)
+	      '((0 0 100 1) (0 0 100 1) 600 1200 .95 .995 .01)))
+
+
+
+Date:     Wed, 11 Sep 91 15:40:00 MET DST
+From: Rick Taube <taube@ira.uka.de>
+To: bil@ccrma.Stanford.EDU
+Cc: taube@ira.uka.de
+Subject:  addflts question (from Mesias Maiguashca)
+
+; The file addflt.lisp was compiled to the file addflt.fasl.
+; The way I understand the instrument is that R0 and R1 give somehow the
+; bandwith of the filter. When R0 and R1 have the same value then 
+; everything is OK. However when the data shown below is given,
+; the bandwith seems to become smaller during 1/2 of the duration,
+; (which is OK) and then a gliss. downwards is heard, which I cannot explain.
+
+  
+(with-sound ()
+     (addflts    
+      0.0                  ; start
+      5.0                  ; duration
+      1                    ; numfilters
+      1                    ; driver 1= white noise
+     '(0 0 100 0 )         ; freqfun        no function
+      10000                ; freq0
+      10000                ; freq1
+      '(0 0  1 1  90 1 100 0)    ; ampfun
+      .1                   ; amp
+      30                   ; cosnum, number of cosines
+      0                    ; inloc
+      0                    ; degree
+      1.0                  ; distance
+      0.01                 ; reverb amount
+      ;  freqfun         R-fun            Frq0   Frq1    R0    R1   AmpScaler
+      '((0 0 100 1)    (0 0 50 1 100 1)  440.0   440.0  .5   .999   .1)))
+ 
+; ============================================================
+; ZKM, Karlsruhe (mesias maiguashca)
+
+Date: Wed, 11 Sep 91 07:36:17 GMT-0700
+From: bil (To: Rick Taube <taube@ira.uka.de>)
+To: Rick Taube <taube@ira.uka.de>
+Subject: Re: addflts question (from Mesias Maiguashca)
+
+I believe this addflts oddity is a sort of bug in addflts.  I'm
+no filter expert (addflts was a translation of an instrument
+written by Xavier Serra), but I think the problem is that the
+"freqfun" and "Rfun" don't take each other into account.  So
+even if the Frq0 and Frq1 are the same, so that freqfun should
+be a no-op, if R0 and R1 are different, that gets factored into
+the freqfun scaler (it is trying to get the result right, but
+ignores the fact that R0 and R1 may not be what it thinks they
+are because R-fun is changing them in unnoticed ways).  The
+glissando is then an artifact of the very narrow bandwidth of
+the filter (R=.999) and the confusion between R-fun and freqfun
+(the latter is trying to end up at 440Hz, which is approximately
+the end of the glissando, but calculates it's shape without 
+noticing that R0 and R1 are getting to their endpoint faster
+than expected).
+
+I hesitate to change addflts, because it has been used in this
+form for many years.
+
+
+|#

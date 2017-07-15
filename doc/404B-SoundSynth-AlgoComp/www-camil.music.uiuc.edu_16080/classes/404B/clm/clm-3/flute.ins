@@ -1,0 +1,96 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+;;; macro for implementing the embouchure feeback non-linearity (x - x-cubed)
+
+(defmacro cubic-polynomial (x) 
+  `(let ()
+     (+ ,x (* -1 ,x ,x ,x))))
+
+;;; macro for imlementing DC Blocker (a one pole, one zero filter)
+;;; equation: y_m = (x_m - x_m-1) + (0.995 * y_m-1)
+
+(defmacro dc-blocker (curr-excit prev-excit prev-val)
+	`(+ (- ,curr-excit ,prev-excit) (* 0.995 ,prev-val)))
+
+(definstrument stereo-flute (start dur freq flow 
+			     &key
+			     (flow-envelope '(0  1 100 1))
+			     (decay 0.01) 		; additional time for instrument to decay
+			     (noise 0.0356) 
+			     (embouchure-size 0.5)
+			     (fbk-scl1 0.5)		; these two are crucial for good results
+			     (fbk-scl2 0.55)
+			     (offset-pos 0.764264) ; from 0.0 to 1.0 along the bore
+			     (out-scl 1.0)
+			     (a0 0.7) (b1 -0.3)	 ; filter coefficients
+			     (vib-rate 5) (vib-amount 0.03)
+			     (ran-rate 5) (ran-amount 0.03))
+
+  (let* ((current-excitation 0.0)
+	 (current-difference 0.0)
+	 (current-flow 0.0)
+	 (out-sig 0.0)
+	 (tap-sig 0.0)
+	 (previous-out-sig 0.0)
+	 (previous-tap-sig 0.0)
+	 (dc-blocked-a 0.0)
+	 (dc-blocked-b 0.0)
+	 (previous-dc-blocked-a 0.0)
+	 (previous-dc-blocked-b 0.0) 
+	 (delay-sig 0.0)
+	 (emb-sig 0.0)
+	 (beg (floor (* start *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (flowf (make-env :envelope flow-envelope 
+			  :scaler flow 
+			  :start beg 
+			  :end (+ beg (* (- dur decay) *srate*))))
+	 (periodic-vibrato (make-oscil :frequency vib-rate))
+	 (random-vibrato (make-rand-interp :frequency ran-rate))
+	 (breath (make-rand :frequency (/ *srate* 2) :amplitude 1))
+	 (period-samples (floor (/ *srate* freq)))
+	 (embouchure-samples (floor (* embouchure-size period-samples)))
+	 (embouchure (make-delay embouchure-samples :initial-element 0.0))
+	 (bore (make-delay period-samples :initial-element 0.0))
+	 (offset (floor (* period-samples offset-pos)))
+	 (reflection-lowpass-filter (make-one-pole a0 b1))) 
+
+    (run
+     (loop for i from beg to end
+	   do
+	   (setf delay-sig (delay bore out-sig))
+	   (setf emb-sig (delay embouchure current-difference))
+	   (setf current-flow (+ (* vib-amount (oscil periodic-vibrato)) 
+				 (* ran-amount (rand-interp random-vibrato)) 
+				 (env flowf)))
+	   (setf current-difference 
+		 (+  (+ current-flow (* noise (* current-flow (rand breath))))
+		     (* fbk-scl1 delay-sig)))
+	   (setf current-excitation (cubic-polynomial emb-sig))
+	   (setf out-sig (one-pole reflection-lowpass-filter 
+				   (+ current-excitation (* fbk-scl2 delay-sig))))
+	   (setf tap-sig (tap bore offset))
+	   ;; NB the DC blocker is not in the cicuit. It is applied to the out-sig 
+	   ;; but the result is not fed back into the system.
+	   (setf dc-blocked-a 
+		 (dc-blocker out-sig previous-out-sig previous-dc-blocked-a))
+	   (setf dc-blocked-b 
+		 (dc-blocker tap-sig previous-tap-sig previous-dc-blocked-b))
+	   (outa i (* out-scl dc-blocked-a))
+	   (outb i (* out-scl dc-blocked-b))
+	   (setf previous-out-sig out-sig previous-dc-blocked-a dc-blocked-a)
+	   (setf previous-tap-sig tap-sig previous-dc-blocked-b dc-blocked-b)))))
+
+		  
+#|
+
+a richer tone as left and right channels are now mutually out of phase
+											
+  (with-sound (:channels 2) (stereo-flute 0 3 220 0.55 :flow-envelope '(0  0 25 1 75 1 100 0)))
+
+positioning the offset on harmonic nodes can cause cancellation effects, 
+hence the irrational number for the default (0.764264)
+	
+  (with-sound (:channels 2) (stereo-flute 0 3 220 0.55 :flow-envelope '(0  0 25 1 75 1 100 0) :offset-pos 0.5))
+											
+|#

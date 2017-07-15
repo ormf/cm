@@ -1,0 +1,97 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../../doc/css/cm.css";
+</style>
+<title>Common Music Tutorials</title>
+</head>
+
+<body>
+<!-- Navbar -->
+<div id="header">
+<div id="logo">
+<img src="../../doc/img/cmlogosw.png" width="50" height="50" alt="[img/cmlogosw.png]" title=""/>
+</div>
+
+<div class="inv">Navigation:</div>
+<ul class="nav">
+<li class="nav1"><a href="../../doc/cm.html">Home Page</a></li>
+<li class="navn"><a href="../../doc/dict/index.html">Dictionary</a></li>
+<li class="navn"><a href="../examples/">Examples</a></li>
+</ul>
+</div>
+
+<hr class="inv"/>
+
+<div id="content">
+
+<h1>Common Music Tutorials</h1>
+
+Tutorials may be used with CM version 2.7.0 or higher:
+
+<ul>
+<li><a href="intro.lisp">intro.lisp</a>, an overview of basic sound operations.</li>
+<li><a href="editing.lisp">editing.lisp</a>, an introduction to sequencing and editing operations.</li>
+<li><a href="scales.lisp">scales.lisp</a>, working with tunings and modes.</li>
+<li><a href="markov.lisp">markov.lisp</a>, an introduction to composing with Markov patterns.</li>
+<li><a href="jazz.lisp">jazz.lisp</a>, sprouting processes, sending program changes, etc.</li>
+</ul>
+
+
+<p>
+Most of the tutorials were prepared for the
+<a
+href="http://international-lisp-conference.org/2005/tutorials.html">Music
+Composition in Lisp</a> tutorial session at
+the <a href="http://international-lisp-conference.org">ILU
+Conference</a>, Stanford University (June 2005).
+</p>
+
+
+<h2>Using the tutorials</h2>
+
+<p>
+Read and practice the tutorials
+in <a href="../../doc/emacs.html">Emacs</a> with Lisp syntax
+highlighting turned on (Options menu) and Common Music running in the
+<a href="../../doc/emacs.html#listener_window">Listener</a>.  Lisp
+expressions can be evaluated by clicking on the first or last
+parentheses in the expression and using
+<span
+class="emacscmd"><span
+class="emacskey">C-x</span> <span class="emacskey">C-e</span></span>
+to evaluate the expression in the Listener window.
+</p>
+
+<p>
+Tutorials are written in the Common Lisp syntax.  To use the tutorials
+in Scheme evaluate the following expressions before attempting
+the examples:
+</p>
+
+<div class="float">
+<p class="captxt">
+Macro definitions for Scheme.
+</p>
+<pre class="code">
+<span class="comment">;;; evaluate these to use examples in Scheme</span>
+
+(<span class="special">define-macro</span> (<span class="defined">defun</span> name formals . body)
+  `(<span class="special">define</span> (,name ,@formals) ,@body))
+
+(<span class="special">define-macro</span> (<span class="defined">defparameter</span> name value)
+  `(<span class="special">define</span> ,name ,value))
+</pre>
+</div>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

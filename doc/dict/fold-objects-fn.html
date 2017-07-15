@@ -1,0 +1,97 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>fold-objects</title>
+</head>
+
+<body>
+<div id="content"> 
+<!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">fold-objects</code> <var>function</var> <var>objects</var> <var>value</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+
+</dl>
+
+<p>
+Maps a <var>function</var> of two arguments over a list
+or <a href="seq-cls.html">seq</a>
+of <var>objects</var>. <var>Value</var> is the intitial value that
+will be combined (folded) through the iterative application
+of <var>function</var> over <var>objects</var>: each value returned by the
+<var>function</var> becomes the next <var>value</var> passed to the
+function as its second argument. Once mapping is complete the
+final <var>value</var> is returned as the value of
+<code class="entry">fold-objects</code>.
+</p>
+
+<p id="args">
+<code class="entry">fold-objects</code> supports all keyword parameters of <a href="map-objects-fn.html">map-objects</a> except <code class="keyword">:slot!</code>.
+</p>
+
+</dl>
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Using <code>fold-object</code>.
+</p>
+<pre class="code">
+<span class="comment">;;; define some random midi events to demonstrate mapping</span>
+(<span class="special">define</span> <span class="defined">midis</span>
+  (<span class="special">loop</span> for i below 100
+        collect (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> i <span class="keyword">:keynum</span> (<a href="between-fn.html">between</a> 20 100)
+                     <span class="keyword">:amplitude</span> (<a href="between-fn.html">between</a> .1 .9)
+                     <span class="keyword">:duration</span> (<a href="pick-fn.html">pick</a> .2 .4 .6 .8))))
+
+<span class="comment">;;; find total duration of all midis</span>
+(fold-objects #'+ midis 0 <span class="keyword">:slot</span> 'duration)
+
+<span class="comment">;;; return list of even keynums in the first 10 events</span>
+(fold-objects #'cons midis '()
+              <span class="keyword">:end</span> 10 <span class="keyword">:slot</span> 'keynum <span class="keyword">:test</span> #'even?)
+
+<span class="comment">;;; return the unique key numbers in the middle-c octave:</span>
+(fold-objects (<span class="special">lambda</span> (x l) (<span class="special">if</span> (member x l) l (cons x l)))
+              midis '() 
+              <span class="keyword">:slot</span> 'keynum <span class="keyword">:test</span> (<span class="special">lambda</span> (x) (<= 60 x 72)))
+
+<span class="comment">;;; count number of even keynums</span>
+(fold-objects (<span class="special">lambda</span> (x v) (+ v 1)) midis 0
+              <span class="keyword">:slot</span> 'keynum <span class="keyword">:test</span> #'even?)
+
+<span class="comment">;;; sum durations of midis whose keynums are between 60 80</span>
+(fold-objects (<span class="special">lambda</span> (x v)
+                (<span class="special">if</span> (<= 60 (<a href="sv-mac.html">sv</a> x <span class="keyword">:keynum</span>) 80)
+                    (+ v (<a href="sv-mac.html">sv</a> x <span class="keyword">:duration</span>))
+                    v))
+              midis 0)
+
+<span class="comment">;;; return the positions of all f-sharp keynums.</span>
+(fold-objects (<span class="special">let</span> ((p -1))
+                (<span class="special">lambda</span> (x l)
+                  (incf p)
+                  (<span class="special">if</span> (= (mod x 6) 0) (append! l (list p)) l)))
+              midis '() <span class="keyword">:slot</span> 'keynum)
+</pre>
+</div>
+<h4>See also:</h4>
+<ul>
+<li><a href="map-objects-fn.html"><code>map-objects</code></a> [Function]</li>
+<li><a href="subobjects-fn.html"><code>subobjects</code></a> [Function]</li>
+<li><a href="sv-mac.html"><code>sv</code></a> [Macro]</li>
+</ul>
+
+</div> 
+<!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

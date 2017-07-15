@@ -1,0 +1,497 @@
+;;; **********************************************************************
+;;; $Name$
+;;; $Revision$
+;;; $Date$
+;;;
+;;; Supercollider examples, by Todd Ingalls. Load the file and then
+;;; execute the (events ...) calls. If you are running under slime you
+;;; may need to add :wait #t to the events calls, or alternately init
+;;; the files using io, i.e.: (io "test.osc" :wait #t :verbose #t).
+;;; See "./sc-synths.sc" for the SC3 synthdefs used by these examples.
+
+(in-package :cm)
+
+(defobject simple (scsynth)
+  ((freq :initform 440)
+   (dur :initform 1)
+   (amp :initform .2)
+   (pan :initform 0))
+  (:parameters freq dur amp pan time))
+
+(defobject reverb1 (scsynth)
+  ((mix :initform .2)
+   (decaytime :initform 15)
+   (in :initform 0)
+   (out :initform 0))
+  (:parameters mix decaytime in out time))
+
+(defobject reverb2 (scsynth)
+  ((mix :initform .2)
+   (decaytime :initform 15))
+  (:parameters mix decaytime time))
+
+(defobject play-buffer (scsynth)
+  ((bufnum)
+   (amp :initform 1.0)
+   (rate :initform 1.0)
+   (looping :initform 1)
+   (out :initform 0))
+  (:parameters bufnum amp rate looping out time))
+
+(defobject granulate (scsynth)
+  ((dur :initform 1)
+   (amp :initform 1.0)
+   (bufnum)
+   (rate :initform 1.0)
+   (gdur :initform .1)
+   (speed :initform 1.0)
+   (out :initform 0))
+  (:parameters dur amp bufnum rate gdur speed out time))
+
+(defobject simple-osc (scsynth)
+  ((freq :initform 440)
+   (dur :initform 1)
+   (bufnum)
+   (amp :initform .2)
+   (pan :initform 0))
+  (:parameters freq dur amp pan bufnum time))
+
+(defobject fm-env (scsynth)
+  ((freq :initform 440)
+   (mratio :initform 1.0)
+   (index :initform 1.0)
+   (amp :initform 1.0)
+   (dur :initform 1))
+  (:parameters freq mratio index amp dur time))
+
+;;;
+;;; First a very simple example
+;;;
+
+(define (sc-simple-1 num)
+  (process repeat num 
+	   output (new simple :time (now) 
+		       :freq (between 300 700)
+		       :dur (between 10 20)
+		       :amp .1
+		       :pan (pickl '(-1.0 0 1.0)))
+	   wait (between 2.0 3.0)))
+
+; (events (sc-simple-1 10) "sc-simple-1.osc" )
+
+;;;
+;;; Scsynth will stop rendering after the last event in the score.
+;;; Because of this there is a :pad that defaults to 5 seconds.  in
+;;; the case above the pad needs to be longer because the simple
+;;; events could have a duration as long as 20 seconds try this:
+;;;
+
+; (events (sc-simple-1 10) "sc-simple-1.osc" :pad 20)
+
+;;;
+;;; in the above example each simple event was not explicitedly
+;;; assigned a node so the default value of -1 was used. This causes
+;;; SC to assign a node to the synth. Because many of the commands
+;;; that one would want to send an instance of a scsynth require
+;;; knowing what node it is, it is usually a good idea to make this
+;;; explicit with using the :node init arg.  the following is an
+;;; example of using the node-set event to set the parameters of a
+;;; synth after it has been initiated. after the synth has played for
+;;; two seconds the panning is set to hard left
+;;;
+
+(define (sc-simple-2 num)
+  (process repeat num for i from 0
+	   output (new simple :time (now) 
+		       :freq (between 300 700) 
+		       :dur (between 10 20) :node (+ i 1000)
+		       :amp .1
+		       :pan 1.0)
+	   sprout (new node-set :node (+ i 1000)
+		       :controls-values '(:pan -1.0)
+		       :time (+ (now) 2))
+	   wait (between 2.0 3.0)))
+
+; (events (sc-simple-2 10) "sc-simple-2.osc" :pad 20 )
+
+;;;
+;;; the next example shows the use of node-set to create more
+;;; continuous changes in panning.
+;;;
+
+(define (sc-simple-3 num)
+  (process repeat num for i from 0
+	   output (new simple :time (now) 
+		       :freq (between 300 700) 
+		       :dur (between 10 20)
+		       :node (+ i 1000)
+		       :amp .1
+		       :pan 1.0)
+	   sprout
+	   (process repeat 100 for j from 0
+		    with node = (+ i 1000)
+		    with pan-env = '(0 1.0 50 .4 100 -1.0)
+		    output (new node-set :node node
+				:controls-values
+				(list :pan (interpl j pan-env)) 
+				:time (now))
+			   wait .1)
+	   wait (between 2.0 3.0)))
+
+; (events (sc-simple-3 10) "sc-simple-3.osc" :pad 20)
+
+;;;
+;;; SC works on the concept of there being a tree of nodes that are
+;;; process by the synth engine. Nodes that are at the "head" of the
+;;; tree are processed first and those at the "tail" are processed
+;;; later.If a node is before another node (or group) it gets process
+;;; and the later nodes can take the audio on the same audio bus and
+;;; alter it. Typically things tha one want to affect a sound should
+;;; come later in the tree. in the following a reverb is initiated on
+;;; node 500. the short simple events use the add-action initarg. in
+;;; this case 0 indicates that the synth should be pushed to the head
+;;; of the tree, and therby is processed first allowing its output to
+;;; pass through the reverb. 1 indicated to place the node at the tail
+;;; effectively by-passing the reverb. in this example roughly 70% of
+;;; the events should get processed through reverb and 30% will not.
+;;;
+
+(define (sc-simple-4 num)
+  (process repeat num for i from 0
+	   when (= i 0) 
+	   output (new reverb2 :decaytime 5.2 :time (now) :node 500)
+	   output (new simple :time (now) :freq (between 300 700) 
+		       :dur (between .2 .5) :node (+ i 1000)
+		       :amp .1 :pan (between -1.0 1.0)
+		       :add-action (odds .7 0 1))
+	   wait (between .3 .5)))
+
+; (events (sc-simple-4 40) "sc-simple-4.osc" :pad 6)
+
+;;;
+;;; just as individual synths can be placed in a different hierarchy
+;;; on the tree, groups can as well. this example does a similiar
+;;; thing as above, however in this case groups are being used.
+;;; 
+;;; first the reverb is initiated and 2 new groups are created with
+;;; ids of 10 and 20. The add-action arguments place the first group
+;;; (group 10) right before the reverb and group 20 right after the
+;;; reverb.
+;;; 
+;;; now each chord that is sprouted is assigned to a :target of either
+;;; group 10 or 20. because of how these groups are situated in the
+;;; tree it has the effect of either bypassing or being processed by
+;;; the reverb.
+;;; 
+
+(define (sc-simple-5 num)
+  (process repeat num for i from 0
+	   when (= i 0) 
+	   output (new reverb2 :node 1000
+		       :decaytime 5.2
+		       :time (now))
+	   and output (new group-new :id '(10 20)
+		       :add-action '(2 3)
+		       :target '(1000 1000)
+		       :time (now))
+	   sprout
+	   (process repeat 4 
+		    with group = (pick 10 20)
+		    output (new simple :time (now)
+				:freq (between 300 700) 
+				:dur (between 5 8) 
+				:amp .1
+				:pan (between -1.0 1.0)
+				:target group))
+	   wait (between 2.0 4.5)))
+
+; (events (sc-simple-5 10) "sc-simple-5.osc" :pad 10)
+
+;;; 
+;;; In SC the arguments used in defining synths can only take scalar
+;;; values. However, there is a way to pass arrays of values to a
+;;; synth once it is running (e.g. for an envelope). To see how this
+;;; is implemented in SC please look at the fm-env instrument in
+;;; sc-synths.sc and also the Help file on Env.
+;;; 
+;;;  In this example of fm, there is a heap pattern
+;;;  created with 4 differently shaped envelopes that will be used as
+;;;  amplitude and modulation index envelopes. These envelopes will
+;;;  scale whatever is in the :amp and :index args to fm-env
+;;;
+;;; To create these envelopes one can can make instances of sc-env
+;;; and use the function sc-env->list to convert this to a list
+;;;
+;;;
+
+(define (sc-fm-1 num)
+  (process repeat num for i from 0
+	   with envs = (new heap :of '((0 0.0 50 1.0 100 0.0)
+				       (0 0 1 1.0 20 .3 70 .2 100 0.0)
+				       (0 0 20 1.0 40 .2 60 1.0 100 0.0)
+				       (0 0 5 1.0 20 0.0 100 0.0)))
+	   when (= i 0)
+	   output (new reverb2 :time (now) 
+		       :node 500
+		       :decaytime 0.8
+		       :mix .05)
+	   output (new fm-env :freq (between 300 700) 
+		       :mratio (between .4 3.2) 
+		       :dur 4
+		       :index 1.0
+		       :amp .7
+		       :node (+ i 1000)
+		       :time (now)
+		       :add-action 0 )
+	   output (new node-setn :node (+ i 1000)
+		       :controls-values 
+		       (list :ampenv (sc-env->list
+                                      (new sc-env :envelope (next envs)
+                                           :duration 4))
+			     :indexenv (sc-env->list
+                                        (new sc-env :envelope (next envs)
+                                             :duration 4)))
+		       :time (now))
+	   wait 3))
+
+;;;
+;;; An even easier way to use envelopes is by creating slots in the
+;;; synth definition that will take sc-env instance.
+;;;
+;;; Here is a redefinition of fm-env that includes two new slots for
+;;; ampenv and indexenv
+;;;
+
+(defobject fm-env2 (scsynth)
+  ((freq :initform 440)
+   (mratio :initform 1.0)
+   (index :initform 1.0)
+   (amp :initform 1.0)
+   (dur :initform 1)
+   (ampenv :initform #f)
+   (indexenv :initform #f))
+  (:parameters freq mratio index amp dur time ampenv indexenv))
+
+(define (sc-fm-2 num)
+  (process repeat num for i from 0
+	   with envs = (new heap :of '((0 0.0 50 1.0 100 0.0)
+				       (0 0 1 1.0 20 .3 70 .2 100 0.0)
+				       (0 0 20 1.0 40 .2 60 1.0 100 0.0)
+				       (0 0 5 1.0 20 0.0 100 0.0)))
+	   when (= i 0)
+	   output (new reverb2 :time (now) 
+		       :node 500
+		       :decaytime 0.8
+		       :mix .05)
+	   output (new fm-env2 :freq (between 300 700) 
+		       :mratio (between .4 3.2) 
+		       :dur 4
+		       :index 1.0
+		       :amp .7
+		       :node (+ i 1000)
+                       :ampenv (new sc-env :envelope (next envs)
+                                    :duration 4)
+                       :indexenv (new sc-env :envelope (next envs)
+                                      :duration 4)
+		       :time (now)
+		       :add-action 0)
+	   wait 3))
+
+; (events (sc-fm-2 10) "sc-fm-2.osc" :play t  :verbose t :pad 10)
+
+;;;
+;;; It is important to note that when importing events with sc-env
+;;; used this way that the scsynth objects being returned will have
+;;; these slots set to nil and the a corresponding node-setn object is
+;;; present For example:
+
+; (list-subobjects (import-events "sc-fm-2.osc"))
+
+
+
+;;;
+;;; This is an example of a granular synthesis where each grain is
+;;; being output by the process
+;;; 
+
+(define (grain-sonorities num)
+  (process repeat num for i from 0
+	   with pat = (new heap :of '((3 5 9 10) (4 6 8 10) 
+				      (2 6 8 11) (1 2 9 10)
+				      (2 3 7 11)))
+	   and base and dur = (between 3 7)
+	   when (= i 0)
+	   output (new reverb1 :decaytime 10 :time (now))
+	   set base = (between 30 50)
+	   sprout
+	   (process repeat 100
+		    with sonor = (next pat)
+		    output
+		    (new simple 
+                      :freq (hertz (+ (pickl '(0 12 24))
+                                      (+ base (pickl sonor)))) 
+                      :dur (exact->inexact (/ dur 10))
+                      :pan (between -1.0 1.0)
+                      :amp .03
+                      :time (now)
+                      :add-action 0)
+		    wait (exact->inexact (/ dur 100)))
+	   wait (- dur 1)
+	   set dur = (between 3 7)))
+
+; (events (grain-sonorities 10) "gsonor.osc" :pad 15)
+
+;;; 
+;;; The next 3 examples are show how to load a soundfile into a buffer.
+;;;
+
+;;;
+;;; Loading and playing buffers. a11wlk01.wav is example sound file in
+;;; base SC installation.  if i do not specify full path for file it
+;;; causes an error.
+;;;
+
+(define wavfile "/Applications/SuperCollider3/sounds/a11wlk01.wav")
+
+(define (random-play num)
+  (process repeat num for i from 0
+	   when (= i 0)
+	   output (new buffer-alloc-read :bufnum 10 
+		       :file wavfile :time (now))
+	   and
+	   output (new reverb1 :decaytime 10 :time (now))
+	   output (new play-buffer :bufnum 10 :amp .1
+		       :time (now) :rate (between .8 1.8)
+		       :add-action (odds .333 1 0))
+	   ;; sometimes not processes through reverb when add-action
+	   ;; is 1 in this case buffer is one channel so will only
+	   ;; come out left channel
+	   wait (between 3 5)))
+
+; (events (random-play 6) "rplay.osc" :pad 15 )
+
+;;;
+;;; In this case pad does not help because there is no duration for
+;;; play-buffer as it is set to loop.  fixed in below but with
+;;; different and slightly less irritating results This example
+;;; depends on wavfile defined by previous example.
+;;;
+
+(define (random-play-no-loop num)
+  (process repeat num for i from 0
+	   when (= i 0)
+	   output (new buffer-alloc-read :time (now)
+		       :bufnum 10
+		       :file wavfile)
+	   and
+	   output (new reverb1 :decaytime 10 :time (now))
+	   output (new play-buffer :bufnum 10 
+		       :amp .2 
+		       :time (now)
+		       :rate (between .6 1.9)
+		       :add-action (odds .333 1 0)
+		       :looping 0)
+	   ;;sometimes not processes through reverb when add-action is 1
+	   wait (between 3 5)))
+
+; (events (random-play-no-loop  10) "rplay.osc" :pad 30)
+
+
+;;;
+;;; one more example. this is granulating a sound file
+;;;
+
+(define (granure num)
+  (process repeat num for i from 0
+	   when (= i 0)
+	   output (new buffer-alloc-read :bufnum 10 :time (now)
+		       :file wavfile)
+	   and
+	   output (new reverb1 :decaytime 10 :time (now))
+	   output (new granulate :time (now) 
+		       :bufnum 10
+		       :dur (between 6 9)
+		       :rate 1.0
+		       :node (+ 1000 i)
+		       :add-action 0)
+	   sprout
+	   (process repeat 10
+		    with n = (+ i 1000)
+		    output (new node-set :time (now) 
+				:node n 
+				:controls-values
+				(list :speed (vary 1.0 .2) 
+				      :rate (vary 1.0 .4)))
+		    wait .5)
+	   wait 7))
+
+; (events (granure 5) "grplay.osc" :play t :pad 30 :verbose t)
+
+
+;;;
+;;; this shows how to make and use wavetable buffers.  first a buffer
+;;; 512 samples long is allocated and assigned an id. then, the
+;;; buffer-gen event is used to fill the wavetable with values. the
+;;; simple-osc synth then uses these buffers as a wavetable for the
+;;; oscillator.
+;;;
+
+(define (wt num)
+  (process repeat num for i from 0 
+	   when (= i 0)
+	   sprout
+	   (process repeat num for j from 0
+		    with wt-length = (between 7 12)
+		    output (new buffer-alloc :bufnum (+ 1 j)
+				:frames 512
+				:time (now))
+		    output (new buffer-gen :bufnum (+ 1 j) 
+				:time (now)
+				:command :sine1
+				:flags :wavetable
+				:args
+				(loop for i from 0 below wt-length
+				      collect
+				      (odds (- 1.0 (/ i wt-length))
+					    (random 1.0) 0.0))))
+	   output (new simple-osc :bufnum (+ 1 i) 
+		       :freq (between 300 500)
+		       :time (now)
+		       :amp .1
+		       :dur 3)
+	   wait 2))
+
+; (events (wt 10) "wt.osc" )
+
+;;;
+;;; there is also an sc-buffer class that is defined which can reduce
+;;; the steps required to allocate and fill a buffer
+;;;
+
+(define (wt2 num)
+  (process repeat num for i from 0 
+	   when (= i 0)
+	   sprout
+	   (process repeat 1
+                    output (new sc-buffer :bufnum 10 :frames 512
+                                ;; a simple sine wave
+                                :with-gen '(:sine1 (1)) :time (now)) 
+                    output (new sc-buffer :bufnum 11 :frames 512 
+                                :with-gen '(:sine1 (1 0 1 0 1 0))
+                                :time (now)) ; some odd harmonics
+                    output (new sc-buffer :bufnum 12 :frames 512
+                                ;; fill with random values
+                                :with-values
+                                (lambda () (ran :from -1.0 :below 1.0))
+                                :time (now)))
+           
+           output (new simple-osc :bufnum (+ 10 (random 3))
+		       :freq (between 300 500)
+		       :time (now)
+		       :amp .1
+		       :dur 3)
+	   wait 2))
+
+; (events (wt2 10) "wt2.osc" )
+
+

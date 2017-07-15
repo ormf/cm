@@ -1,0 +1,183 @@
+;; Michelle Daniels :)
+;; sonification...
+;; Feb/March 2001
+;; *version 1.6*
+;; here's the vowel instrument - uses a pulse-train generator or
+;; noise or an input file  to synthesize
+;; vowel sounds using a bank of formant filters.
+
+
+;;http://www.computermusic.ch/files/misc/Table_of_formants-values.html
+
+(defvar *formants*   ;; bw measured at 3dB below, not 6...
+     '((I . ((350 1.0 .143) (1700 0.1 .059) (2700 0.032 .044) (3700 .016 .041) (4950 .001 .040)))  
+       (E . ((400 1.0 .15) (1600 0.063 .05) (2700 0.032 .044) (3300 .018 .045) (4950 .001 .040)))
+       (AE . ((660 1.0 .15) (1720 0.3 .05) (2410 0.15 .044)))
+       (UH . ((520 1.0 .15) (1190 0.3 .05) (2390 0.15 .044)))
+       (A . ((800 1.0 .1) (1150 0.631 .078) (2800 0.1 .043) (3500 .016 .037) (4950 .001 .028)))
+       (OW . ((450 1.0 .156) (800 0.355 .1) (2830 0.158 .035) (3500 .040 .037) (4950 .002 .027)))
+       (U . ((325 1.0 .154) (700 0.251 .086) (2530 0.032 .067) (3500 .01 .051) (4950 .001 .040)))
+       (OO . ((300 1.0 .15) (870 0.3 .05) (2240 0.15 .044)))
+       (ER . ((490 1.0 .15) (1350 0.3 .05) (1690 0.15 .044)))
+       (EE . ((260 1.0 .15) (3500 0.2 .05) (3800 0.02 .044)))))
+
+#| how formants should be specified:
+:formants '((freq1 amp1 bw1) (freq2 amp2 bw2) (freqn ampn bwn))
+:formants '((260 1.0 .1) (3500 0.3 .1) (3800 0.15 .1))
+with bw given as ratio to center freq...
+|#
+
+(defmacro set-formnt(filter freq r)
+                 `(let* ((freq ,freq)
+                         (r ,r))
+                    (setf (mus-a2 (identity ,filter)) (- r)
+                          (mus-b1 (identity ,filter)) (- (* 2.0 r (cos (hz->radians freq))))
+                          (mus-b2 (identity ,filter)) (* r r))))
+
+(defmacro compute-radius (bw) ;bw in hertz
+    `(exp (/ (* (- pi) ,bw) *srate*)))
+
+(definstrument vowel (start dur amp
+			    &key (phoneme 'I)
+			         (dictionary *formants*)
+			         (formants '())
+				 (amp-env '(0 0 .2 1 .8 1 1 0))
+				 (pulse-amp 6.0)
+				 (pulse-env '(0 200 1 200))
+				 (noise-amp 0)
+				 (file-name "")
+				 (file-start 0)
+				 (file-srate 1.0)
+				 (reverb-amount 0)
+				 (degree 45) ;for locsig
+				 (distance 1)) ;for locsig
+ 
+    (multiple-value-bind (beg end) (times->samples start
+						   (if (string/= file-name "")
+						       (min dur (- (sound-duration file-name) file-start))
+						     dur))
+        (let* ((pulse (make-pulse-train :frequency (second pulse-env) :amplitude pulse-amp))
+	       (noise nil)
+	       (a-env (make-env :envelope amp-env :duration dur))
+	       (p-env (make-env :envelope pulse-env :duration dur))
+	       (f nil)
+	       (use-file nil)
+	       (source nil)
+	       (deg degree)
+	       (dist distance)
+	       (dist-scl 0)
+	       (dist-rscl 0)
+	       (out-chans (mus-channels *output*))  
+	       (loc (make-locsig :degree degree :distance distance :reverb reverb-amount)))
+	    (cond ((string/= file-name "")
+		    (progn
+		      (setf use-file t)
+		      (setf f (open-input* :name file-name))
+		      (setf source (make-src :input f :srate file-srate))
+		      (setf (mus-location source) (* *srate* file-start))))
+		  ((> noise-amp 0)
+		     (setf noise (make-rand :frequency (* 0.49 *srate*) :amplitude noise-amp))))
+	    (if (= (list-length formants) 0)
+		(setf formants (cdr (assoc phoneme dictionary))))
+	   ; (format t "formants: ~s~%" formants)
+	   ; (format t "phoneme: ~s~%" phoneme)
+	    (let* ((num-formants (length formants))
+		   (freq-array (make-array num-formants))
+		   (freq-env-array (make-array num-formants))
+		   (filt-array (make-array num-formants))
+		   (amp-array (make-array num-formants))
+		   (amp-env-array (make-array num-formants))
+		   (bw-array (make-array num-formants))
+		   (bw-env-array (make-array num-formants)))
+	    (loop for formnt from 0 below num-formants do
+	      (setf (aref freq-array formnt)
+		       (first (nth formnt formants)))
+	      (setf (aref freq-env-array formnt) ;frequency envelopes
+		    (if (not (numberp (aref freq-array formnt)))
+					    (aref freq-array formnt)
+					    (list 0 (aref freq-array formnt)
+						  1 (aref freq-array formnt))))
+	      (setf (aref amp-array formnt) ;amps
+		       (second (nth formnt formants)))
+	      ;(format t "amps: ~s~%" (aref amp-array formnt))
+	      (setf (aref amp-env-array formnt) ;amp envelopes
+		    (if (not (numberp (aref amp-array formnt)))
+			(aref amp-array formnt)
+		      (list 0 (aref amp-array formnt)
+			    1 (aref amp-array formnt))))
+	      ;(format t "amp envs: ~s~%" (aref amp-env-array formnt))
+	      (setf (aref bw-array formnt) ;bws
+		       (third (nth formnt formants)))
+	      (setf (aref bw-env-array formnt) ;bw envelopes
+		    (envelope* (aref freq-env-array formnt)
+			       (if (not (numberp (aref bw-array formnt)))
+				   (aref bw-array formnt)
+				   (list 0 (aref bw-array formnt)
+	                                 1 (aref bw-array formnt)))))
+	      (setf (aref freq-env-array formnt)
+		    (make-env :envelope (aref freq-env-array formnt) :duration dur))
+	      (setf (aref amp-env-array formnt)
+		    (make-env :envelope (aref amp-env-array formnt) :duration dur))
+	      (setf (aref bw-env-array formnt)
+		    (make-env :envelope (aref bw-env-array formnt) :duration dur))
+	      (setf (aref filt-array formnt) ;filters
+		       (make-formant :frequency 200 :radius 0.99)))
+	    ;(format t "radius: ~s~%" (compute-radius (env (aref bw-env-array 0))))
+	    (progn
+	      (setf dist-scl (/ 1.0 (max dist 1.0))
+		    dist-rscl (/ 1.0 (sqrt (max dist 1.0))))
+	      (if *reverb*
+		  (setf (locsig-reverb-ref loc 0) (* reverb-amount dist-rscl)))
+	      (if (= out-chans 1)
+		  (setf (locsig-ref loc 0) dist-scl)
+		(if (= out-chans 2)
+		    (let ((frac (/ (min 90.0 (max 0.0 deg)) 90.0))) 
+		      (setf (locsig-ref loc 0)(* dist-scl (- 1.0 frac))
+			    (locsig-ref loc 1)(* dist-scl frac)))
+		  (if (> out-chans 2)
+		      (progn
+			(setf (locsig-ref loc 0)
+			      (if (<= 0 deg 90)
+				  (* dist-scl (/ (- 90 deg) 90.0))
+				(if (<= 270 deg 360)
+				    (* dist-scl (/ (- deg 270) 90)) 
+				  0.0))
+			      (locsig-ref loc 1) 
+			      (if (<= 90 deg 180)
+				  (* dist-scl (/ (- 180 deg) 90.0))
+				(if (<= 0 deg 90)
+				    (* dist-scl (/ deg 90)) 
+				  0.0))
+			      (locsig-ref loc 2)
+			      (if (<= 180 deg 270)
+				  (* dist-scl (/ (- 270 deg) 90.0))
+				(if (<= 90 deg 180)
+				    (* dist-scl (/ (- deg 90) 90)) 
+				  0.0)))
+			(if (> out-chans 3)
+			    (setf (locsig-ref loc 3)
+				  (if (<= 270 deg 360)
+				      (* dist-scl (/ (- 360 deg) 90.0))
+				    (if (<= 180 deg 270)
+					(* dist-scl (/ (- deg 180) 90))
+				      0.0)))))))))
+	    (run
+	       (loop for i from beg to end do
+		  (let
+		     ((pulseTemp (pulse-train pulse(hz->radians (env p-env))))
+		      (outvalue 0))
+		    (cond ((= use-file t)
+			   (setf pulseTemp (src source)))
+			  ((> noise-amp 0)
+			   (setf pulseTemp (rand noise))))
+		    (loop for j from 0 below num-formants do
+		      (set-formnt (aref filt-array j) (env (aref freq-env-array j))
+				  (compute-radius (env (aref bw-env-array j)))))
+		    (loop for j from 0 below num-formants do
+		      (setf outvalue (+ outvalue (* (env (aref amp-env-array j))
+				(formant (aref filt-array j) pulseTemp)))))
+		    (locsig loc i (* amp (env a-env) outvalue)))))
+	  (close-input f)))))
+
+
+    

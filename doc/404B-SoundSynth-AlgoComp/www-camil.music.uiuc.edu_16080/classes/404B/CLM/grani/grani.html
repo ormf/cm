@@ -1,0 +1,384 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/CLM/grani/grani.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:57 GMT -->
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "http://www-camil.music.uiuc.edu:16080/classes/css/cm.css";
+</style>
+<title>Granular Synthesis</title>
+</head>
+<body>
+
+
+<div id="content">
+<!-- Title -->
+<h1>Granular Synthesis</h1>
+
+<h3> Granular Synthesis </h3>
+
+<p>
+In granular synthesis, a sound is built up from thousands of small acoustic events
+called <em>grains</em>.
+A single grain typically lasts from 1 to 100 milliseconds (.01 to .1 seconds) and
+approaches the minimum time for frequency and amplitude discrimination.
+Grains can be synthesised by unit generators or applied to existing sounds in soundfile processing.
+
+Each grain in granular synthesis can be characterized by a number of parameters:
+<ul>
+<li>grain duration<li>
+<li>grain amplitude envelope</li>
+<li>grain waveform or spectrum</li>
+<li>grain sample position</li>
+</ul>
+
+<p>
+If there is an average density <var>d</var> of grains per second and
+each grain has <var>p</var> parameters then granular syntheis
+requres <var>pn</var> parameter values per second! For this reason 
+most granular synthisis is performed by "high level" generators such as
+clms <a href="http://www-camil.music.uiuc.edu:16080/classes/src/clm-2/clm.html#granulate">granulate</a> that
+generate grains from a small number of inputs.
+</p>
+
+<ul>
+
+<li>Grids and Screens. Xenakis' <var>screen</var> concent is a type of
+granular synthesis in which frequency vs time is divided into grids,
+each of which constitues a grain with zero or more intensity.  A
+series of such scenes (grids) are collected into <var>books</var> to
+form a composition.
+</li>
+
+<li>Quasi-synchronous granular synthesis generates "streams" of grains
+with variable overlap and hop between grains. This technique is
+similar to <em>amplitude modulation</em>, in which a carrier (the
+grain waveform) is modulated (altered) by the amplitude envelope of
+each grain, resulting in a spectal components above and below the
+"carrier" at 1/period of the grain envelope.
+</li>
+
+<li>Asynchronous granular synthesis scatters grains in a statictical
+manner over regions of frequency and time. Using statictal
+distribution is like "spray painting" a sound from "clouds" of sound
+particles.  Parameters controlling this process might include grain
+duration and spectrym, density of grains per second, center and
+bandwith of cloud, amplitude evolution of cloud, and so on.
+<li>Time granularization of sound files</li>
+An input sound file is chopped up into small pieces and redistributed
+in the output sound.</li>
+</ul>
+
+<img src="timegrains.gif"/>
+
+
+<h3> Granular Synthesis with <code>expandn</code></h3>
+
+<pre>
+(expand <var>time duration filename amplitude</var>
+        &key (hop .05)
+        (expand 1.0)
+        (matrix nil)
+        (ramp 0.4)
+        (seglen 0.15)
+        (srate 1.0)
+
+        (amp-env '(0 0 50 1 100 0))
+        (input-start 0.0)
+        (grain-amp 0.8)
+        (reverb nil))
+</pre>
+
+<p>
+The <a href="../vkey/expandn.ins"> <code>expandn</code></a> instrument
+performs granular syntheisis to time-stretching
+(expanding/compressing) an input file. This effect is achived by
+"chopping" up the input sound into very small segments (grains) that
+are then overlayed in the ouput stream.  The larger the segments
+the more the output sound is smeared, an effect approaching
+reverberation.
+</p>
+
+<h4>Required parameters</h4>
+
+<dl>
+
+<dt><code>time</code> <var>number</var></dt>
+<dd>
+The start time of the sound in the output file.
+</dd>
+
+<dt><code>duration</code> <var>number</var>| <var>false</var></dt>
+<dd>
+Optional duration of expanded sound, Defaults to duration of input
+file.  To produce an expanded version of a file that lasts the entire
+length of the input file set this to the duration of the input file
+(<code>sound-duration</code>) times the expansion factor.
+</dd>
+
+<dt><code>filename</code> <var>string</var></dt>
+<dd>
+The input file to expand.
+</dd>
+
+<dt><code>amplitude</code> <var>string</var></dt>
+<dd>
+A scaler on the ampitude of the input file. Since the output is created by overlaying many copied of the
+intput this value is generally less than 1.
+</dd>
+</dl>
+
+<h4>Keyword parameters</h4>
+
+
+<dt><code class="keyword">:hop</code> {<var>number</var> | <var>env</var>}</dt>
+<dd>The average length in time between segments (grains) in the output.</dd>
+
+<dt><code class="keyword">:expand</code> {<var>number</var> | <var>env</var>}</dt>
+<dd>
+The amount of expansion to produce in the output
+file. <code>expand</code> really determines the
+size of the <em>input</em> hop: <var>inhop</var> = <code>hop/expand</code>.
+</dd>
+
+<dt><code class="keyword">:seglen</code> {<var>number</var> | <var>env</var>}</dt>
+<dd>The length in time of the sound segments (grains).</dd>
+
+<dt><code class="keyword">:srate</code> {<var>number</var> | <var>env</var>}</dt>
+<dd>An optional sampling rate change to apply to the output file.</dd>
+
+<dt><code class="keyword">:amp-env</code> {<var>env</var>}</dt>
+<dd>
+Optional amplitude envelope for output sound.
+</dd>
+
+<dt><code class="keyword">:input-start</code> <var>number</var></dt>
+<dd>
+Optional input file start time in input file to begin expansion.
+</dd>
+
+<dt><code class="keyword">:grain-amp</code> <var>number</var></dt>
+<dd>
+Optional amplitude scaler for grains.
+</dd>
+
+<dt><code class="keyword">:matrix</code> <var>list</var> </dt>
+<dd>
+Optional mixing matrix.
+</dd>
+
+<dt><code class="keyword">:reverb</code> <var>number</var></dt>
+<dd>
+Optional reverb amount.
+</dd>
+</dl>
+
+<h4>Expandn examples</h4>
+
+<pre>
+
+(define strumsnd "strum1.aiff")
+(dac strumsnd)
+
+(define (aeolian-strum file )
+  (let ((fdur (clm:sound-duration strumsnd)))
+    (process for ratio in (shuffle '(1 9/8 32/27 4/3 3/2
+                                     128/81 16/9 2))
+             output
+             (new expandn :time (now) 
+                  :filename file
+                  :duration (* fdur ratio)
+                  :amplitude .9
+                  :expand 2
+                  :srate ratio)
+           wait (vary .5 .1))))
+
+(events (aeolian-strum strumsnd) 
+        "astrum.aiff"  :srate 44100 :channels 2 )
+
+(define (aeolian-strum-booboo file )
+  (let ((fdur (clm:sound-duration strumsnd)))
+    (process for ratio in (shuffle '(1 9/8 32/27 4/3 3/2
+                                     128/81 16/9 2))
+             output
+             (new expandn :time (now) 
+                  :filename file
+                  :duration (* fdur ratio 8)
+                  :amplitude .6
+                  :expand  (* fdur ratio 8)
+                  :srate ratio)
+             wait (vary 1.5 .1))))
+
+(events (aeolian-strum-booboo strumsnd) 
+        "booboo.aiff"  :srate 44100 :channels 2 )
+</pre>
+
+<h3> Granular Synthesis with <code>grani</code></h3>
+
+<a href="../../src/clm-2/grani.ins"><code>grani</code></a> is a very
+comprehensive granular synthesis instrument written by Fernando
+Lopez-Lezcano for granulation of soundfiles. </P>
+<pre>
+(grani start-time duration amplitude file
+       &key (grains grani-grains)
+        (amp-envelope grani-amp-envelope)
+	(grain-envelope grani-grain-envelope)
+	(grain-envelope-end grani-grain-envelope-end)
+	(grain-envelope-transition grani-grain-envelope-transition)
+	(grain-duration grani-grain-duration)
+	(grain-duration-spread grani-grain-duration-spread)
+	(grain-duration-limit grani-grain-duration-limit)
+	(srate grani-srate)
+	(srate-spread grani-srate-spread)
+	(srate-linear grani-srate-linear)
+	(srate-base grani-srate-base)
+	(srate-error grani-srate-error)
+	(grain-start grani-grain-start)
+	(grain-start-spread grani-grain-start-spread)
+	(grain-density grani-grain-density)
+	(grain-density-spread grani-grain-density-spread)
+	(reverb-amount grani-reverb-amount)
+	(reverse grani-reverse)
+	(where-to grani-where-to)
+	(where-bins grani-where-bins)
+	(grain-distance grani-grain-distance)
+	(grain-distance-spread grani-grain-distance-spread)
+	(grain-degree grani-grain-degree)
+	(grain-degree-spread grani-grain-degree-spread))
+</pre>
+
+<h4>Required parameters</h4>
+<dl>
+<dt><code>start-time</code>
+    <dd>starting time in seconds
+<dt><code>duration</code>
+    <dd>duration of the note in seconds
+<dt><code>amplitude</code>
+    <dd>amplitude of the note
+<dt><code>file</code>
+    <dd>the complete pathname of the soundfile you want to use as source material for the grains
+</dl>
+
+<h4>Keyword parameters</h4>
+
+<p>After the name of the parameter I specify the type of parameter. Most of the key parameters can be either numbers (for a constant value) or an envelope. </p>
+
+<dl>
+<dt><code class="keyword">:amp-envelope</code> [<em>envelope</em>]
+    <dd>amplitude envelope for the whole note
+<dt><code class="keyword">:grain-envelope</code> [<em>envelope</em>]
+    <dd>amplitude envelope for each individual grain
+<dt><code class="keyword">:grain-envelope-end</code> [<em>envelope or nil</em>]
+    <dd>a second amplitude envelope for each individual grain. If specified, <em>grain-envelope-transition</em> can be used to interpolate between both envelopes over the duration of the note. 
+<dt><code class="keyword">:grain-envelope-transition</code> [<em>envelope</em>]
+    <dd>interpolation envelope for the grain envelope (used only if <em>grain-envelope-end</em> has been specified). 
+<dt><code class="keyword">:grain-duration</code> [<em>number or envelope</em>]
+    <dd>duration in seconds of each individual grain
+<dt><code class="keyword">:grain-duration-spread</code> [<em>number or envelope</em>]
+    <dd>random deviation from <em>grain-duration</em>
+<dt><code class="keyword">:grain-duration-limit</code> [<em>number</em>]
+    <dd>minimum duration in seconds of a grain
+<dt><code class="keyword">:srate</code> [<em>number or envelope</em>]
+    <dd>sample rate conversion factor. The value for each grain is either a constant if the parameter is a number or is determined by the value of the envelope at the point in time where the grain starts. The sample rate conversion factor is a constant within the grain. If not overriden by <em></em> the sampling rate conversion factor is specified in semitones (positive values transpose the sound up and negative values transpose down). 
+<dt><code class="keyword">:srate-spread</code> [<em>number or envelope</em>]
+    <dd>random deviation the value of <em>srate</em> 
+<dt><code class="keyword">:srate-linear</code> [<em>t or nil</em>]
+    <dd>defines the type of envelope used for the sampling rate conversion factor:<br>
+<em>nil</em> (the default): "srate" is expressed in fractional semitones above or below the original sampling rate (0 = no change in sampling rate conversion). The exponential envelope is approximated by a linear segment representation. The error bounds of the approximation can be set by <em>srate-error</em>. The base of the exponential curve can be changed by <em>srate-base</em>.<br>
+<em>t</em>: "srate" is the linear sampling rate conversion factor (1 = no change in sampling rate). 
+<dt><code class="keyword">:srate-error</code> [<em>number</em>]
+    <dd>error bound for the exponential conversion
+<dt><code class="keyword">:srate-base</code> [<em>number</em>]
+    <dd>base for the exponential conversion. "2" will express the envelope in octaves. "(expt 2 (/ 12)" will express the envelope in semitones. 
+<dt><code class="keyword">:grain-start</code> [<em>number or envelope</em>]
+    <dd>point in the input file where the samples are going to be read from. "0" represents the start of the input soundfile, "1" represents the end. An envelope can be used to produce arbitrary mappings over time. 
+<dt><code class="keyword">:grain-start-spread</code> [<em>number or envelope</em>]
+    <dd>random deviation from the value of <em>grain-start</em>.
+<dt><code class="keyword">:grain-density</code> [<em>number or envelope</em>]
+    <dd>number of grains per second that will be created. 
+<dt><code class="keyword">:grain-density-spread</code> [<em>number or envelope</em>]
+    <dd>random deviation from the value of <em>grain-density</em>.
+<dt><code class="keyword">:reverse</code> [<em>t or nil</em>]
+    <dd>"t" means the input soundfile will be read backwards (each grain will read backwards but of course this is independent from grain-start, for example we could be advancing forwards in the file but reading the samples backwards).
+<dt><code class="keyword">:reverb-amount</code> [<em>number</em>]
+    <dd>amount of sound to be sent to the reverb output stream. 
+<dt><code class="keyword">:grain-distance</code> [<em>number or envelope</em>]
+    <dd>distance to the listener position (for locsig)
+<dt><code class="keyword">:grain-distance-spread</code> [<em>number or envelope</em>]
+    <dd>random deviation from the value of <em>grain-distance</em>
+<dt><code class="keyword">:grain-degree</code> [<em>number or envelope</em>]
+    <dd>angular position (for locsig)
+<dt><code class="keyword">:grain-degree-spread</code> [<em>number or envelope</em>]
+    <dd>random deviation from the value of <em>grain-degree</em>
+</dl>
+
+<h4>Grani examples</h4>
+<p>
+Copy these sound files to an appropriate directory on your computer:
+</p>
+
+<ul>
+<li><a href="sounds/cencerros-1.snd">cencerros-1.snd</a></li>
+<li><a href="sounds/small-gong.snd">small-gong.snd</a></li>
+<li><a href="sounds/turkish-cymbal-1.snd">turkish-cymbal-1.snd</a></li>
+<li><a href="sounds/tubular-bell.snd">tubular-bell.snd</a></li>
+</ul>
+
+
+<li>Just a silly stuttering gong:
+<pre>
+(with-sound()(grani 0 8 2 
+                    "small-gong.snd"))
+</pre>
+
+<li>Smaller grains:
+<pre>
+(with-sound ()
+   (grani 0 8 3 "small-gong.snd"
+          :grain-duration 0.06 :grain-density 40 
+          :grain-density-spread 5 :grain-start '(0 0.3 1 0.4)))
+</pre>
+
+<li>Smaller grains, downsampled by an octave:
+<pre>
+(with-sound ()
+  (grani 0 8 3 "small-gong.snd" 
+         :grain-duration 0.06 :grain-density 40 
+         :grain-density-spread 5 :grain-start '(0 0.1 1 0.22) 
+         :srate -12))
+</pre>
+
+<li>Smaller grains, downsampled by a 0.3x factor. Note that we change the position were we start sampling the input file and create a big spread there so that we are actually jumping around randomly:
+<pre>
+(with-sound()
+  (grani 0 8 3 "small-gong.snd" 
+         :grain-duration 0.06 :grain-density 40 :grain-density-spread 5 
+         :grain-start '(0 0.1 1 0.22) :grain-start-spread 0.2 :srate -12))
+</pre>
+
+<li>Three notes spread in the stereo field:
+
+<pre>
+(with-sound(:channels 2 :statistics t)
+(grani 0 8 0.4 "tubular-bell.snd" 
+       :grain-duration 0.06 :grain-density 20 :grain-density-spread 2 :srate 0)
+(grani 0 8 0.4 "tubular-bell.snd" 
+       :grain-duration 0.08 :grain-density 20 :grain-density-spread 2 :srate 5  
+       :grain-degree 0)
+(grani 0 8 0.4 "tubular-bell.snd" 
+       :grain-duration 0.05 :grain-density 35 :grain-density-spread 3
+       :srate -5 :grain-degree 90))
+</pre>
+
+<p>Try replacing the turkish-cymbal-1.snd soundfile instead of the tubular-bell... </P>
+
+</ul>
+
+
+
+</div>
+</body>
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/CLM/grani/grani.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:57 GMT -->
+</html>

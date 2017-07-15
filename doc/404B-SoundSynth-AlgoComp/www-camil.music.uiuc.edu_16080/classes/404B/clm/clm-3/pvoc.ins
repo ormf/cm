@@ -1,0 +1,350 @@
+;(in-package :clm)
+
+#| 
+
+This version of pvoc is the same as Michael's version
+just ported for clm-2 (by Marco Trevisani)
+
+just added: envelope for distance, and degree
+
+
+pvoc - A feature complete phase vocoder instrument. Based in part on sms
+instrument and the phase vocoder section in F. Richard Moore's "Elements of
+Computer Music"
+
+Performs analysis and oscillator bank resynthesis. 
+time - specifies the time dilation ratio
+pitch - specifies the pitch transposition ratio
+gate - specifies a resynthesis gate in dB (partials with amplitudes lower than
+the gate value will not be synthesized)
+pitchoffset - a pitch offset in Hz (creates inharmonic spectra)
+
+todo: improve speed, reduce number of temporary arrays
+      start and end points (currently chops off some analysis that should be
+      performed) 
+      read and write analysis files (in formats such as Beuachamp's sndan,
+      csound pvoc, etc...) 
+      improve quality when input and output sample rates differ (still sounds
+      bad) 
+      smarter resynthesis gating (time based gating)
+      plug-in system for spectral modification
+
+Michael Klingbeil
+March, 1999   Urbana, IL
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Modifications by Michael Edwards (michael@ccrma.stanford.edu), January 2000:
+
+The basic pv algorithm is unchanged here, but I added some features that I
+thought would be nice to have:
+
+duration: If duration is given then the given time-stretch will be ignored and
+will be instead re-calculated to fit the given duration.   Now you have the
+choice. 
+
+input-start/input-end: The original instrument always transformed the whole
+sound file.  With these arguments (in seconds) you can read whichever portion
+you want to.  If input-end is not specified, then it will read to the end of
+the file as normal.
+
+time -> time-stetch
+pitch -> pitch-scaler 
+pitchoffset -> pitch-offset
+These arguments all do the same as the original, but I changed their names when
+I was feeling pedantic and/or confused.
+
+pitch-scaler-env is like pitch-scaler but instead of being a fixed constant is
+now envelope controllable.  pitch-scaler is the scaler to this envelope. 
+
+pitch-offset-env is similar again in that you can control the offset with an
+envelope using y values given in Hz.  Note that pitch-offset is an offset to
+this envelope so whatever the envelope returns will be added to pitch-offset.
+
+harmonic-mirror-env is an envelope also in Hz, and is similar to
+pitch-offset-env except that instead of adding an offset to all harmonics, it
+SUBTRACTS the offset from the lower half of the harmonics and ADDS the offset
+to the upper half, thus creating a symmetry around the central harmonic(s) and
+some kind of expansion of the frequency space.  Note that you can't have a
+pitch-offset-env and a harmonic-mirror-env at the same time.
+
+amp/amp-env: The standard things that were missing in the original.
+
+degree/rev-amt/distance: The original was mono only (outa) so I've inserted the
+standard loc structure for stereo capability.
+
+rev-env:  a reverb envelope that plays with the loc structure to create
+time-varying reverb amount.
+
+For those wondering about the gate argument, it wasn't clear to me how it
+worked at first, but I assume now that Michael Klingbeil means amplitudes lower
+than a real positive DB will not be resynthesised, which was confusing to me,
+because I always tend to think on that negative DB scale that we see on DAT
+players.  Using a value of 70 or so worked for me (and I think it reduced the
+resynth time--can that be?).
+
+Final words:  Nice instrument, shame it's so damned slow!  I'd really like to
+see the analysis/resynthesis parts separated so that analysis data can be saved
+and reloaded, but I'm too lazy/confused to go into that at the moment.
+
+|#
+
+#|
+
+(with-sound (:scaled-to .99 :statistics t) 
+  (pvoc "b6.wav" 0
+        :input-start .145
+        :input-end 5.4
+        :time-stretch 10
+        :duration 7
+        ;;:pitch-offset 100
+        ;;:pitch-offset-env '(0 0 20 0 50 100 70 100 80 0 100 0)
+        ;;:harmonic-mirror-env '(0 0 20 0 50 1000 70 1000 80 0 100 0)
+        ;;:pitch-scaler-env '(0 1 50 2 100 1)
+        ;;:amp-env '(0 1 40 0 50 1 60 0 100 1)
+        ;;:gate 70
+        :fftsize 512))
+
+|#
+
+(definstrument pvoc
+    (file time &key 
+          (duration nil)
+          (input-start 0)
+          (input-end nil)
+          (fftsize 512) 
+          (overlap 4) 
+          (time-stretch 1.0)
+          (pitch-scaler 1.0)
+          (pitch-scaler-env '(0 1 100 1))
+          (pitch-offset 0.0)  ;; in Herz!
+          (pitch-offset-env '(0 0 100 0)) ;; Also in Herz
+          (harmonic-mirror-env nil) ;; again in hz
+          (degree 0)
+	  (degree-env '(0 .5 100 .5))
+          (rev-amt 0)
+          (rev-env '(0 0 100 1))
+          (distance 1)
+	  (distance-env '( 0 1 1 1))
+          (gate 0.0) 
+          (amp 1.0)
+          (amp-env '(0 1 100 1)))
+  (when (and pitch-offset-env harmonic-mirror-env)
+    (warn "pitch-offset-env and harmonic-mirror-env cannot be used together. ~
+           Using harmonic-mirror-env only."))
+  (when (and duration time-stretch)
+    (warn "duration and time-stretch cannot be used together.  Using duration ~
+           to calculate new time-stretch"))
+  (let* ((fil (open-input* file))
+         (file-duration (sound-duration file)) 
+         (file-sampling-rate (sound-srate file))
+         (input-start-sample (* input-start *srate*))
+         (input-end-sample (floor (if input-end 
+                                      (* input-end *srate*)
+                                    (* file-duration *srate*))))
+         (input-dur-samples (- input-end-sample input-start-sample))
+         (input-dur-secs (/ (float input-dur-samples) *srate*))
+         (2ids (* 2 input-dur-secs))
+         (filptr input-start-sample)           ;; index into the file
+         (ts (if duration (/ duration input-dur-secs) time-stretch))
+         (dur (* input-dur-secs ts))
+         (start (floor (* time *srate*)))
+         (end (+ start (floor (* dur *srate*))))
+         
+         (pi2 (* 2 pi)) ;; handy constant
+         (N fftsize)  ;; fft size
+         (N2 (floor N 2))  ;; half the fft size
+         (N4 (floor N 4))  ;; quarter the fft size
+         (Nw fftsize) ;; window size -- currently restricted to the fftsize
+         ;; decimation factor (how often do we take an fft)
+         (D (floor fftsize overlap)) 
+         ;; interpolation factor how often do we synthesize
+         (interp (* (floor fftsize overlap) 
+                    (/ *srate* file-sampling-rate)
+                    ts))      
+         ;; compensates for window normalization
+         (windowsum 0.0)    
+        
+         ;; take a resynthesis gate specificed in dB, convert to linear
+         ;; amplitude  
+         (syngate (if (= 0.0 gate) 0.0 (expt 10 (/ (- (abs gate)) 20))))
+         
+         ;;(pitch-offset (in-hz pitch-offset))
+         (psenv (make-env :envelope pitch-scaler-env :scaler pitch-scaler
+                          :start time :duration 2ids))
+         (poenv (make-env :envelope pitch-offset-env 
+                          :offset (in-hz pitch-offset)
+                          :scaler (in-hz 1) :start time 
+                          :duration 2ids))
+         (hmenv (make-env :envelope harmonic-mirror-env 
+                          :scaler (in-hz 1) :start time 
+                          :duration 2ids))
+	 (degrenv (make-env :envelope degree-env :start time
+			    :duration dur))
+	 (distenv (make-env :envelope distance-env :start time
+			    :duration dur))
+	 (ampf (make-env :envelope amp-env :scaler amp :start time
+                         :duration dur))
+         (loc (make-locsig  :distance distance :degree degree
+			    :reverb rev-amt))
+         (renv (make-env :envelope rev-env :scaler rev-amt :start time 
+                         :duration dur))
+         (window (make-double-array Nw)) ; array for the window
+         (fdr (make-double-array N)) ; buffer for real fft data
+         (fdi (make-double-array N)) ; buffer for imaginary fft data
+         
+         (lastphase (make-double-array N2)) ;; last phase change
+         (lastamp (make-double-array N2)) ;; last sampled amplitude
+         (lastfreq (make-double-array N2)) ;; last sampled frequency
+         ;; amplitude interpolation increment
+         (ampinc (make-double-array N2))
+         ;; frequency interpolation increments
+         (freqinc (make-double-array N2))
+         
+         ;; expresses the fundamental in terms of radians per OUTPUT sample
+         (fundamental (* (/ file-sampling-rate N) (/ pi2 *srate*)))
+         ;; (fundamental (in-hz (/ file-sampling-rate N)))
+
+         (sum 0.0)                      ;; output sample sum
+         ;;(poval 0.0)
+         ;;(psval 0.0)
+         (output interp)      ;; count of samples that have been output
+         (resynth-oscils (make-array N2))
+         ;; how often to print out the percentage complete message
+         (nextpct 10.0)
+	 (dist-scaler 0.0))
+    ;; zero out the arrays (lastamp and lastphase will be set from fdr and fdi)
+    (clear-array lastphase)
+    (clear-array fdr)
+    (clear-array fdi)
+
+    ;; setup oscillators
+    (dotimes (i N2)
+      (setf (aref resynth-oscils i) (make-oscil :frequency 0)))
+    (when duration (format t "~&time-stretch = ~a~%" ts))
+    (run
+     (progn
+       ;; set-up the analysis window here
+       (setf windowsum 0.0)
+       ;; create a Hamming window (Moore p. 251)
+       (dotimes (k Nw)
+         (let ((val (- 0.54 (* 0.46 (cos (* 2 pi (/ k (- Nw 1))))))))
+           (setf (aref window k) val)
+           (incf windowsum val)))
+       ;; normalize window
+       (setf windowsum (/ 2.0 windowsum))
+       ;; loop over normalizing the window
+       (dotimes (k Nw)
+         (setf (aref window k) (* (aref window k) windowsum)))
+       
+       ;; begin the master run loop
+       (loop for i from start to end do
+             ;; if all the samples have been output then do the next frame
+             (if (>= output interp)
+                 (let ((buffix (mod filptr N)))
+                   ;; buffix is the index into the input buffer
+                   ;; it wraps around circularly as time increases in the input
+                   
+                   ;; reset the output sample counter
+                   (setf output 0)
+                 
+                   ;; save the old amplitudes and frequencies
+                   (dotimes (k N2)
+                     (setf (aref lastamp k) (aref fdr k))
+                     (setf (aref lastfreq k) (aref fdi k)))
+                 
+                   (dotimes (k N)
+                     ;; apply the window and then stuff into the input array
+                     (setf (aref fdr buffix) (* (aref window k)
+                                                (ina filptr fil)))
+                     (incf filptr)
+
+                     ;; increment the buffer index with wrap around
+                     (incf buffix)
+                     (if (>= buffix N) (setf buffix 0)))
+                   ;; rewind the file for the next hop
+                   (decf filptr (- N D))
+                   ;; no imaginary component input so zero out fdi
+                   (clear-array fdi)
+                   ;; compute the fft
+
+                   (fft fdr fdi N 1)
+                   ;; now convert into magnitude and interpolated frequency
+                   (dotimes (k N2)
+                     (let* ((a (aref fdr k))
+                            (b (aref fdi k))
+                            (mag (* (sqrt (+ (* a a) (* b b)))))
+                            (phase 0) (phasediff 0))
+                       (setf (aref fdr k) mag)    ;; current amp stored in fdr
+                       ;; mag is always positive
+                       ;; if it is zero then the phase difference is zero
+                       (if (> mag 0)
+                           (progn
+                             (setf phase (- (atan b a)))
+                             (setf phasediff (- phase (aref lastphase k)))
+                             (setf (aref lastphase k) phase)
+                             ;; frequency wrapping from Moore p. 254
+                             (loop while (> phasediff pi) do
+                                   (decf phasediff pi2))
+                             (loop while (< phasediff (- pi)) do
+                                   (incf phasediff pi2))))
+                       ;; current frequency stored in fdi
+                       ;; scale by the pitch transposition
+                       (setf (aref fdi k) 
+                         (* (env psenv) (+ (/ (* phasediff file-sampling-rate)
+                                              (* D *srate*))
+                                           (* k fundamental)
+                                           (if harmonic-mirror-env
+                                               (if (> k N4)
+                                                   (env hmenv)
+                                                 (- (env hmenv)))
+                                             (env poenv)))))
+                       ;; resynthesis gating
+                       (if (< (aref fdr k) syngate)
+                           (setf (aref fdr k) 0))
+                     
+                       ;; take (aref lastamp k) and count up to (aref fdr k)
+                       ;; interpolating by ampinc
+                       (setf (aref ampinc k) (/ (- (aref fdr k) 
+                                                   (aref lastamp k)) interp))
+                       ;; take (aref lastfreq k) and count up to (aref fdi k)
+                       ;; interpolating by freqinc
+                       (setf (aref freqinc k)
+                         (/ (- (aref fdi k) (aref lastfreq k)) interp))))
+                 
+                   ;; we can now output samples
+                   ;; set the interpolation increment
+                   ;; (setf interp-inc (/ 1.0 interp))
+                   ;; set the interpolation factor
+                   ;; (setf interp-factor 0.0)
+                   ))
+
+             ;; loop over the partials
+             (setf sum 0.0)
+             (dotimes (k (floor N 2))
+               ;; interpolate frequency and amplitude
+               ;; it would be faster to do this with increments
+               
+               (incf (aref lastamp k) (aref ampinc k))
+               (incf (aref lastfreq k) (aref freqinc k))
+	       )
+	     ;; nearly 75% of the compute time is spent here
+	     (if (> (aref lastamp k) 0)
+		 (incf sum (* (aref lastamp k)
+			      (oscil (aref resynth-oscils k)
+				     (aref lastfreq k)))))
+	     (setf dist-scaler (/ 1.0 (env distenv)))
+	     (setf (locsig-ref loc 0) (* dist-scaler (- 1.0 (env degrenv))))
+	     (setf (locsig-ref loc 1) (* dist-scaler (env degrenv)))
+             (when *reverb* (setf (locsig-reverb-ref loc 0)
+				  (* (sqrt dist-scaler)(env renv))))
+             (locsig loc i (* (env ampf) sum))
+             ;; print out a message
+             (let ((pct (* 100.0 (/ (- i time) (- end time)))))
+               (if (>= pct nextpct) (progn
+                                      (clm-print "~&~F%" pct)
+                                      (incf nextpct 10))))
+
+             ;; we just output 1 sample
+             (incf output))))))
+

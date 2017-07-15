@@ -1,0 +1,72 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>next</title>
+</head>
+<body>
+<div id="content">
+
+
+<!-- Entry: "next" -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">next</code> <var>pattern</var> [<var>length</var>]<code>)</code></span></dd>
+</dl>
+
+
+<p>
+Returns one or more elements from <var>pattern</var> according
+to <var>length</var>. If <var>length</var> is unspecified or false
+then just the next element from <var>pattern</var> is
+returned. If <var>length</var> is a number then that many elements are
+read from the pattern and returned in a list. Otherwise if length is
+true then the next period's worth data is read from the pattern.
+</p>
+
+<div class="float" id="repl_0-1">
+<pre class="code">
+(<span class="special">define</span> p (<a href="new-mac.html">new</a> cycle <span class="keyword">:of</span> '(a b c d) ))
+
+(<a href="next-fn.html">next</a> p)
+<span class="result">&rArr;</span> a
+
+(<a href="next-fn.html">next</a> p)
+<span class="result">&rArr;</span> b
+
+(<a href="next-fn.html">next</a> p 6)
+<span class="result">&rArr;</span> (c d a b c d)
+
+(<a href="next-fn.html">next</a> p #t)
+<span class="result">&rArr;</span> (a b c d)
+</pre>
+</div>
+
+
+<!-- See also -->
+<h4>See Also:</h4>
+<ul>
+<li><a href="eodqmk-fn.html"><kbd>eod?</kbd></a> [Function]</li>
+<li><a href="eopqmk-fn.html"><kbd>eop?</kbd></a> [Function]</li>
+<li><a href="map-pattern-data-fn.html"><kbd>map-pattern-data</kbd></a> [Function]</li>
+<li><a href="pattern-state-fn.html"><kbd>pattern-state</kbd></a> [Function]</li>
+<li><a href="pattern-value-fn.html"><kbd>pattern-value</kbd></a> [Function]</li>
+<li><a href="patternqmk-fn.html"><kbd>pattern?</kbd></a> [Function]</li>
+</ul>
+
+
+</div>
+<hr class="inv"/>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
+
+

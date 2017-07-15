@@ -1,0 +1,256 @@
+;;; -*- Mode: LISP; Syntax: Common-lisp -*-
+
+;;;
+;;; Cut and Paste instrument
+;;;
+
+;;;
+;;; Parameters
+;;;
+
+(defparameter cut-soundfile nil)
+(defparameter cut-sound-start 0.0)
+(defparameter cut-sound-end 1.0)
+(defparameter cut-sound-start-time nil)
+(defparameter cut-sound-end-time nil)
+(defparameter cut-segment nil)
+(defparameter cut-segment-slice nil)
+(defparameter cut-duration nil)
+(defparameter cut-channel 0)
+(defparameter cut-sample-rate '(0 1 1 1))
+(defparameter cut-sample-rate-mult 1.0)
+(defparameter cut-amp-func '(0 0 5 1 95 1 100 0))
+(defparameter cut-vib-osc-freq 6.0)
+(defparameter cut-vib-osc-freq-dev 3.0)
+(defparameter cut-vib-osc-amp 0.1)
+(defparameter cut-vib-noi-freq 15)
+(defparameter cut-vib-noi-amp 0.1)
+(defparameter cut-vib-osc-amp-func '(0 0 50 0.2 100 1))
+(defparameter cut-vib-noi-amp-func '(0 0.2 50 1 100 0))
+(defparameter cut-vib-osc-freq-func '(0 1 50 2.0 100 0.8))
+(defparameter cut-reverb-amount 0.015)
+(defparameter cut-degree 45)
+(defparameter cut-distance 1)
+
+;;;
+;;; Instrument definition (duration)
+;;;
+
+(defun one-cut-dur
+     (&key
+      (soundfile cut-soundfile)
+      (sound-start cut-sound-start)
+      (sound-end cut-sound-end)
+      (sound-start-time cut-sound-start-time)
+      (sound-end-time cut-sound-end-time)
+      (segment cut-segment)
+      (segment-slice cut-segment-slice)
+      (duration cut-duration)
+      (sample-rate cut-sample-rate)
+      (sample-rate-mult cut-sample-rate-mult)
+      &allow-other-keys)
+   (let* ((in-file-sr (sound-srate soundfile))
+	 (srate-ratio (/ in-file-sr *srate*))
+	 (in-file-dur (if segment
+			  (* (- (second segment)(first segment))
+			     (if segment-slice
+				 (- (second segment-slice)(first segment-slice))
+			       1.0))
+			(if (and sound-start-time sound-end-time)
+			    (- sound-end-time sound-start-time)
+			  (* (- sound-end sound-start)(sound-duration soundfile)))))
+	 ;; average sample rate for the whole note
+	 (average-rate (* srate-ratio sample-rate-mult
+			  (let ((xo (car sample-rate))
+				(yo (cadr sample-rate)))
+			    (loop
+				for x in sample-rate by #'cddr
+				for y in (cdr sample-rate) by #'cddr
+				sum (+ (- (* x y)(* xo y))(- (* x yo)(* xo yo))) into s
+				do (setf xo x yo y)
+				finally (return (/ s 2 x)))))))
+     (let ((estimated (/ in-file-dur average-rate)))
+       (if (and duration (< duration estimated))
+	  duration
+	estimated))))
+
+;;;
+;;; Instrument definition
+;;;
+
+(definstrument one-cut
+     (start-time amp
+        &key
+        (soundfile cut-soundfile)
+        (sound-start cut-sound-start)
+        (sound-end cut-sound-end)
+        (sound-start-time cut-sound-start-time)
+        (sound-end-time cut-sound-end-time)
+        (segment cut-segment)
+        (segment-slice cut-segment-slice)
+        (duration cut-duration)
+	(channel cut-channel)
+        (sample-rate cut-sample-rate)
+        (sample-rate-mult cut-sample-rate-mult)
+        (amp-func cut-amp-func)
+        (vib-osc-freq cut-vib-osc-freq)
+        (vib-osc-freq-dev cut-vib-osc-freq-dev)
+        (vib-osc-amp cut-vib-osc-amp)
+        (vib-noi-freq cut-vib-noi-freq)
+        (vib-noi-amp cut-vib-noi-amp)
+        (vib-osc-amp-func cut-vib-osc-amp-func)
+        (vib-noi-amp-func cut-vib-noi-amp-func)
+        (vib-osc-freq-func cut-vib-osc-freq-func)
+        (degree cut-degree)
+        (distance cut-distance)
+        (reverb-amount cut-reverb-amount))
+
+     (let* ((in-file-sr (sound-srate soundfile))
+	   (srate-ratio (/ in-file-sr *srate*))
+	   (in-file-dur (if segment
+			    (* (- (second segment)(first segment))
+			       (if segment-slice
+				   (- (second segment-slice)(first segment-slice))
+				 1.0))
+			  (if (and sound-start-time sound-end-time)
+			      (- sound-end-time sound-start-time)
+			    (* (- sound-end sound-start)(sound-duration soundfile)))))
+	   (in-file-start (if segment
+			      (+ (first segment)
+				 (if segment-slice
+				     (* (first segment-slice)
+					(- (second segment)(first segment)))
+				   0.0))
+			    (if sound-start-time
+				sound-start-time
+			      (* sound-start (sound-duration soundfile)))))
+	   ;; average sample rate assuming cancellation of vibrato component
+	   (average-rate (* srate-ratio sample-rate-mult
+			    (let ((xo (car sample-rate))
+				  (yo (cadr sample-rate)))
+			      (loop
+				for x in sample-rate by #'cddr
+				for y in (cdr sample-rate) by #'cddr
+				sum (+ (- (* x y)(* xo y))(- (* x yo)(* xo yo))) into s
+				do (setf xo x yo y)
+				finally (return (/ s 2 x))))))
+	   (out-file-dur (let ((estimated (* (/ in-file-dur average-rate) srate-ratio)))
+			   (if (and duration (< duration estimated))
+			       duration
+			     estimated)))
+	   (src-gen (make-src :input (open-input soundfile 
+						 :start (floor (* in-file-start in-file-sr))
+						 :channel channel)
+			      :srate 0))
+	   (amp-env (make-env :envelope amp-func
+			      :scaler amp
+			      :duration out-file-dur))
+	   (srate-env (make-env :envelope sample-rate
+				:scaler (* srate-ratio sample-rate-mult)
+				:duration out-file-dur))
+	   (vib-osc (make-oscil :frequency vib-osc-freq))
+	   (vib-noi (make-rand-interp :frequency vib-noi-freq))
+	   (vib-osc-amp-env (make-env :envelope vib-osc-amp-func
+				      :scaler (* average-rate vib-osc-amp)
+				      :duration out-file-dur))
+	   (vib-noi-amp-env (make-env :envelope vib-noi-amp-func
+				      :scaler (* average-rate vib-noi-amp)
+				      :duration out-file-dur))
+	   (vib-osc-freq-env (make-env :envelope vib-osc-freq-func
+				       :scaler (hz->radians vib-osc-freq-dev)
+				       :duration out-file-dur))
+	   (loc (make-locsig :degree degree
+			     :distance distance
+			     :reverb reverb-amount))
+	   (beg (floor (* start-time *srate*)))
+	   (end (+ beg (floor (* *srate* out-file-dur)))))
+       ;; start at this location in input file
+;      (setf (mus-location src-gen) in-file-start)
+
+       (format t "<~,3F-~,3F>~10Tone-cut rate: ~,3F dur: ~,3F~%" start-time (+ start-time out-file-dur) average-rate out-file-dur)
+       (run
+        (loop for i from beg to end do
+	     (let ((sample (* (env amp-env)
+			      (src src-gen (+ (env srate-env)
+					      (* (env vib-osc-amp-env)
+						 (oscil vib-osc (env vib-osc-freq-env)))
+					      (* (env vib-noi-amp-env)
+						 (rand-interp vib-noi)))))))
+	       (locsig loc i sample))))
+       ))
+;;;
+;;;
+;;;
+
+(defun cuts (start-time amp
+	     &key
+	     (rate 1.0)
+	     (soundfile cut-soundfile)
+	     (sound-start 0.1)
+	     (sound-end 0.8)
+	     (sound-slac (/ (- sound-end sound-start) 2))
+	     (cuts 6))
+   (loop
+     repeat cuts
+     for s-start from sound-start by (/ sound-slac 3 cuts)
+     for s-end from sound-end by (- (/ sound-slac 3 cuts))
+     do
+     (one-cut start-time amp
+	     :sound-start s-start
+	     :sound-end s-end
+	     :soundfile soundfile
+	     :sample-rate rate)))
+
+;;;
+;;;
+;;;
+
+(defparameter cut-partials '(1 1.33 2 4 5.55))
+(defparameter cut-coincidence 0.95)
+
+(defun collect-items (label start end elements)
+   (if (and start end)
+       (loop
+	  for i from start to end by (/ (- end start)(- elements 1))
+	  collect (list label i))
+     '()))
+
+(defun partial-cuts (start-time amp
+		     &rest rest
+		     &key
+		     (multiplier 1.0)
+		     (partials cut-partials)
+		     (coincidence cut-coincidence)
+		     (start-vib-freq nil)
+		     (start-vib-amp nil)
+		     (end-vib-freq nil)
+		     (end-vib-amp nil)
+		     (soundfile cut-soundfile)
+		     &allow-other-keys)
+   (declare (ignore soundfile))
+   (let* ((max-dur 0)
+	 (curr-dur 0))
+     (mapcar #'(lambda (p)(remf rest p))
+	    '(:partials :coincidence :multiplier
+	      :start-vib-freq :end-vib-freq
+	      :start-vib-amp :end-vib-amp))
+     (setf partials (mapcar #'(lambda (m)(* multiplier m)) partials))
+     (let* ((vib-freqs (collect-items :vib-osc-freq start-vib-freq end-vib-freq (length partials)))
+	   (vib-amps (collect-items :vib-osc-amp start-vib-amp end-vib-amp (length partials))))
+       (setf max-dur (* coincidence (apply #'one-cut-dur `(:sample-rate-mult ,(car partials) ,@rest))))
+       (apply #'one-cut `(,start-time
+			 ,amp
+			 :sample-rate-mult ,(pop partials)
+			 ,@(pop vib-amps)
+			 ,@(pop vib-freqs)
+			 ,@rest))
+       (loop
+        for partial in partials do
+	(setf curr-dur (* coincidence (apply #'one-cut-dur `(:sample-rate-mult ,partial ,@rest))))
+	(apply #'one-cut `(,(+ start-time (- max-dur curr-dur))
+			   ,amp
+			   :sample-rate-mult ,partial
+			   ,@(pop vib-amps)
+			   ,@(pop vib-freqs)
+			   ,@rest))))))
+

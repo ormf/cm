@@ -1,0 +1,68 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+    <style type="text/css" media="all">
+@import "../css/cm.css";
+    </style>
+    <title>osc-stream</title>
+  </head>
+<body>
+  <div id="content">
+    
+    <dl class="dictsyntax">
+      <dt>[Class]</dt>
+      <dd><code class="entry">osc-stream</code></dd>
+    </dl>
+    
+    <p>
+      Implements output to OSC sockets. 
+    </p>
+    
+    <p>
+      <code class="entry">osc-stream</code> supports the following slot
+      initializations:
+    </p>
+
+    <dl>
+      <dt><code class="keyword">:remote-port</code> <var>number</var></dt>
+      <dd>The port of the scsynth to connect to. Default is 57110.</dd>
+      
+      <dt><code class="keyword">:remote-host</code> <var>string</var></dt>
+      <dd>The ip of the scsynth to connect to. Default is "127.0.0.1"
+      </dd>
+      
+      <dt><code class="keyword">:local-port</code> <var>number</var></dt>
+      <dd>The local port to use. Default is 571000
+      </dd>
+
+      <dt><code class="keyword">:buffer-size</code> <var>number</var></dt>
+      <dd>Size of the buffer in bytes to use for receiving messages. Default is 512.
+      </dd>
+      
+      <dt><code class="keyword">:latency</code> <var>number</var></dt>
+      <dd>A value in seconds to add on to any timestamped bundles. Default is .05
+      </dd>
+      
+      
+    </dl>
+
+
+
+    <h4>See also:</h4>
+
+    <ul>
+      <li><a href="supercollider-topic.html">SuperCollider</a> [Topic]</li>
+    </ul>
+
+    <!-- Footer -->
+    <div id="footer">
+      <div id="version">$Name$</div>
+      <div id="cvs-info">($Revision$, $Date$)</div>
+    </div>
+  </body>
+</html>
+
+
+
+

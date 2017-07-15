@@ -1,0 +1,37 @@
+(require 'hyperspec)
+
+;; load cm interface  set C-x l startup command
+(let ((load-path (cons "/Lisp/cm/etc/xemacs" load-path)))
+  (load "cm.el")
+  (setq inferior-lisp-program "cm"))
+
+(display-time)
+
+(setq mac-command-key-is-meta nil)  
+
+(when (member 'carbon-emacs-package features)
+  ;; install apple commands on Command key
+  (mac-key-mode 1))
+
+(custom-set-variables
+  ;; custom-set-variables was added by Custom.
+  ;; If you edit it by hand, you could mess it up, so be careful.
+  ;; Your init file should contain only one such instance.
+  ;; If there is more than one, they won't work right.
+
+ ;; start with no spash screen
+ '(inhibit-startup-message t)
+ ;; start with blank buffer
+ '(initial-scratch-message nil)
+ '(display-time-day-and-date t)
+ '(default-frame-plist (width 75 height 45))
+ '(cua-mode nil)
+ '(global-font-lock-mode t)
+ '(show-paren-mode nil))
+
+(custom-set-faces
+  ;; custom-set-faces was added by Custom.
+  ;; If you edit it by hand, you could mess it up, so be careful.
+  ;; Your init file should contain only one such instance.
+  ;; If there is more than one, they won't work right.
+ )

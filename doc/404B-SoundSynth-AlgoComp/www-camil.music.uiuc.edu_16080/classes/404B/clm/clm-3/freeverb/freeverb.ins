@@ -1,0 +1,200 @@
+;; Freeverb - Free, studio-quality reverb SOURCE CODE in the public domain
+;;
+;; Written by Jezar at Dreampoint, June 2000
+;; http://www.dreampoint.co.uk
+;;
+;; Translated into clm-2 by Fernando Lopez-Lezcano <nando@ccrma.stanford.edu>
+;; Version 1.0 for clm-2 released in January 2001
+;; http://ccrma.stanford.edu/~nando/clm/freeverb/
+;;
+;; Changes to the original code by Jezar (by Fernando Lopez-Lezcano):
+;; - the clm version can now work with a mono input or an n-channel input
+;;   stream (in the latter case the number of channels of the input and output
+;;   streams must match.
+;; - the "wet" parameter has been eliminated as it does not apply to the model
+;;   that clm uses to generate reverberation
+;; - the "width" parameter name has been changed to :global. It now controls the
+;;   coefficients of an NxN matrix that specifies how the output of the reverbs
+;;   is mixed into the output stream.
+;; - predelays for the input channels have been added.
+;; - damping can be controlled individually for each channel. 
+
+;; To do:
+;; - change stereospread parameter for a generalized n-channel solution to
+;;   channel decorrelation. 
+
+;; Global parameters
+
+;; length of delay lines for comb and allpass filters:
+;; these values assume 44.1KHz sample rate, they are scaled for other
+;; sampling rates, the values were obtained by listening tests.
+(defparameter freeverb-stereo-spread 23)
+(defparameter freeverb-combtuning '(1116 1188 1277 1356 1422 1491 1557 1617))
+(defparameter freeverb-allpasstuning '(556 441 341 225))
+
+;; decay time of room
+(defparameter freeverb-room-decay 0.5)
+
+;; damping of the comb feedback filters
+(defparameter freeverb-damping 0.5)
+
+;; predelay for input signal
+(defparameter freeverb-predelay 0.03)
+
+;; output gain scaler
+(defparameter freeverb-output-gain 1.0)
+
+;; be verbose with warnings
+(defparameter freeverb-verbose t)
+
+;; balance between global and local reverb for multichannel input
+;; 1 -> all reverberated channels are mixed on all output channels
+;; 0 -> each reverberated channel is sent to its correnponding output only
+(defparameter freeverb-global 0.3)
+
+;; custom output mixing matrix
+(defparameter freeverb-output-mixer nil)
+
+;; scale and offsets for parameters
+(defparameter freeverb-scale-damping 0.4)
+(defparameter freeverb-scale-room-decay 0.28)
+(defparameter freeverb-offset-room-decay 0.7)
+
+;; ignore sane limits to input parameters
+(defparameter freeverb-ignore-param-limits nil)
+
+;; CLM unit generator: comb filter with one-zero filtered feedback
+
+;(def-clm-struct fcomb
+;  delay
+;  filter
+;  (feedback 0.0))
+  
+(defmacro fcomb (dly flt input fdbck)
+  `(delay ,dly
+	  (+ ,input (* (one-zero ,flt
+				 (tap ,dly))
+		       ,fdbck))))
+
+(definstrument freeverb (start-time duration
+			 &key
+			 (room-decay freeverb-room-decay)
+			 (damping freeverb-damping)
+			 (global freeverb-global)
+			 (predelay freeverb-predelay)
+			 (output-gain freeverb-output-gain)
+			 (output-mixer freeverb-output-mixer)
+			 (verbose freeverb-verbose))
+  (let* ((beg (floor (* start-time *srate*)))
+	 (end (+ beg (floor (* duration *srate*))))
+	 (out-chans (mus-channels *output*))
+	 (out-mix (if (mixer? output-mixer) output-mixer
+		    (make-empty-mixer out-chans)))
+	 (out-buf (make-empty-frame out-chans))
+	 (out-gain output-gain)
+	 (out (make-empty-frame out-chans))
+	 (in-chans (mus-channels *reverb*))
+	 (in (make-empty-frame in-chans))
+	 (predelays (make-array in-chans))
+	 (local-gain (+ (* (- 1 global)(- 1 (/ out-chans)))
+			(/ out-chans)))
+	 (global-gain (/ (- out-chans (* local-gain out-chans))
+			 (max 1 (- (* out-chans out-chans) out-chans))))
+	 (srate-scale (/ *srate* 44100))
+	 (room-decay-val (+ (* room-decay freeverb-scale-room-decay)
+			    freeverb-offset-room-decay))
+	 (numcombs (length freeverb-combtuning))
+	 (numallpasses (length freeverb-allpasstuning))
+	 (combs (make-array (* out-chans numcombs)))
+	 (flts (make-array (* out-chans numcombs)))
+	 (fdbcks (make-array (list out-chans numcombs)))
+	 (allpasses (make-array (list out-chans numallpasses))))
+
+    (format t ";;; freeverb: ~d input channels, ~d output channels~%" in-chans out-chans)
+    (if (and (> in-chans 1)
+	     (/= in-chans out-chans))
+	(error "input must be mono or input channels must equal output channels"))
+    ;; create the output mixer if it was not supplied as an argument
+    (if (not (mixer? output-mixer))
+	(if (arrayp output-mixer)
+	    (loop for in from 0 below out-chans do
+	      (loop for out from 0 below out-chans do
+		(setf (mixer-ref out-mix in out)(aref output-mixer in out))))
+	  (loop for in from 0 below out-chans do
+	    (loop for out from 0 below out-chans do
+	      (setf (mixer-ref out-mix in out)
+		    (double (/ (* out-gain (if (= in out)
+					       local-gain
+					     global-gain))
+			       out-chans)))))))
+    ;; create the input predelays
+    (loop for c from 0 below in-chans do
+      (setf (aref predelays c)
+	    (make-delay :size (* *srate*
+				 (if (arrayp predelay)
+				     (aref predelay c)
+				   (if (listp predelay)
+				       (nth c predelay)
+				     predelay))))))
+    ;; create the comb filters
+    (loop for c from 0 below out-chans do
+      (loop for i from 0 
+	for tuning in freeverb-combtuning
+	for len = (floor (* srate-scale tuning))
+	for dmp = (* freeverb-scale-damping
+		     (if (arrayp damping)(aref damping i)
+		       (if (listp damping)(nth i damping)
+			 damping)))
+	do
+	(if (oddp c)(incf len (floor (* srate-scale freeverb-stereo-spread))))
+	(setf (aref combs (+ (* c numcombs) i)) (make-delay len))
+	(setf (aref flts (+ (* c numcombs) i)) (make-one-zero :a0 (- 1.0 dmp) :a1 dmp))
+	(setf (aref fdbcks c i) room-decay-val)))
+
+    ;; create the allpass filters
+    (loop for c from 0 below out-chans do
+      (loop for i from 0 
+	for tuning in freeverb-allpasstuning
+	for len = (floor (* srate-scale tuning))
+	do
+	(if (oddp c)(incf len (floor (* srate-scale freeverb-stereo-spread))))
+	(setf (aref allpasses c i)
+	      (make-all-pass :size len
+			     :feedforward -1
+			     :feedback 0.5))))
+    (run
+     (loop for i from beg to end do
+       (declare (type :double* fdbcks)
+		(type :integer numcombs out-chans))
+       (file->frame *reverb* i in)
+       (if (> in-chans 1)
+	   ;; multichannel input: all combs in parallel for all channels
+	   (loop for c from 0 below out-chans do
+	     (setf (frame-ref in c) (delay (aref predelays c) (frame-ref in c))
+		   (frame-ref out c) 0.0)
+	     (loop for j from 0 below numcombs do
+	       (let ((ind (+ (* c numcombs) j)))
+		 (incf (frame-ref out c)
+		       (fcomb (aref combs ind)
+			      (aref flts ind)
+			      (frame-ref in c)
+			      (aref fdbcks c j))))))
+	 ;; mono input: all combs in parallel
+	 (progn
+	   (setf (frame-ref in 0) (delay (aref predelays 0) (frame-ref in 0)))
+	   (loop for c from 0 below out-chans do
+	     (setf (frame-ref out c) 0.0)
+	     (loop for j from 0 below numcombs do
+	       (let ((ind (+ (* c numcombs) j)))
+		 (incf (frame-ref out c)
+		     (fcomb (aref combs ind)
+			    (aref flts ind)
+			    (frame-ref in 0)
+			    (aref fdbcks c j))))))))
+       ;; all allpass filters in series for all channels
+       (loop for c from 0 below out-chans do
+	 (loop for j from 0 below numallpasses do
+	   (setf (frame-ref out c) (all-pass (aref allpasses j) (frame-ref out c)))))
+       ;; mix down and output samples
+       (frame->file *output* i (frame->frame out out-mix out-buf))))))
+

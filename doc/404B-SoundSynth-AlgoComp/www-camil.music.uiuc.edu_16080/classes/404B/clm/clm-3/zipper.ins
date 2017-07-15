@@ -1,0 +1,106 @@
+;;; create the 'digital zipper' effect
+;;; a not-very-debonair way to fade out file1 and fade in file2
+
+(definstrument zipper (beg dur file1 file2 ramp-envelope frame-size &optional (ramp-envelope-base 1.0) frame-envelope)
+  ;; pan between file1 and file2 using a "zipper-like" effect
+  ;; ramp-env at 0 => all file1, at 1 => all file2, in between a mixture
+  ;; frame-size is the basic speed at which the mixture takes place (dependent also on frame-env)
+  ;; ramp-env-base is the base of the panning envelope (for exponential pans)
+  ;; frame-env affects the frame size -- don't let it get to 0!!
+  (let* ((f1 (open-input* file1))
+	 (f2 (if f1 (open-input* file2) (close-input f1))))
+    (if (not f1) (warn "can't find ~A" file1))
+    (if (not f2) (warn "can't find ~A" file2))
+    (when (and f1 f2)
+      (unwind-protect
+	  (if (and frame-envelope (<= (min-envelope frame-envelope) 0.0))
+	      (progn
+		(warn "zipper can't use frame-env ~A because it goes to ~F" frame-envelope (min-envelope frame-envelope))
+		(setf frame-envelope nil)))
+	(let* ((start (floor (* *srate* beg)))
+	       (end (+ start (floor (* *srate* dur))))
+	       (tframe-envelope (or frame-envelope '(0 1 1 1)))
+	       (fe (make-env tframe-envelope :scaler (* *srate* frame-size) :duration dur))
+	       (maxframe (max-envelope tframe-envelope))
+	       (ctr1 0)
+	       (ctr2 0)
+	       (frame-loc 0)
+	       (ramp-loc 0.0)
+	       (rampe (make-env ramp-envelope :duration dur :base ramp-envelope-base))
+	       (trigger 0)
+	       (frame-samples (1+ (ceiling (* *srate* maxframe frame-size))))
+	       (frame (make-double-array frame-samples))
+	       (frame1 (make-double-array frame-samples))
+	       (frame2 (make-double-array frame-samples))
+	       (cursamples 0)
+	       (chunk-len 0)
+	       (low-start 20)
+	       )
+	  (run
+	   (loop for i from start to end do
+	     (declare (type :integer ctr1 ctr2 trigger frame-loc cursamples chunk-len low-start frame-samples)
+		      (type :float ramp-loc low-start)
+		      (type :double* frame frame1 frame2))
+	     ;; read straight file input if outside ramp section
+	     (setf ramp-loc (env rampe))
+	     (setf frame-samples (floor (env fe)))
+	     (setf chunk-len (floor (* frame-samples ramp-loc)))
+	     ;; fe's duration assumes it's being called on every sample, but we only need this value every once in a while
+	     (if (<= chunk-len low-start)
+		 (progn
+		   (outa i (ina ctr1 f1))
+		   (incf ctr1))
+	       (if (>= chunk-len (- frame-samples low-start))
+		   (progn
+		     (outa i (ina ctr2 f2))
+		     (incf ctr2))
+		 ;; else we're in the ramp phase
+		 ;;  read frame if we're within its bounds
+		 (if (= trigger 0)
+		     (outa i (aref frame frame-loc))
+		   ;; now get next portion of the ramp
+		   (progn
+		     (setf cursamples frame-samples)
+		     (dotimes (k cursamples)
+		       (setf (aref frame1 k) (ina ctr1 f1))
+		       (incf ctr1)
+		       (setf (aref frame2 k) (ina ctr2 f2))
+		       (incf ctr2))
+		     ;; now resample each dependent on location in ramp (samp1 and samp2 are increments)
+		     (clear-array frame)
+		     (let ((start-ctr 0.0)
+			   (samp2 (/ frame-samples chunk-len)))
+		       (dotimes (k chunk-len)
+			 (let* ((ictr (floor start-ctr))
+				(y0 (aref frame2 ictr))
+				(y1 (aref frame2 (+ ictr 1))))
+			   (setf (aref frame k) (+ y0 (* (- y1 y0) (- start-ctr ictr))))
+			   (incf start-ctr samp2))))
+		     (let ((start-ctr 0.0)
+			   (m chunk-len)
+			   (samp1 (/ frame-samples (- frame-samples chunk-len))))
+		       (dotimes (k (- frame-samples chunk-len))
+			 (let* ((ictr (floor start-ctr))
+				(y0 (aref frame1 ictr))
+				(y1 (aref frame1 (+ ictr 1))))
+			   (setf (aref frame m) (+ y0 (* (- y1 y0) (- start-ctr ictr))))
+			   (incf start-ctr samp1)
+			   (incf m))))
+		     (outa i (aref frame 0))))))
+	     (incf frame-loc)
+	     (setf trigger 0)
+	     (if (>= frame-loc cursamples)
+		 (progn
+		   (setf frame-loc 0)
+		   (setf trigger 1))))))
+	)
+      (progn
+	(close-input f1)
+	(close-input f2)))))
+
+;;; (with-sound () (zipper 0 3 "/snd/sounds/mb.snd" "fyow.snd" '(0 0 1.0 0 1.5 1.0 3.0 1.0) .025))
+;;; (with-sound () (zipper 0 3 "/snd/sounds/mb.snd" "fyow.snd" '(0 0 1.0 0 1.5 1.0 2.0 1.0 2.5 0.0 3.0 1.0) .015))
+;;; (with-sound () (zipper 0 3 "/snd/sounds/mb.snd" "fyow.snd" '(0 0 1.0 0 1.5 .5 2.0 .1 2.5 0.7 3.0 0.0) .05))
+;;; (with-sound () (zipper 0 4 "/snd/sounds/mb.snd" "fyow.snd" '(0 0 1.0 0 1.5 .5 2.0 .1 2.5 0.7 3.0 0.0 4.0 0.0) .03 1.0 '(0 1 1 2)))
+;;; mb.snd is a take from Madame Butterfly, fyow.snd is M.C. saying "Yeah right, Bill"
+;;; this is also good if the same file is used twice -- sort of like a CD player gone berserk

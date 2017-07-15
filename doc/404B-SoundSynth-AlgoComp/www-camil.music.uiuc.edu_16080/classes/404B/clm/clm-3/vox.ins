@@ -1,0 +1,102 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; translation from MUS10 of MLB's waveshaping voice instrument (using FM here)
+;;;
+
+(defvar formants 
+    '((I 390 1990 2550)  (E 530 1840 2480)  (AE 660 1720 2410)
+      (UH 520 1190 2390) (A 730 1090 2440)  (OW 570 840 2410)
+      (U 440 1020 2240)  (OO 300 870 2240)  (ER 490 1350 1690)
+      (W 300 610 2200)   (LL 380 880 2575)  (R 420 1300 1600)
+      (Y 300 2200 3065)  (EE 260 3500 3800) (LH 280 1450 1600)
+      (L 300 1300 3000)  (I2 350 2300 3340) (B 200 800 1750)
+      (D 300 1700 2600)  (G 250 1350 2000)  (M 280 900 2200)
+      (N 280 1700 2600)  (NG 280 2300 2750) (P 300 800 1750)
+      (T 200 1700 2600)  (K 350 1350 2000)  (F 175 900 4400)
+      (TH 200 1400 2200) (S 200 1300 2500)  (SH 200 1800 2000)
+      (V 175 1100 2400)  (THE 200 1600 2200)(Z 200 1300 2500)
+      (ZH 175 1800 2000) (ZZ 900 2400 3800) (VV 565 1045 2400)))
+                   ;;formant center frequencies for a male speaker
+
+(defun find-phoneme (phoneme form)
+  (loop for i in form do
+    (if (eq phoneme (first i))
+	(return-from find-phoneme (rest i)))))
+
+(defun vox-fun (phons which)
+  (let ((phdata nil)
+	(f1 nil))
+    (loop for x in phons by #'cddr and
+              phoneme in (cdr phons) by #'cddr do
+      (setf phdata (find-phoneme phoneme formants))
+      (push x f1)
+      (push (nth which phdata) f1))
+    (nreverse f1)))
+
+(definstrument vox (beg dur freq amp ampfun freqfun freqscl phonemes formant-amps formant-indices &optional (vibscl .1) (deg 0) (pcrev 0))
+  (let* ((start (floor (* *srate* beg)))
+	 (end (+ start (floor (* *srate* dur))))
+	 (car-os (make-oscil :frequency 0))
+	 (fs (length formant-amps))
+	 (evens (make-array fs))
+	 (odds (make-array fs))
+	 (amps (make-double-array fs))
+	 (indices (make-double-array fs))
+	 (frmfs (make-array fs))
+	 (ampf (make-env :envelope ampfun 
+			 :scaler amp :duration dur))
+	 (freqf (make-env :envelope freqfun :duration dur
+			  :scaler (* freqscl freq)
+			  :offset freq))
+	 (frq 0.0)
+	 (car 0.0)
+	 (frm 0.0)
+	 (frm-int 0)
+	 (frm0 0.0)
+	 (even-amp 0.0)
+	 (odd-amp 0.0)
+	 (even-freq 0.0)
+	 (odd-freq 0.0)
+	 (sum 0.0)
+	 (loc (make-locsig :degree deg :distance 1.0 :reverb pcrev))
+	 (per-vib (make-triangle-wave :frequency 6 :amplitude (* freq vibscl)))
+	 (ran-vib (make-rand-interp :frequency 20 :amplitude (* freq .5 vibscl))))
+    (loop for i from 0 below fs and
+              amp in formant-amps and
+              index in formant-indices do
+      (setf (aref evens i) (make-oscil :frequency 0))
+      (setf (aref odds i) (make-oscil :frequency 0))
+      (setf (aref amps i) (double amp))
+      (setf (aref indices i) (double index)) ;see note below
+      (setf (aref frmfs i) (make-env :envelope (vox-fun phonemes i) :duration dur)))
+    (run
+     (loop for i from start to end do
+       (setf frq (+ (env freqf) (triangle-wave per-vib) (rand-interp ran-vib)))
+       (setf car (oscil car-os (hz->radians frq)))
+       (setf sum 0.0)
+       (dotimes (k fs)
+	 (setf frm (env (aref frmfs k)))
+	 (setf frm0 (/ frm frq))
+	 (setf frm-int (floor frm0))
+	 (if (evenp frm-int)
+	     (progn
+	       (setf even-freq (hz->radians (* frm-int frq)))
+	       (setf odd-freq (hz->radians (* (+ frm-int 1) frq)))
+	       (setf odd-amp (- frm0 frm-int))
+	       (setf even-amp (- 1.0 odd-amp)))
+	   (progn
+	     (setf odd-freq (hz->radians (* frm-int frq)))
+	     (setf even-freq (hz->radians (* (+ frm-int 1) frq)))
+	     (setf even-amp (- frm0 frm-int))
+	     (setf odd-amp (- 1.0 even-amp))))
+	 (incf sum (+ (* (aref amps k) (+ (* even-amp (oscil (aref evens k) (+ even-freq (* (aref indices k) car))))
+					  (* odd-amp (oscil (aref odds k) (+ odd-freq (* (aref indices k) car)))))))))
+       (locsig loc i (* (env ampf) sum))))))
+
+
+;;; (with-sound () (vox 0 2 110 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 UH 25 UH 35 ER 65 ER 75 UH 100 UH) '(.8 .15 .05) '(.005 .0125 .025)))
+;;; (with-sound () (vox 0 2 160 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 UH 25 UH 35 ER 65 ER 75 UH 100 UH) '(.85 .10 .05) '(.005 .0125 .07)))
+;;; (with-sound () (vox 0 2 460 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 UH 25 UH 35 ER 65 ER 75 UH 100 UH) '(.85 .1 .05) '(.005 .0125 .02)))
+;;; (with-sound () (vox 0 2 560 .4 '(0 0 25 1 75 1 100 0) '(0 0 5 .5 10 0 100 1) .1 '(0 OW 25 OW 35 OO 65 OO 75 OW 100 OO) '(.25 .7 .05) '(.1 .0125 .02)))
+
+;;; I believe the indices array should have hz->radians wrapped around the index values

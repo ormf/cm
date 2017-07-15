@@ -1,0 +1,163 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>rts</title>
+</head>
+
+<body>
+<div id="content"> <!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Topic]</dt>
+<span class="syntax">RTS</span></dd>
+</dl>
+
+<p>Support for real-time scheduling (RTS) is currently available for the following
+Lisp implementations:
+</p>
+
+<ul>
+<li>Gauche Scheme</li>
+<li>OpenMCL</li>
+<li>SBCL</li>
+</ul>
+
+<p>To load RTS do:</p>
+
+<blockquote>
+<pre>(<a href="use-system-fn.html">use-system</a> <span class="keyword">:rts</span>)</pre>
+</blockquote>
+
+<p>Loading RTS enables the following set of functions:<p>
+<ul>
+  <li> <a href="rts-fn.html"><code>rts</code></a> </li>
+  <li> <a href="rts-pause-fn.html"><code>rts-pause</code></a> </li>
+  <li> <a href="rts-continue-fn.html"><code>rts-continue</code></a> </li>
+  <li> <a href="rts-hush-fn.html"><code>rts-hush</code></a> </li>
+  <li> <a href="rts-stop-fn.html"><code>rts-stop</code></a> </li>
+  <li> A set of <a href="#tools">non-consing replacements</a> for some CM runtime tools.</li>
+</ul>
+
+<h4>Implementation</h4>
+
+<p> <a href="rts-fn.html"><code>rts</code></a> is a real-time musical process scheduler based on <A href="http://www.llnl.gov/computing/tutorials/pthreads/">POSIX threads</a> that is source
+compatible with CM's non-real time <a href="events-fn.html"><code>events</code></a> scheduler.
+Source compatible means that the exact same <a
+href="process-mac.html"><code>process</code></a> definition can run in
+both environments.  The most visible differences between the two
+schedulers are:</p>
+
+<ul> <li>the REPL is not blocked by <a
+href="rts-fn.html"><code>rts</code></a> while the scheduler is
+running.  </li>
+
+<li> <a href="rts-fn.html"><code>rts</code></a> continues to run until it is
+explicitly stopped, even if its queue is empty.  </li>
+
+<li> <a
+href="sprout-fn.html">sprout</a> can be called interactively from the REPL
+or from a <a href="receive-fn.html">receive hook</a> to add objects to
+<code>rts</code>.  </li>
+
+<li>Object time stamps are ignored during output. That is, setting the time of an object to a  <code>(now)</code> value has no effect on the time that the object is actually output: it is always output at the current time plus any latency in the output stream.</li>
+
+<li>Values returned by <a
+href="now-fn.html">now</a> under RTS reflect the current real time in
+seconds, milliseconds or microseconds, depending on the time format specified to <a href="rts-fn.html"><code>rts</code></a>.</li>
+</ul>
+
+<h4>To Cons or Not To Cons</h4>
+
+<p> Although process definitions do not have to be changed to run
+under <code>rts</code>, real time scheduling does place timing demands
+on software that non-real time scheduling does not. 
+To get maximum accuracy process definitions should avoid unnecessary <em>consing</em> -- creating lots of
+temporary data stuctures (lists, objects, vectors, strings etc), performing floating point arithmetic, or being otherwise wasteful and inefficient. As an alternative, consider running the scheduler in millisecond time format, reusing one event rather than creating new events for each output statement and using integer math.  If you are working with MIDI, consider using low-level,
+consless <a href="midi-topic.html#midi_messages">MIDI messages</a> in place of <a href="midi-cls.html">midi</a> objects. 
+
+</p>
+
+<h4 id="tools">Non-consing Tools</h4>
+
+<p>Some operations in Lisp are inherently "consy", for example
+non-destructive operations on lists or performing math or random
+selection with floating point values. In order to facilite non-consing
+process definition, the RTS system provides non-consing replacements
+for a subset of CM's runtime functions. Obviously, these replacements
+provide only limited functionalty, for example they only return
+integer values.</p>
+
+<dl class="dictsyntax" id="rhythm">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:rhythm</code> <var>ticks</var> [<var>tempo</var>]) </code></dd>
+</dl>
+<p>Returns rhythmic value of <var>ticks</var> and <var>tempo</var> as integer milliseconds. The value of <var>ticks</var> can be an integer or symbol. Integer ticks are interpreted relative to a quarter-note worth 480 ticks, so 240 is one eighth, 960 one half, 320 one triplet quarter, 900 is a quarter tied to a doubly-dotted eighth and so on. If <var>ticks</var> is a symbol it can be one of: <code>w h q e s t x</code> (whole, half, quarter, eighth, sixteenth, thirty-second, sixty-fourth), the triplet variants: <code>tw th tq te ts tt tx</code>, the dotted variants: <code>w. h. q. e. s. t. x.</code> and the doubly-dotted variants.
+</p>
+
+<dl class="dictsyntax" id="rescale">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:rescale</code> <var>x</var> <var>x1</var> <var>x2</var>  <var>y1</var> <var>y2</var><code>)</code></dd>
+</dl>
+<p>Rescales an integer <var>x</var> that lies between integers <var>x1</var> and <var>x2</var> to lie proportionally between integers <var>y1</var> and <var>y2</var>. Rescaling is essentially linear interpolation along a single line segment.</p>
+
+
+<dl class="dictsyntax" id="interpl">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:interpl</code> <var>x</var> <var>list</var>) </code></dd>
+</dl>
+<p>Performs integer linear interpolation of <var>x</var> in a <var>list</var> of integer coordinates (<var>x1 y1 x2 y2 ... xn yn</var>) where <var>x1 ... xn</var> must be in monotonically increasing order and <var>y</var> integers are unordered.</p>
+
+
+<dl class="dictsyntax" id="random-seed">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:random-seed</code> <var>seed</var>)</code></dd>
+</dl>
+<p>Seeds random selection with integer <var>seed</var>. The Common Lisp function <code>(get-universal-time)</code> can be used to provide continuously new <var>seed</var> values. </p>
+
+<dl class="dictsyntax" id="between">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:beween</code> <var>lb</var> <var>ub</var> [<var>avoid</var>]<code>)</code></dd>
+</dl>
+<p>Returns an integer value equal to or greater than the integer <var>lb</var> but less than integer <var>ub</var>. If <var>avoid</var> is provided the value returned by the function will not be equal to it.</p>
+
+<dl class="dictsyntax" id="odds">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:odds</code> <var>pct</var> [<var>true</var>] [<var>false</var>]<code>)</code></dd>
+</dl>
+<p>Returns the <var>true</var> value if a random choice between 0 and 100 is less than <var>pct</var>, which must also lie between 0 and 100 and where 0 means impossiblity and 100 is complete certainty, otherwise returns <val>false</var>. If <var>true</var> or <var>false</var> are not specfied they default to boolean true and false, respectively.</p>
+
+<dl class="dictsyntax" id="drunk">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:drunk</code> <var>num</var> <var>width</var>)</code></dd>
+</dl>
+<p>Returns integer <var>num+width</var> or <var>num-width</var> based on a random choice.</p>
+
+<dl class="dictsyntax" id="shuffle">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">rts:shuffle</code> <var>list</var> [<var>start</var>] [<var>end</var>])</code></dd>
+</dl>
+
+<p>Destructively modifies <var>list</var> by scrambling the order of elements between the <var>start</var> and <var>end</var> positions, which default to 0 and length of <var>list</var>, respectively.</p>
+
+<h4>See also:</h4>
+
+<ul>
+
+<li><a href="rts-fn.html"><code>rts</code></a> [Function]</li>
+
+<li><a href="set-receiver-fn.html"><code>set-receiver!</code></a> [Function]</li>
+
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Rtster -->
+<div id="rtster">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

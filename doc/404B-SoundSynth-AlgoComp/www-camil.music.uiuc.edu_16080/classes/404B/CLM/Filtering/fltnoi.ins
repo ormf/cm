@@ -1,0 +1,29 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+#|
+(definstrument filter-noise (beg dur amp coeffs)
+  (let* ((st (floor (* beg *srate*)))
+	 (noi (make-rand :frequency (* .5 *srate*) :amplitude amp))
+	 (order (length coeffs))
+	 (flA (make-filter :order order
+			   :xcoeffs nil
+			   :ycoeffs nil))
+	 (envs (make-array order))
+	 (nd (+ st (floor (* *srate* dur)))))
+    (loop for e in coeffs and i from 0 do
+      (setf (aref envs i) (make-env :envelope e :duration dur)))
+    (run
+     (loop for i from st to nd do
+       (dotimes (k order)
+	 (setf (aref (flt-b flA) k) (env (aref envs k))))
+       (outa i (filter flA (rand noi)))))))
+
+|#
+(definstrument filter-noise (beg dur amp &key x-coeffs order)
+  (let* ((st (floor (* beg *srate*)))
+         (noi (make-rand :frequency (* .5 *srate*) :amplitude amp))
+         (flA (make-FIR-filter :xcoeffs x-coeffs :order order))
+         (nd (+ st (floor (* *srate* dur)))))
+    (run
+      (loop for i from st to nd do
+        (outa i (FIR-filter flA (rand noi)))))))

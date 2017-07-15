@@ -1,0 +1,245 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>set-receiver!</title>
+</head>
+
+<body>
+<div id="content"> 
+<!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">set-receiver!</code> <var>hook</var> <var>stream</var><code>)</code></dd>
+</dl>
+
+<p>
+Installs <var>hook</var> to receive <var>stream</var> data as soon as
+it arrives from an external application. No values are returned
+by <code>set-receiver!</code> or
+by <var>hook</var>. <!--code>set-receiver!</code>  returns no
+values. --> Receiving remains in effect until canceled by
+ <a href="remove-receiver-fn.html">remove-receiver!</a>.
+</p>
+
+<p>
+ The calling syntax of <var>hook</var> depends on <var>stream</var>:
+
+<ul>
+<li>
+If <var>stream</var> is
+a <a href="portmidi-topic.html#portmidi-stream">portmidi-stream</a>
+then <var>hook</var> is passed two arguments, the values of which
+depend on the <a href="portmidi-topic.html#receive-mode">receive
+mode</a> of <var>stream</var>.
+</li>
+
+<li>
+If <var>stream</var> is
+a <a href="midishare-topic.html#midishare-stream">midishare-stream</a>
+then <var>hook</var> is passed one argument, a <a href="midishare-topic.html#MidiEv">MidiEv</a> foreign object.
+</li>
+
+<li>
+If <var>stream</var> is an <a href="sc-stream.html#">sc-stream</a> then blah blah blah.
+</li>
+
+<li id="generic-receiver">
+If <var>stream</var> is boolean true then <var>hook</var> is a thunk
+(a function of no arguments) that will be called every
+millisecond. The <var>hook</var> is responsible for reading whatever
+ports are necessary. See <a href="receive-fn.html">receive</a> for
+information about explicitly reading input from streams.
+</li>
+</ul>
+
+<h4>Implementation and Limitations:</h4>
+<p>Receiving is  implemented in the following Lisp/OS combinations:
+</p>
+
+<ul>
+<li>OpenMCL on OS X</li>
+<li>SBCL (0.9.0 or higher) on Linux</li>
+<li>CMUCL (19b or higher) on Linux</li>
+<li><span style="color:gray">Gauche Scheme (planned)</span></li>
+</ul>
+
+
+<p>
+From the caller's perspective <var>hook</var> appears to receive data
+asynchronously<!-- and the Lisp REPL is not blocked during
+receiving. --> but actually receiving is always polling in some
+manner; how this polling is implemented depends on what facilities the
+host Lisp provides.  CM utilizes two different strategies for
+implementing non-blocking receiving:
+</p>
+
+
+<ul>
+<li>Periodic polling [OpenMCL, CMUCL, SBCL]: the host Lisp provides the ability to periodically call a function in the main Lisp process without blocking the REPL.</li>
+<li>Threaded polling [OpenMCL, Gauche]: each receiver runs in its own native thread.</li>
+<!-- li>
+Callbacks: the host lisp provides the ability for an external
+application such as GTK or Midishare to call Lisp functions
+asynchronously from a different OS process.
+</li -->
+</ul>
+
+<!-- p>
+Since multiprocessing is not part of the Common Lisp or Scheme
+standards there may be significant differences in how (or how well)
+receiving works across the various Lisp/OS combinations.
+</p -->
+
+<!--  Here is a summary of the various
+strategies that are available as of this writing (July '05):
+</p>
+
+<div class="float" >
+<p class="captxt">
+<span class="floatlabel">Table 1.</span> Implementation of receiving
+strategies in supported Lisp implementations: LT (Lisp threads) NT
+(native threads) PP (periodic polling).
+</p>
+
+<table class="float">
+<tr >
+<td>&nbsp;</td>
+<th class="col" align="center" style="padding-left:2em;padding-right:2em;">Linux</th>
+<th class="col" align="center" style="padding-left:2empadding-right:2em;">OS X</th>
+<th class="col" align="center" style="padding-left:2em;padding-right:2em;">Windows</th>
+</tr>
+<tr><td style="font-weight:bold;">CMUCL</td>    <td align="center">LT, PP</td><td align="center">PP</td><td></td></tr>
+<tr><td style="font-weight:bold;">Gauche</td>   <td align="center">NT    </td><td align="center">NT</td><td></td></tr>
+<tr><td style="font-weight:bold;">LispWorks</td><td align="center">LT   </td><td align="center">NT</td><td align="center">NT</td></tr>
+<tr><td style="font-weight:bold;">OpenMCL</td>  <td align="center">NT, PP</td><td align="center">NT, PP</td><td></td></tr>
+<tr><td style="font-weight:bold;">SBCL</td>     <td align="center">NT<span style="font-size:smaller;vertical-align:super"> 1</span>, PP   </td><td align="center">PP</td><td></td></tr>
+</table>
+
+<p style="font-style:normal;font-size:smaller;">
+<span style="vertical-align:super;">1</span>  Native threads are in alpha release.<br/>
+</p>
+
+
+</div>
+-->
+
+
+<!--
+<p id="args"><code class="entry">foo</code> supports the following [slot initializations:] [keyword arguments:]
+</p>
+
+<dl>
+
+<dt>
+<code class="keyword">:bar</code> <var>number</var>
+</dt>
+<dd>Blah, defaults to zuz.</dd>
+
+<dt>
+<code class="keyword">:baz</code> {<var>list</var> | <var>false</var>}
+</dt>
+<dd>asdf</dd>
+
+</dl>
+-->
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Receiving input from
+Portmidi. 
+</p>
+<pre class="code">
+<span class="comment">;;; open with no latency for interactive work. the input and
+;;; output device ids to open will depend on your MIDI setup.</span>
+
+(<span class="special">define</span> <span class="defined">*pm*</span>
+  (<a href="portmidi-topic.html#portmidi-open">portmidi-open</a> <span class="keyword">:input</span> 1 <span class="keyword">:output</span> 3 <span class="keyword">:latency</span> 0))
+
+<span class="comment">;;; a midi through</span>
+
+(set-receiver! (<span class="special">lambda</span> (mm ms) ms (<a href="output-fn.html">output</a> mm <span class="keyword">:to</span> *pm*))
+               *pm*)
+
+<span class="comment">;;; play your keyboard...then</span>
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *pm*)
+
+<span class="comment">;;; make a harmonizer</span>
+
+(set-receiver!
+  (<span class="special">lambda</span> (mm ms) ms
+    (<span class="special">if</span> (or (<a href="midi-topic.html#note-on-p">note-on-p</a> mm)
+            (<a href="midi-topic.html#note-off-p">note-off-p</a> mm))
+      (<span class="special">let</span> ((k (<a href="middi-topic.html#note-on-key">note-on-key</a> mm)))
+        (<a href="output-fn.html">output</a> mm <span class="keyword">:to</span> *pm*)
+        (<a href="output-fn.html">output</a> (<a href="midi-topic.html#midi-copy-message">midi-copy-message</a> mm <span class="keyword">:data1</span> (+ k 3)) 
+                <span class="keyword">:to</span> *pm*)
+        (<a href="output-fn.html">output</a> (<a href="midi-topic.html#midi-copy-message">midi-copy-message</a> mm <span class="keyword">:data1</span> (+ k 7)) 
+                <span class="keyword">:to</span> *pm*))))
+  *pm*)
+
+<span class="comment">;;; play your keyboard...then</span>
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *pm*)
+
+(<a href="portmidi-topic.html#portmidi-close">portmidi-close</a>)
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Using a receiver to trigger processes in <a href="rts-fn.html"><code>rts</code></a>. 
+</p>
+<pre class="code">
+(<span class="special">define</span> (<span class="defined">tonto</span> len knum wai amp)
+  (<a href="process-mac.html">process</a> repeat len
+           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>)
+                       <span class="keyword">:duration</span> .1 <span class="keyword">:amplitude</span> amp
+                       <span class="keyword">:keynum</span> (<a href="between-fn.html">between</a> knum (+ knum 12)))
+           wait wai))
+
+(<span class="special">define</span> (<span class="defined">trigger</span> mm ms)
+  ms
+  (<span class="special">if</span> (<a href="midi-topic.html#note-on-p">note-on-p</a> mm)
+      (<a href="sprout-fn.html">sprout</a> (tonto 10 (<a href="midi-topic.html#note-on-key">note-on-key</a> mm) .1 
+                     (/ (<a href="midi-topic.html#note-on-velocity">note-on-velocity</a> mm) 127.0)))))
+
+(<span class="special">define</span> <span class="defined">*pm*</span>
+  (<a href="portmidi-open-fn.html">portmidi-open</a> <span class="keyword">:input</span> 1 <span class="keyword">:output</span> 3 <span class="keyword">:latency</span> 0))
+
+(<a href="rts-fn.html">rts</a> #f *pm*)
+
+(set-receiver! #'trigger *pm*)
+
+<span class="comment">;;; play your keyboard...then</span>
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *pm*)
+
+(<a href="rts-stop-fn.html">rts-stop</a>)
+
+(<a href="portmidi-topic.html#portmidi-close">portmidi-close</a>)
+</pre>
+</div>
+<h4>See also:</h4>
+<ul>
+<li><a href="midishare-topic.html">Midishare</a> [Topic]</li>
+<li><a href="portmidi-topic.html">Portmidi</a> [Topic]</li>
+<li><a href="receive-fn.html"><code>receive</code></a> [Function]</li>
+<li><a href="remove-receiver-fn.html"><code>remove-receiver!</code></a>[Function]</li>
+<li><a href="receiverqmk-fn.html"><code>receiver?</code></a> [Function]</li>
+<li><a href="rts-fn.html"><code>rts</code></a> [Function]</li>
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

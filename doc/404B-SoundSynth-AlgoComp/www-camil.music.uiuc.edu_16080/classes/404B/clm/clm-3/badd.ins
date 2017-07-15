@@ -1,0 +1,107 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+;;; additive synthesis courtesy Doug Fulton
+
+(definstrument badd
+  (begin-time dur frequency amplitude
+		    &key
+		    (ampfun '(0 0  1 1  2 0))
+		    (freqfun '(0 0 100 0))
+		    (partials '(1 1))
+		    (degree 45)
+		    (reverb-amount 0)
+		    (distance 1)
+		    (pvibrate 5.0)
+		    (pvibamp 0.012)
+		    (rvibrate 16.0)
+		    (rvibamp .005)
+
+		    ;; Each partial is fuzzed by a random frequency increment
+		    ;; FUZZ expresses the bounds of this randomness in divisions of the octave
+		    (fuzz 36)
+
+		    ;; POWER is a spectrum brightness control analogous to an fm index. 
+		    ;; At 0.0 power, the spectrum isn't altered; increasing power causes
+		    ;; the amplitudes of individual partials to increase exponentially until, at
+		    ;; a power of 1.0, all partials have an amp of 1.0.  Powers beyond
+		    ;; 1.0 "invert" the spectrum.
+		    (power 0.0)
+		    (powerfun ampfun))
+
+  (let* ((siz (floor (/ (length partials) 2)))
+	 (beg (floor (* begin-time *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (locs (make-locsig :degree degree
+			    :reverb reverb-amount
+			    :distance distance))   
+	 (freqenvs (make-array siz))
+	 (plist (make-array siz))
+	 (alist (make-array siz))
+	 (newfreqfun (copy-list freqfun))
+	 (oscils (make-array siz))
+	 (nfuzzsteps 100)
+	 (fuzzstep (if (or (zerop fuzz) (not fuzz))
+		       nil
+		     (/ (- (expt 2 (/ 1 fuzz)) 1) nfuzzsteps)))
+	 (frq-scl (hz->radians frequency))
+	 (rvibfact 0)
+	 (pvibfact 0)
+	 (sum 0.0)
+	 (powerfact 0.0)
+	 (ampenv (make-env ampfun amplitude dur))
+	 (pervib (make-triangle-wave :frequency pvibrate :amplitude (* pvibamp frq-scl)))
+	 (ranvib (make-rand-interp :frequency rvibrate :amplitude (* rvibamp frq-scl)))
+	 (powerenv (make-env :envelope powerfun
+			      :scaler (- power)
+			      :duration dur
+			      :offset 1.0)))
+    
+    (if (oddp (length partials))
+	(error "Odd number of elements in partials array"))
+    
+    (if (oddp (length freqfun))
+	(error "Odd number of elements in freqfun"))
+    
+    (if (> (length newfreqfun) 0)
+	(loop for i below (length newfreqfun) do
+	  (if (oddp i)
+	      (setf (elt newfreqfun i)
+		(* frequency (expt 2 (/ (elt newfreqfun i) 12)))))))
+    
+    (loop for i below siz do
+      (let* ((this-amp (elt partials (+ 1 (* i 2))))
+	     (this-freq (elt partials (* i 2))))
+	
+	(setf (aref oscils i) (make-oscil :frequency 0))
+	(setf (aref alist i) this-amp)
+	(setf (aref plist i) this-freq)
+	(setf (aref freqenvs i)
+	  (make-env
+	   :envelope newfreqfun
+	   :duration dur
+	   :scaler (hz->radians
+		    (+ this-freq
+		       (if fuzzstep
+			   (* fuzzstep (random nfuzzsteps))
+			 0)))))))
+    (run
+     (loop for i from beg to end do
+       (setf sum 0.0)
+       (setf rvibfact (rand-interp ranvib))
+       (setf pvibfact (triangle-wave pervib))
+       (setf powerfact (env powerenv))
+       (dotimes (ktr siz)
+	 (incf sum (* (oscil (aref oscils ktr)
+			     (+ (env (aref freqenvs ktr))
+				(* pvibfact (aref plist ktr))
+				(* rvibfact (aref plist ktr))))
+		      (expt (aref alist ktr) powerfact))))
+       (locsig locs i (* sum (env ampenv)))))))
+
+				
+
+
+
+
+				  
+

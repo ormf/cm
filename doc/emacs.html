@@ -1,0 +1,745 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+  <meta content="text/html; charset=iso-8859-1"
+ http-equiv="content-type"/>
+
+<style type="text/css" media="all">
+@import "css/cm.css";
+</style>
+<title>Running Common Music in Emacs</title>
+</head>
+
+<body>
+<!-- Navbar -->
+<div id="header">
+<div id="logo">
+<img src="img/cmlogosw.png" width="50" height="50" alt="[img/cmlogosw.png]" title=""/>
+</div>
+
+<div class="inv">Navigation:</div>
+<ul class="nav">
+<li class="nav1"><a href="cm.html">Home Page</a></li>
+<li class="navn"><a href="dict/index.html">Dictionary</a></li>
+</ul>
+</div>
+
+<hr class="inv"/>
+<div id="content">
+
+<h1>Running Common Music in Emacs</h1>
+
+<h2>Contents</h2>
+<ol>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#distributions">Recommended Emacs Distributions</a></li>
+<li><a href="#slime">Installing and Configuring SLIME</a></li>
+<li><a href="#running">Running Common Music</a></li>
+<li><a href="#commands">Emacs Command Summary</a></li>
+<li><a href="#info">More Emacs Information</a></li>
+</ol>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>
+The <a href="http://www.gnu.org/software/emacs/emacs.html">Emacs</a>
+and <a href="http://www.xemacs.org">XEmacs</a> program editors
+(jointly referred to as Emacs in this document) can connect to a
+running Common Music image using an add-on package
+called <a href="http://common-lisp.net/project/slime/">SLIME</a>,
+which stands for <em>Superior Lisp Interaction Mode for
+Emacs</em>. SLIME provides a full-featured, Lisp REPL (interpreter)
+with its own command history, remote evaluation services from Emacs
+Lisp-mode buffers, and a host of useful Lisp development
+tools. <!-- The Lisp side of Slime, called Swank, provides the actual
+connection between Emacs and the Common Music image is started as
+an <em>inferior process</em>, or sub-process, of Emacs using
+the <span class="emacscmd">M-x</span> cm command. -->
+</p>
+
+<p>Note that if you are on OS X and have Aquamacs Emacs or Carbon
+Emacs installed (see below), you can simply download the latest CM
+application bundle and double-click it to start using CM with all
+the <a href="install.html#programs">bundled Lisp systems</a> without
+having to perform any of the installation steps described here or in
+the document <a href="install.html">Installing Common Music</a>.</p>
+
+<h2 id="distributions">Recommended Emacs Distributions</h2>
+
+<p> For best results install one of these Emacs distributions: </p>
+
+<ul>
+
+<li>Linux: <a href="http://www.xemacs.org/Download/index.html">XEmacs</a></li>
+
+<li>OS X: <a href="http://aquamacs.org/">Aquamacs Emacs</a> (a very Mac-like Emacs) or <a href="http://homepage.mac.com/zenitani/emacs-e.html">Carbon Emacs</a></li>
+
+<li>Windows XP: <a href="http://www.xemacs.org/Download/win32/">XEmacs
+for Windows</a>. Download using their <a
+href="http://www.xemacs.org/Download/win32/netinstaller.html#installation">net
+install method</a> with this <a
+href="http://www.xemacs.org/Download/win32/setup.exe">setup.exe</a>.
+(Cygwin install available on the same page.)  </li>
+
+</ul>
+
+<h2 id="slime">Installing and Configuring SLIME</h2>
+
+<p> Follow the download directions on the <a
+href="http://common-lisp.net/project/slime/">SLIME homepage</a> to
+install the sources on your machine. SLIME is under active development
+so it would be best to use their CVS installation method.  </p>
+
+<p>In order to work with Common Music using SLIME you must first add a
+few customizations to your personal <em>emacs initialization
+file</em>. Every time Emacs starts it reads your initialization file
+to set up the editing environment exactly the way you want it to
+be. Emacs names this init file ~/.emacs, that is, the file named
+.emacs in your home directory.  XEmacs uses ~/.xemacs/init.el, that
+is, the file named init.el in the .xemacs/ subdirectory of your home
+folder. Note that pathnames that start with a dot (like .emacs and
+.xemacs/) are <em>invisible</em> files on OS X and Linux so you cannot
+see them in the Finder window or in a normal directory listing.</p>
+
+<p>How to configure Emacs for SLIME and CM:</p>
+
+<ol>
+  <li><p>Start Emacs and use the keyboard command <span
+class="emacscmd"><span class="emacskey">C-x</span> <span
+class="emacskey">C-f</span> ~/.emacs</span> to create or edit your
+initialization file. (See the section <a href="#commands">Emacs Command
+Summary</a> for more information about Emacs keyboard commands.)</p></li>
+
+<li><p>Add the following code to your init file, replacing the
+pathname strings <span class="string">"/path/to/slime"</span>, <span
+class="string">"/path/to/cm/</span> with the correct paths to the
+slime/ and cm/ installation directories on your machine.</p>
+
+<pre class="code">
+(add-to-list 'load-path <span class="string">"/path/to/slime/"</span>)
+(add-to-list 'load-path <span class="string">"/path/to/cm/"</span>)
+(load "etc/xemacs/cm.el")
+(enable-cm-commands)
+</pre>
+
+<p>See <a href="#editing">Lisp Editing and Remote Evaluation</a> to
+learn more about the effects of <code>enable-cm-commands</code>.  If
+you do not want to use the extra features that CM provides simply
+comment the line out.</p> </li>
+
+<li><p>Save the file (<span class="emacscmd"><span class="emacskey">C-x</span> <span class="emacskey">C-s</span></span>) and  quit Emacs (<span class="emacscmd"><span class="emacskey">C-x</span> <span class="emacskey">C-c</span></span>). Your changes will take effect the next time you start Emacs.</p></li>
+
+</ol>
+
+<h2>Running Common Music</h2>
+
+<p> To run Common Music in SLIME start Emacs and type the keyboard command:
+<blockquote>
+<p><span class="emacscmd"><span class="emacskey">M-x</span> cm</span> </p>
+</blockquote>
+
+<p> Watch as a new window opens and Common Music is loaded in the
+Slime REPL. Once the REPL is fully loaded you should see the Common
+Music logo in the REPL:</p>
+
+<div class="float">
+  <pre class="shell">; SLIME 2006-03-24
+<span style="color: tan;">
+ /\\\          
+---\\\---------
+----\\\--------
+----/\\\------- Common Music 2.8.0
+---/--\\\------
+--/----\\\-----
+ /      \\\/  
+</span>
+<span style="color:purple;">CL-USER&gt;</span>
+; No value
+<span style="color:purple;">CM&gt;</span> <span style="color: red;">|</span>
+</pre>
+</div>
+
+<p> To kill the current Common Music session type the command:
+<blockquote>
+<p><span class="emacscmd"><span class="emacskey">M-x</span> kill-cm</span> </p>
+</blockquote>
+
+<h3>Basic REPL Interaction</h3>
+
+<p> The term REPL stands for <em>Read Eval Print loop</em>.  Lisp
+expressions are typed at the <em>insertion point</em> located just to
+the right of the latest input prompt. When the <span
+class="emacscmd">&lt;return&gt;</span> key is pressed, Lisp first
+reads the input, then evaluates it and finally prints the results back
+in the REPL on the next line. Any previous input can be copied to the
+insertion point by placing the cursor inside the input expression and
+then typing <span class="emacscmd">&lt;return&gt;</span>. The copied
+expression can then be edited at the listening point using regular
+Emacs editing commands. Press the <span
+class="emacscmd">&lt;return&gt;</span> key again to enter it into
+Lisp.  The Listener records each input expression in its <em>input
+history list</em>.  Previous input expressions can be recalled from
+the history list using <span class="emacscmd"><span
+class="emacskey">C-&uarr;</span></span> to move backward and <span
+class="emacscmd"><span class="emacskey">C-&darr;</span></span> to move
+forward through the list. Use <span
+class="emacscmd">&lt;return&gt;</span> to reenter the desired input.
+</p>
+
+<p>To summarize:</p>
+
+<ul>
+
+  <li>Type <span class="emacscmd"><span class="emacskey">M-x</span> cm</span> to start the CM application.</p>
+  <li>Type expressions just after the Lisp prompt and press <span
+  class="emacscmd">&lt;return&gt;</span> to enter them.</li>
+
+  <li>Copy visible input expressions to the insertion point by clicking on them and typing <span
+  class="emacscmd">&lt;return&gt;</span>.</li>
+  <li> Use <span
+  class="emacscmd"><span class="emacskey">C-&uarr;</span></span> to cycle backward through your
+  input history until you find an expression, then type <span class="emacscmd">&lt;return&gt;</span> to enter it.  The command
+  <span class="emacscmd"><span class="emacskey">C-&darr;</span></span> goes forward through the
+  input history.
+
+  <li>To abort from an error break type  <span class="emacscmd">q</span> in the error window.
+
+  <li>You can type <span class="emacscmd"><span class="emacskey">M-&lt;return&gt;</span></span> to
+automatically close all open parenthesis and evaluate a function call
+expression.</li>
+
+  <li>To kill the Common Music session, type <span class="emacscmd"><span class="emacskey">M-x</span> kill-cm</span></li>
+
+</ul>
+
+<h3 id="editing">Lisp Editing and Remote Evaluation</h3>
+
+<p> The real power of SLIME only become apparent when you start
+editing Lisp code inside an Emacs editing buffer. SLIME's Lisp editing
+commands are installed in the SLIME menu visible in the Emacs menubar
+whenever you select a Lisp buffer. The SLIME menu has many fancy
+commands that help you edit Lisp code and develop programs; here are a
+few of the most commonly used items:</p>
+
+<ul>
+  <li> <span class="emacscmd"><span
+class="emacskey">C-x</span> <span class="emacskey">C-e</span></span> evaluates the Lisp expression before point. Results of the evaluation appear in the mini-buffer, not in the REPL.</li>
+
+  <li>The <span class="emacscmd">&lt;tab&gt;</span> key indents lines
+ according to Lisp syntax. It also performs <em>symbol
+  completion</em>. For example, type <code>(ampli</code><span
+  class="emacscmd"></code>&lt;tab&gt;</span> to autocomplete:
+  <code>(amplitude</code> </li>
+
+  <li> The first space typed after a function name in a function call
+  will display the arguments to the function in the minibuffer. For
+  example, type <code>(rhythm</code><span
+  class="emacscmd">&lt;space&gt;</span> to see the arguments to Common Music's
+  <a href="dict/rhythm-fn.html">rhythm</a> function.</li>
+
+  <li>The command <span class="emacscmd"><span class="emacskey">M-.</span></span> edits the
+  definition of the lisp function or variable at point (under the
+  cursor) if SLIME can find it. </li>
+</ul>
+
+
+<p>Common Music documentation is installed in the SLIME menu under
+SLIME>Documentation>Common Music. The Lookup... menu item will display
+the dictionary entry of the CM function or variable at point in your
+web browser's window.</p>
+
+<p> If you add <code>(enable-cm-commands)</code> to your .emacs file
+then the following commands are activated: </p>
+
+<ul>
+
+<li> <span class="emacscmd"><span
+class="emacskey">C-x</span> <span class="emacskey">C-e</span></span>
+(and <span class="emacscmd"><span class="emacskey">Apple-e</span></span> on OS X) evaluates expressions at point, before point, around point or in the selected region. </li>
+
+<li> <span class="emacscmd">&lt;f8&gt;</span> (function key 8) toggles between the REPL and the last Lisp buffer you were editing.</li>
+
+<li> <span class="emacscmd">&lt;tab&gt;</span> indents lines and whole regions according Lisp rules.</li>
+
+<li> <span class="emacscmd"><span class="emacskey">C-c</span> <span class="emacskey">C-d</span> c</span> displays CM dictionary documentation about the CM symbol at point. </li>
+
+</ul>
+
+<h4>SLIME Editing Tips</h4>
+
+<p> Finally, here are a few tips for beginning SLIME users:
+</p>
+
+<ul>
+  <li> The very first form in your Lisp file or buffer should be <code>(in-package <span class="keyword">:cm</span>)</code> or else SLIME will not evaluate expressions in the CM package, even if the REPL package is set to CM. It is good Lisp practice to put an <code>in-package</code> declaration at the top of every source file.</li>
+
+  <li> When you evaluate an expression in a Lisp editing buffer the return value is printed in the mini-buffer at the bottom of the edit window, <em>not</em> in the REPL. </li>
+
+  <li> In order to eval CM expressions the status line at the bottom of the edit window should say (Slime:cm) and the SLIME menu should be visible in the menubar.
+
+<li>The command <span class="emacscmd"><span
+class="emacskey">M-x</span> lisp-mode</span> will force any Emacs
+buffer into a Lisp editing buffer, even if the buffer does not
+contain Lisp code. </li>
+
+</ul>
+  
+<h2 id="commands">Emacs Command Summary</h2>
+
+<p> Although Emacs supports point-and-click editing operations just
+like any word processor, its real power lies in its <em>keyboard
+commands</em> &mdash; short keystroke combinations that invoke the
+powerful editing, formatting and cursor motion capabilities of the
+editor. Emacs keyboard commands are formed by holding down the
+<em>control</em> and/or <em>meta</em> keys while typing a keystroke
+that identified the command.  The control key is located in the lower
+left-hand corner of the keyboard.  The location of the meta key varies
+with computers; it is usually found either to the left of the spacebar
+(Windows) or just to the right of the control key (Aquamacs).
+<!-- The Emacs initialization file for this class sets Meta to be the
+key immediately to the right of Control key. This arrangement
+allows Apple's Command key to continue its normal function as the
+generic OS X shortcut key. -->
+</p>
+ 
+<p> Emacs documentation refer to the control and meta keys using
+shorthand names <span class="emacscmd">C-</span> and <span
+class="emacscmd">M-</span> respectively. In this documentation,
+underlines indicate keystrokes that are typed with the control and/or
+meta keys depressed. For example: </p>
+
+<ul>
+<li>
+<span class="emacscmd"><span class="emacskey">C-h</span></span> means to hold down the control key while you type
+the <span class="emacscmd">h</span> key.
+</li>
+
+<li>
+<span class="emacscmd"><span class="emacskey">C-x</span> <span class="emacskey">C-s</span></span>
+means to hold down the control key as you type the <span
+class="emacscmd">x</span> key, hold control down
+while you type the <span class="emacscmd">s</span> key.
+
+</li>
+
+<li>
+<span class="emacscmd"><span class="emacskey">M-x</span></span> means
+to hold down the meta key while you type <span
+class="emacscmd">x</span>.
+</li>
+
+<li>
+<span class="emacscmd"><span class="emacskey">C-M-f</span></span>
+means to hold down both control and meta while you type <span
+class="emacscmd">f</span>.
+</li>
+
+<li>
+<span class="emacscmd"><span class="emacskey">C-h</span> t</span>
+means to first type <span class="emacscmd"><span
+class="emacskey">C-h</span></span>, then <em>release</em> the control
+key and type just the <span class="emacscmd">t</span> key.
+</li>
+
+<li>
+<span class="emacscmd"><span class="emacskey">M-x</span>
+lisp-mode</span> means to hold down meta while you type <span
+class="emacscmd">x</span>, then release both keys and type the
+word <span class="emacscmd">lisp-mode</span>.
+</li>
+
+</ul>
+
+<h3>Cursor Motion Commands</h3>
+
+<table class="float" width="75%">
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-f</span></span></td>
+  <td>forward one character</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-b</span></span></td>
+
+  <td>back one character</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-p</span></span></td>
+  <td>previous line</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-n</span></span></td>
+
+  <td>next line</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-a</span></span></td>
+  <td>beginning of line</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-e</span></span></td>
+
+  <td>end of the line</td>
+</tr>
+
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-f</span></span></td>
+  <td>forward one word</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-b</span></span></td>
+
+  <td>back one word</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-M-f</span></span></td>
+  <td>forward one expression</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-M-b</span></span></td>
+
+  <td>back one expression</td>
+</tr>
+
+</table>
+
+
+<h3>Scrolling Commands</h3>
+
+<table class="float" width="75%">
+
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-v</span></span></td>
+  <td>down one screenfull</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-v</span></span></td>
+  <td>up one screenfull</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-&gt;</span></span></td>
+  <td>beginning of file</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-&lt;</span></span></td>
+  <td>end of file</td>
+
+</tr>
+
+</table>
+
+
+<h3>Editing Commands</h3>
+
+<table class="float" width="75%" >
+
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td >
+
+    <span class="emacscmd"><span class="emacskey">C-g</span></span>
+  </td>
+  <td >abort current command</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-d</span></span></td>
+  <td>delete character</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-d</span></span></td>
+  <td>delete word</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-M-d</span></span></td>
+  <td>delete expression</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-k</span></span></td>
+  <td>kill (cut) to end of line, keep in pasteboard</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-<em>spacebar</em></span></span></td>
+  <td>set the <em>mark</em>, the starting position of a region.</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-w</span></span></td>
+  <td>cut from mark to here, keep in pasteboard</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-w</span></span></td>
+  <td>copy from mark to here, keep in pasteboard</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-y</span></span></td>
+  <td>yank back last thing in pasteboard</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-s</span></span></td>
+  <td>interactive text search</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-%</span></span></td>
+  <td>interactive search and replace</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-]</span></span></td>
+  <td>abort recursive editing mode</td>
+
+</tr>
+
+</table>
+
+
+<h3>File Commands</h3>
+
+<table class="float" width="75%" >
+
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x C-f</span></span></td>
+
+  <td>open file (new or existing)</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x C-s</span></span></td>
+  <td>save buffer changes</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x C-w</span></span></td>
+
+  <td>write buffer to new name</td>
+</tr>
+
+<tr>
+  <td >
+    <span class="emacscmd"><span class="emacskey">M-x</span> revert-buffer</span>
+  </td>
+  <td >throw away buffer changes and reload file</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x C-c</span></span></td>
+  <td>exit emacs</td>
+</tr>
+
+</table>
+
+<h3>Buffer and Window Commands</h3>
+
+<table class="float" width="75%" >
+
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x k</span></span></td>
+  <td>kill current buffer</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x b</span></span></td>
+
+  <td>switch to buffer</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x C-b</span></span></td>
+  <td>list all buffers</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x</span> 1</span></td>
+
+  <td>only one window</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-x</span> 2</span></td>
+  <td>two windows</td>
+</tr>
+
+<tr>
+
+  <td><span class="emacscmd"><span class="emacskey">C-x</span> o</span></td>
+  <td>other window</td>
+</tr>
+
+</table>
+
+<h3>Help Commands</h3>
+
+<table class="float" width="75%" >
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-h ?</span></span></td>
+  <td>list  help commands</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-h b</span></span></td>
+  <td>list all keyboard commands</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-h b</span></span></td>
+  <td>describe a key command</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-h t</span></span></td>
+  <td>online tutorial</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">C-h a</span></span></td>
+  <td>apropos word</td>
+</tr>
+
+</table>
+
+<h3>Directory Editing</h3>
+
+<table class="float" width="75%" >
+
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-x</span> dired</span></td>
+  <td>start up directory editor</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd">return</span></td>
+  <td>edit file or enter directory</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd">d</span></td>
+  <td>mark file for deletion</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd">u</span></td>
+  <td>un-mark file for deletion</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd">x</span></td>
+  <td>Really expunge files marked for deletion</td>
+
+</tr>
+
+</table>
+
+<h3>FuN CoMmAnDs</h3>
+
+<table class="float" width="75%" >
+<tr><th class="lcol">Command</th> <th class="lcol">Meaning</th></tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-x</span> doctor</span></td>
+
+  <td>find out why nobody likes you</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-x</span> life</span></td>
+  <td>Game Of Life (cellular automaton)</td>
+</tr>
+
+<tr>
+
+  <td><span class="emacscmd"><span class="emacskey">M-x</span> yow</span></td>
+  <td>words of wisdom from Zippy the Pinhead</td>
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-x</span> dunnet</span></td>
+  <td>text-based adventure game</td>
+
+</tr>
+
+<tr>
+  <td><span class="emacscmd"><span class="emacskey">M-x</span> spook</span></td>
+  <td>scary CIA anarchistic somebody shoot me!</td>
+</tr>
+</table>
+
+<h2 id="info">More Emacs Information</h2>
+
+<p>
+In order to become an efficient Emacs Lisp user you should spend
+several hours familiarizing yourself with Emacs and its keyboard
+commands.  Here are some places you can start:</p>
+
+<ul>
+
+<li>
+Perform the interactive Emacs Tutorial, available from the Help menu
+or by typing the command <span class="emacscmd"><span
+class="emacskey">C-h</span> t</span>
+</li>
+
+<li>
+<a href="http://www.xemacs.org/Documentation/21.5/html/new-users-guide.html">
+Getting Started With XEmacs</a>
+</li>
+
+<li>
+<a href="http://www.gnu.org/software/emacs/manual/html_chapter/emacs_toc.html">
+The Emacs Manual</a>
+</li>
+
+<li>
+<a href="http://www.gnu.org/software/emacs/elisp-manual/html_chapter/elisp.html#SEC_Top">
+The GNU Emacs Lisp Reference Manual</a>
+</li>
+</ul>
+
+</div> <!-- end content -->
+<div id="footer">
+<div id="author">H. Taube</div>
+<div id="cvs-info">$Name$: $Source$ ($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
+

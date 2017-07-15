@@ -1,0 +1,81 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument jc-reverb
+		(startime dur
+			  &key (low-pass nil) 
+			  (volume 1.0)
+			  (double nil)
+			  (delay1 .013) 
+			  (delay2 .011)
+			  (delay3 .015)
+			  (delay4 .017)
+			  (amp-env nil))
+  (let* ((allpass1 (make-all-pass -0.700 0.700 1051))
+	 (allpass2 (make-all-pass -0.700 0.700  337))
+	 (allpass3 (make-all-pass -0.700 0.700  113))
+	 (comb1 (make-comb 0.742 4799))
+	 (comb2 (make-comb 0.733 4999))
+	 (comb3 (make-comb 0.715 5399))
+	 (comb4 (make-comb 0.697 5801))
+	 (chan2 (> (mus-channels *output*) 1))
+	 (chan4 (= (mus-channels *output*) 4))
+	 (outdel1 (make-delay (* delay1 *srate*)))
+	 (outdel2 (if chan2 (make-delay (* delay2 *srate*))))
+	 (outdel3 (if (or double chan4) (make-delay (* delay3 *srate*))))
+	 (outdel4 (if (or chan4 (and double chan2)) (make-delay (* delay4 *srate*))))
+	 (allpass-sum 0.0)
+	 (comb-sum 0.0)
+	 (comb-sum-1 0.0)
+	 (comb-sum-2 0.0)
+	 (all-sums 0.0)
+	 (delA 0.0)
+	 (delB 0.0)
+	 (envA (if amp-env (make-env :envelope amp-env :scaler volume :duration dur)))
+	 (vol volume)
+	 (beg (floor (* startime *srate*)))
+	 (end (+ beg (floor (* dur *srate*)))))
+    (if (and double chan4) (warn "jc-reverb is not set up for doubled reverb in quad"))
+    (run
+     (loop for i from beg to end do
+       (declare (type float allpass-sum comb-sum comb-sum-1 comb-sum-2 all-sums delA delB vol)
+		(type :boolean low-pass double chan2 chan4))
+       (let ((ho (ina i *reverb*)))
+	 (setf allpass-sum (all-pass allpass3
+				     (all-pass allpass2
+					       (all-pass allpass1 ho)))))
+       (setf comb-sum-2 comb-sum-1)
+       (setf comb-sum-1 comb-sum)
+       (setf comb-sum 
+	 (+ (comb comb1 allpass-sum)
+	    (comb comb2 allpass-sum)
+	    (comb comb3 allpass-sum)
+	    (comb comb4 allpass-sum)))
+       (if low-pass
+	   (setf all-sums (+ (* .25 (+ comb-sum comb-sum-2)) (* .5 comb-sum-1)))
+	 (setf all-sums comb-sum))
+       ;; "modified least squares low pass filter"
+       (setf delA (delay outdel1 all-sums))
+       (if double (incf delA (delay outdel3 all-sums)))
+       (if envA (setf vol (env envA)))
+       (outa i (* vol delA))
+       (when chan2
+	 (setf delB (delay outdel2 all-sums))
+	 (if double (incf delB (delay outdel4 all-sums)))
+	 (outb i (* vol delB))
+	 (when chan4
+	   (outc i (* vol (delay outdel3 all-sums)))
+	   (outd i (* vol (delay outdel4 all-sums)))))))
+    ))
+  
+#|
+another reverb from 1978 used:
+
+srate 12800:
+all-pass 347 .7
+all-pass 113  .7
+all-pass 37 .7
+comb 1601 .802
+comb 1856 .773
+comb 2053 .753
+comb 2251 .753 
+|#

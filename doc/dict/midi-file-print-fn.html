@@ -1,0 +1,107 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>midi-file-print</title>
+</head>
+
+<body>
+<div id="content"> <!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">midi-file-print</code> <var>midifile</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+<p>
+Prints the contents of <var>midifile</var> to a stream and returns <var>midifile</var> as its value.
+</p>
+
+<p id="args"><code class="entry">midi-file-print</code> supports the following keyword arguments:
+</p>
+
+<dl>
+
+<dt>
+<code class="keyword">:stream</code> {<var>stream</var>}
+</dt>
+<dd>The stream to print <var>midifile</var> to. The default value is the standard output.</dd>
+<dt>
+<code class="keyword">:track</code> <var>number</var>
+</dt>
+<dd>The MIDI track number to print. The default value is 0.</dd>
+</dl>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Printing the contents of a MIDI file to the standard output.
+</p>
+<pre class="code">
+(<span class="special">define</span> (<span class="defined">simp</span> reps)
+  (<a href="process-mac.html">process</a> repeat reps
+           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>)
+                       <span class="keyword">:duration</span> 1
+                       <span class="keyword">:keynum</span> (<a href="between-fn.html">between</a> 50 90))
+           wait .5))
+
+(<a href="events-fn.html">events</a> (list (<a href="new-mac.html">new</a> <a href="midi-program-change-cls.html">midi-program-change</a> <span class="keyword">:time</span> 0 <span class="keyword">:program</span> 30)
+              (simp 12))
+        <span class="string">"test.mid"</span> <span class="keyword">:timesig</span> '(2 4) <span class="keyword">:tempo</span> 120)
+<span class="result">&rArr;</span> <span class="string">"test.mid"</span>
+
+(midi-file-print "test.mid")
+File: test.mid 
+Format: 0
+Tracks: 1
+Division: 480
+Track 0, length 123
+       0 #&lt;Tempo Change 500 ms&gt;
+       0 #&lt;Time Signature 2/4 (24 clocks, 8 32nds)&gt;
+       0 #&lt;Program-Change 0 "distortion-guitar"&gt;
+       0 #&lt;Note-On 0 53 64&gt;
+     240 #&lt;Note-On 0 62 64&gt;
+     240 #&lt;Note-Off 0 53 127&gt;
+       0 #&lt;Note-On 0 88 64&gt;
+     240 #&lt;Note-Off 0 62 127&gt;
+       0 #&lt;Note-On 0 74 64&gt;
+     240 #&lt;Note-Off 0 88 127&gt;
+       0 #&lt;Note-On 0 64 64&gt;
+     240 #&lt;Note-Off 0 74 127&gt;
+       0 #&lt;Note-On 0 57 64&gt;
+     240 #&lt;Note-Off 0 64 127&gt;
+       0 #&lt;Note-On 0 68 64&gt;
+     240 #&lt;Note-Off 0 57 127&gt;
+       0 #&lt;Note-On 0 70 64&gt;
+     240 #&lt;Note-Off 0 68 127&gt;
+       0 #&lt;Note-On 0 77 64&gt;
+     240 #&lt;Note-Off 0 70 127&gt;
+       0 #&lt;Note-On 0 81 64&gt;
+     240 #&lt;Note-Off 0 77 127&gt;
+       0 #&lt;Note-On 0 62 64&gt;
+     240 #&lt;Note-Off 0 81 127&gt;
+       0 #&lt;Note-On 0 68 64&gt;
+     240 #&lt;Note-Off 0 62 127&gt;
+     240 #&lt;Note-Off 0 68 127&gt
+<span class="result">&rArr;</span> <span class="string">"test.mid"</span>
+</pre>
+</div>
+<h4>See also:</h4>
+<ul>
+<li><a href="midi-topic.html">MIDI</a> [Topic]</li>
+<li><a href="dumposc-fn.html"><code>dumposc</code></a> [Function]</li>
+<li><a href="import-events-fn.html"><code>import-events</code></a> [Function]</li>
+
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>output</title>
+</head>
+<body>
+<div id="content">
+
+
+<!-- Entry: "output" -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">output</code> <var>object</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+
+<p>
+Outputs <var>object</var> according to keyword arguments. Returns no values.
+
+<p id="args"><code class="entry">output</code> supports the following keyword arguments:
+</p>
+
+<dl>
+<dt><code class="keyword">:to</code> <var>stream</var></dt>
+<dd>
+The open output stream to write object to. The default value
+is <code>*out*</code>, the stream specified
+to <a href="events-fn.html">events</a>
+or <a href="rts-fn.html">rts</a>.
+</dd>
+
+<dt><code class="keyword">:at</code> <var>number</var></dt>
+<dd>The output time of <var>object</var>.
+Use this argument to supply a score time for objects
+like <a href="midi-topic.html#midi_messages">midi messages</a> that do
+not have methods defined on <code>object-time</code>.
+</dd>
+</dl>
+
+<p><code>output</code> is also available as a <a href="process-mac.html">process</a> clause.
+</p>
+
+
+<!-- See also -->
+<h4>See Also:</h4>
+<ul>
+<li><a href="events-fn.html"><code>events</code></a> [Function]</li>
+<li><a href="now-fn.html"><code>now</code></a> [Function]</li>
+<li><a href="process-mac.html"><code>process</code></a> [Macro]</li>
+<li><a href="rts-fn.html"><code>rts</code></a> [Function]</li>
+<li><a href="sprout-fn.html"><code>sprout</code></a> [Function]</li>
+<li><a href="wait-fn.html"><code>wait</code></a> [Function]</li>
+</ul>
+
+
+</div>
+<hr class="inv"/>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
+
+

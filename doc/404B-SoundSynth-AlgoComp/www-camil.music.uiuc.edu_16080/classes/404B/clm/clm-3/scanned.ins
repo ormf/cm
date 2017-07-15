@@ -1,0 +1,451 @@
+;;;********************************************************************
+;;;
+;;;  Scanned synthesis Instrument: 
+;;;  this is a simplification of the underlying table-filling routine
+;;;  for "scanned synthesis"
+;;;  based on Bill Verplank and Max Mathews paper
+;;;  "Scan Synthesis", Proc. of ICMC-2001 Berlin 
+;;;
+;;;
+;;;  This instrument by Juan Reyes with help from Bill Schottstaedt
+;;;                              Craig Sapp, Fernando Lopez-Lezcano
+;;;
+;;;  Sept-2004: Added haptic force, centering, damping factor envelopes, 
+;;;  Dec -2004: MVM's Initial conditions
+;;; 
+;;;********************************************************************
+(definstrument scanned (start dur freq amp 
+			      &key
+			      (pts 256)    ;; number of masses in string
+			      (recompute-samps 192) 
+			      (scale 1)
+			      (wave 1) ;; 1 = Full cycle Cosine, 2 = Full Cycle Sine 3 = Simple Pluck
+			      ;;          4 = Triangular,       5 = Pulse    6 = Unidirectional Pulse
+			      ;;          7 = Another Pulse,    8 = Sawtooth 9 = Inverted Sawtooth
+			      ;;          10 = Exponential      11 = Random Centering
+			      ;;          12 = Overtones        13 = Henon
+			      ;;
+			      (tension t)  ;; Tension=t ON; nil = off
+			      (rampcentering t) ;; Centering=t ON
+			      (damp-env '(0 0 25 75 50 5 100 20)) ;; Damping envelope
+			      (cent-env '(0 0 50 1.25 100 0)) ;; Centering envelope
+			      ) 
+  ;; 
+  (multiple-value-bind (beg end) (times->samples start dur)
+    (let* (
+	   (x0  (make-double-array pts   :initial-element 0.0d0))
+	   (x1  (make-double-array pts   :initial-element 0.0d0))
+	   (x2  (make-double-array pts   :initial-element 0.0d0))
+	   (p1  (make-double-array pts   :initial-element 0.0d0))
+	   (p2  (make-double-array pts   :initial-element 0.0d0))
+	   (p3  (make-double-array pts   :initial-element 0.0d0))
+	   (p4  (make-double-array pts   :initial-element 0.0d0))
+	   (d   (make-double-array pts   :initial-element 0.0d0))
+	   (invM (make-double-array pts   :initial-element 0.0d0))
+	   (f   (make-double-array pts   :initial-element 0.0d0))
+	   (c   (make-double-array pts   :initial-element 0.0d0))
+	   (xf  (make-double-array pts   :initial-element 1.0d0))
+	   (mm  6.0)    ;; initial mass
+	   (ff  0.25)   ;; initial haptics
+	   (cc  0.2)    ;; Centering
+	   (dd  0.06)   ;; initial damping
+	   (s 1.125)
+	   (ss (* s s))
+	   (dpts (- pts 2))
+	   (hpts (/ pts 2))
+	   (qpts (/ pts 4))
+	   (gen1 (make-table-lookup :frequency (* scale  freq) :wave x1))
+	   (gen2 (make-table-lookup :frequency (* scale  freq) :wave x2))
+	   (dyt2 (make-env :envelope damp-env :scaler .01 :duration dur ))
+	   (dxt2 (make-env :envelope cent-env :scaler .10 :duration  dur))
+	   (k 0)
+	   (kincr  (/ 1.0 recompute-samps)))
+      ;;
+      ;;;;;;;;;;;;;;;;;;;; waveforms for different timbres
+      ;;                   modify or create your own
+      ;;                   beware of initial conditions 
+      ;;
+      ;;
+      ;; here are some examples
+      ;;
+      (cond ((= wave 1) ;; full cycle Cosine Wave
+	     (progn
+	       (do ((i 0 (1+ i))) 
+		   ((= i pts))
+		 (let ((val  (* 0.5 (sin (/ (* 2.0 pi  (+ i qpts )) (- dpts 1))))))
+		   (setf (aref x1 i ) val)))
+	       (setf mm 6.0)
+	       (setf ff 0.25)
+	       (setf cc 0.02)
+	       (setf dd .07)
+	       ))
+	    ;;
+	    ((= wave 2) ;; full cycle Sine Wave
+	     (progn
+	       (do ((i 0 (1+ i))) 
+		   ((= i pts))
+		 (let ((val  (* 0.5 (sin (/ (* 2.0 pi i) (- dpts 1))))))
+		   (setf (aref x1 i ) val)))
+	       (setf mm 6.0)
+	       (setf ff 0.25)
+	       (setf cc 0.02)
+	       (setf dd .07)
+	       ))
+	    ;;
+	    ((= wave 3) ;;Simple Pluck
+	     (progn
+	       ;;(format t ";;; Simple pluck  ~f~%" dur )
+	       (let ((seg1 (floor (/ pts 7)))
+		     (dseg1 (/ pts 7))
+		     (count 0))
+		 (do ((i 0 (1+ i))) 
+		     ((= i pts))
+		   (setf count i)
+		   (if (<= count (/ pts 9))
+		       (progn (setf (aref x1 i) (double  (/ i seg1 ))))
+		     (progn (setf (aref x1 i)
+				  (double (+ 1 (- 1.00 (/ (- i dseg1) (- pts dseg1)))))) ))
+		   )) 
+	       (setf mm 6.1)
+	       (setf ff 0.25)
+	       (setf cc 0.02)
+	       (setf dd .075)
+	       ))
+	    ((= wave 4)  ;; triangular wave
+	     (progn
+	       (do ((i 0 (1+ i))) 
+		   ((= i pts))
+		 (cond ((<= i qpts )
+			(setf (aref x1 i) (double (/ i hpts))))
+		       ((and (> i qpts) (<= i hpts))
+			(setf (aref x1 i) (double (/ (- i (* 2 (- i qpts))) hpts)) ))
+		       ((and (> i hpts) (<= i (* 3 qpts)))
+			(setf (aref x1 i) (double (/ (- hpts i) hpts))))
+		       ((> i (* 3 qpts))
+			(setf (aref x1 i) (double (/ (- (* 2 (- i hpts)) i) hpts))  ))))
+	       (setf mm 1.0)
+	       (setf ff 0.25)
+	       (setf cc 0.0001)
+	       (setf dd .006)
+	       ))
+	    ;;
+	    ((= wave 5)  ;; Pulse
+	     (progn
+	       (setf (aref x1 (- hpts 9)) (* .1 (double  1.000))) 
+	       (setf (aref x1 (- hpts 8)) (* .1 (double  2.000)))
+	       (setf (aref x1 (- hpts 7)) (* .1 (double  3.000)))
+	       (setf (aref x1 (- hpts 6)) (* .1 (double  4.000)))
+	       (setf (aref x1 (- hpts 5)) (* .1 (double  5.00)))
+	       (setf (aref x1 (- hpts 4)) (* .1 (double  6.00)))
+	       (setf (aref x1 (- hpts 3)) (* .1 (double  7.00)))
+	       (setf (aref x1 (- hpts 2)) (* .1 (double  8.00)))
+	       (setf (aref x1 (- hpts 1)) (* .1 (double  9.00)))
+	       (setf (aref x1 (+ hpts 0)) (* .1 (double  9.900)))
+	       (setf (aref x1 (+ hpts 1)) (* .1 (double  9.00)) )
+	       (setf (aref x1 (+ hpts 2)) (* .1 (double  8.00)))
+	       (setf (aref x1 (+ hpts 3)) (* .1 (double  7.00)) )
+	       (setf (aref x1 (+ hpts 4)) (* .1 (double  6.00)))
+	       (setf (aref x1 (+ hpts 5)) (* .1 (double  5.00)) )
+	       (setf (aref x1 (+ hpts 6)) (* .1 (double  4.00)))
+	       (setf (aref x1 (+ hpts 7)) (* .1 (double  3.00)) )
+	       (setf (aref x1 (+ hpts 8)) (* .1 (double  2.00)) )
+	       (setf (aref x1 (+ hpts 9)) (* .1 (double  1.00)) )
+	       ;;
+	       ;;
+	       (setf mm 1.0)
+	       (setf ff 0.25)
+	       (setf cc 0.0000)
+	       (setf dd .006)
+	       ))
+	    ;;
+	    ((= wave 6)  ;;Unidirectional Pulse
+	     (progn
+	       (do ((i 0 (1+ i)))
+		   ((= i pts))
+		 (cond ((< i qpts )
+			(setf (aref x1 i) (double (* .5 1))))
+		       ((and (>= i qpts) (< i hpts))
+			(setf (aref x1 i) (double (* .5 (/ (- i qpts) hpts)))))
+		       ((and (>= i hpts) (< i (* 3 qpts)))
+		      (setf (aref x1 i) (double (* .5 (/ (- (* 3 qpts) i)  hpts)))))
+		       ((>= i (* 3 qpts))
+			(setf (aref x1 i) (* .5 (double 1))))
+		     ))
+	       (setf mm 1.0)
+	       (setf ff 0.25)
+	       (setf cc 0.0000)
+	       (setf dd .006)
+	       ))
+	    ;;
+	    ((= wave 7) ;; Another Pulse
+	     (progn
+	       (do ((i 0 (1+ i)))
+		   ((= i pts))
+		 (cond ((< i qpts )
+			(setf (aref x1 i) (double 1)))
+		     ((and (>= i qpts) (< i hpts))
+		      (setf (aref x1 i) (double (/ (- i qpts) qpts))))
+		     ((and (>= i hpts) (< i (* 3 qpts)))
+		      (setf (aref x1 i) (double (/ (- (* 3 qpts) i)  qpts))))
+		     ((>= i (* 3 qpts))
+		      (setf (aref x1 i) (double 1)))
+		     ))
+	       (setf mm 1.0)
+	       (setf ff 0.5)
+	       (setf cc 0.00)
+	       (setf dd .02)
+	     ))
+	    ;;
+	    ((= wave 8)  ;; sawtooth
+	     (progn
+	       (setf (aref x1 0) (double 0.00))
+	       (setf (aref x1 1) (double (* .01 20.00)))
+	       (setf (aref x1 2) (double (* .01 40.00)))
+	       (setf (aref x1 3) (double (* .01 60.00)))
+	       (setf (aref x1 4) (double (* .01 80.00)))
+	       (do ((i 5 (1+ i)))
+		   ((= i pts))
+		 (setf (aref x1 i) (double (- 1 (/ (- i 5) (- pts 6.0)))))
+		 )
+	       (setf mm 6.0)
+	       (setf ff 0.25)
+	       (setf cc 0.02)
+	       (setf dd .05)
+	       
+	       ))
+	    ;;
+	    ((= wave 9)  ;; Inverted Sawtooth
+	     (progn
+	       (do ((i 0 (1+ i)))
+		   ((= i pts))
+		 (cond ((< i qpts )
+			(setf (aref x1 i) (double 0)))
+		       ((and (>= i qpts) (<= i hpts))
+			(setf (aref x1 i) (double (/ (* .1 qpts (- hpts i)) pts))))
+		       ((and (> i hpts) (<= i (* 3 qpts)))
+			(setf (aref x1 i) (double (/ (* .1 qpts (- i hpts)) pts))))
+		       ((> i (* 3 qpts))
+			(setf (aref x1 i) (double 0)))
+		       ))
+	       (setf mm 6.0)
+	       (setf ff 0.25)
+	       (setf cc 0.002)
+	       (setf dd .05)
+	     ))
+	    ;;
+	    ((= wave 10)  ;; Exponential Wave
+	     (progn
+	       (do ((i 0 (1+ i)))
+		   ((= i pts))
+		 (let* ((qpts (double (/ pts 4))))
+		   (cond ((<= i (* 3 qpts ) )
+			  (setf (aref x1 i) (double (* (- (exp (/ i (* 3 hpts))) 1) .579 ))))
+			 ((> (* 3 qpts))
+			  (setf (aref x1 i) (double (/ (- pts i) qpts)))) )
+		   ))
+	       (setf mm 8.0)
+	       (setf ff 0.025)
+	       (setf cc 0.0001)
+	       (setf dd .26)
+	     ))
+	    ;;
+	    ((= wave 11)  ;; Random Centering
+	     (progn
+	       (do ((i 0 (1+ i)))
+		   ((= i pts))
+		 (cond ((= i 0)
+			(setf (aref x1 i) (double 0)))
+		       ((oddp i)
+			(setf (aref x1 i) (double (random 0.4800212))))
+		       ((evenp i)
+			(setf (aref x1 i) (* -1 (double (random 0.5200212)))))
+		     ))
+	       (setf mm 12.0)
+	       (setf ff 0.00)
+	       (setf cc 0.002)
+	       (setf dd .024)
+	     ))
+	    ;;
+	    ((= wave 12)  ;; Cosine
+	     (progn
+	       (do ((i 0 (1+ i))) 
+		   ((= i pts))
+		 (let* ((pts2 (double (/ pts 2)))
+			(dpts4 (* dpts .25))
+			(val  (double (* .5 (- 1 (sin  (/ (* 2 pi (+ i dpts4 )) pts2)))))))
+		   (setf (aref x1 i ) val)
+		   ))
+	       (setf mm 8.0)
+	       (setf ff 0.25)
+	       (setf cc 0.001)
+	       (setf dd .024)
+	     ))
+	    ;;
+	    ;;
+	    ((= wave 13) ;; Henon
+	     (progn
+	       (let ((x 0.63135448)
+		     (y 0.18940634)
+		     (a -1.2889 )
+		     (b 0.285))
+		 (do ((i 0 (1+ i)))
+		     ((= i pts))
+		   (setf (aref x1 i) (double (* .25 y) ))
+		   (let ((new-x (+ 1 (* a (* x x)) (* b y))) 
+			 (new-y x))
+		     (setf x new-x)
+		     (setf y new-y) )))
+	       (setf mm 6.0)
+	       (setf ff 0.0025)
+	       (setf cc 0.000)
+	       (setf dd .00005)
+	       ))
+	    )
+      ;;
+      (do ((i 0 (1+ i))) ;;; initialize trajectories and positions
+	  ((= i pts))
+	(setf (aref xf i) (double i)))
+      ;;
+      ;;; Haptic force array
+      ;;
+      (let* ((da (/ pts 2))
+	     (db (/ 2.5 da))
+	     (dc 0.00)
+	     (dd (/ ff 6.0)))
+	(if tension
+	    (progn
+	      (do ((jj 0 (1+ jj))) ;;; generate Haptic Force Array
+		  ((= jj pts ))
+		(setf dc (* db (abs (- (/ pts 2) jj))))
+		(setf (aref f jj) (double (exp (* dc dd))))))
+	  (progn
+	    (do ((jj 0 (1+ jj))) ;;; generate Haptic Force Array
+		((= jj pts ))
+	      (setf (aref f jj) (double ff ) )))
+	  ))
+      
+          
+      ;;;;
+      (do ((jj 0 (1+ jj))) 
+	  ((= jj pts ))
+	(setf (aref invM jj) (double (/ 1 mm)))
+	)
+;;      (format t ";;; ready to loop ~f~%" cc )
+      ;;
+      ;;;;;;;;;;;;;; run - loop
+      ;;
+      (run 
+       (loop for i from beg below end do
+	 ;;
+	 ;; Envelopes for haptics
+	 ;;
+	 (let ((d-ctrl (env dyt2))
+	       (c-ctrl (env dxt2)))
+	   (if (>= k 1.0)
+	       (progn
+		 (setf k 0.0)
+		 ;;
+		 (dotimes (j pts)
+		   ;;
+		   ;; Damping
+		   ;;
+		   (let ((dampctrl 0.00)
+			 (damping 0.00))
+		     (setf dampctrl (- 1 d-ctrl))
+		     (if (> dampctrl 0.00)
+			 (progn
+			   (setf damping (* dampctrl  dd))
+			   )
+		       (progn
+			 (setf damping 0.00)))
+		     (setf (aref d j) (double damping   ))
+		     )
+		   ;;
+		   ;; Centering
+		   ;;
+		   (let ((centerctrl (* (env dxt2)  1.00))
+			 (djk 0.00)
+			 (centering 0.00))
+		     (if (> centerctrl 0.10)
+			 (progn 
+			   (setf centering (* (- 0.90 centerctrl  ) cc))
+			   )
+		       (progn 
+			 (setf centering 0.10)))
+		     (setf djk j )
+		       ;;
+		     (if rampcentering
+			 (progn
+			   (setf (aref c j) (double (* (* centering djk)  (/ 1 pts))))
+			   )
+			 (progn (setf (aref c j) (double centering))) ;; constant centering 
+			 ))
+		    ;; )
+		   
+		   ;; generate p1, p2, and p3 values
+		   (let* ((djk j)
+			  (hjj (/ djk 2))
+			  (invdenom (/ 1 (+ 1.0 (* s (aref d j) (aref invM j)) (* ss (aref c j) (aref invM j))))))
+		     (cond ((<= j hjj)
+			    (setf (aref c j) (double (* cc djk 0.00002))))
+			   (t (setf (aref c j) (double (* cc djk 2.00)))))
+		     (setf (aref p1 j) (- (+ 2 (* s (aref d j) (aref invM j))) (* 2 ss (aref f j) (aref invM j))))
+		     (setf (aref p2 j) (* ss (aref f j) (aref invM j) invdenom))
+		     (setf (aref p3 j) invdenom)
+		     (setf (aref p4 j) (* ss (aref invM j) invdenom)))
+		   ;;
+		   ;; compute-uniform-circular-string
+		   ;;
+		   (setf (aref x0 j) (- (+ (* (aref p1 j) (aref x1 j))
+					   (* (aref p2 j) (+
+							   ;; circle-vect-ref
+							   (if (< (- j 1) 0)
+							       (aref x1 (+ pts (- j 1)))
+							     (if (>= (- j 1) pts)
+							       (aref x1 (- (- j 1) pts))
+							       (aref x1 (- j 1))))
+							   ;; circle-vect-ref
+							   (if (< (+ j 1) 0)
+							       (aref x1 (+ pts (+ j 1)))
+							     (if (>= (+ j 1) pts)
+								 (aref x1 (- (+ j 1) pts))
+							       (aref x1 (+ j 1))))))
+					 (* (aref p4 j)  (aref xf j)))
+					(* (aref p3 j) (aref x2 j))))
+		   ) ;; dotimes damping
+		 ;;
+		 ;;
+		 (dotimes (j pts)
+		 ;; initialize vector X2
+		   (setf (aref x2 j ) 0.0))
+		 (dotimes (j pts)
+		   ;; add contents of vector X1 to vector X2
+		   (let ((sum (+ (aref x2 j) (aref x1 j))))
+		     (setf (aref x2 j) sum) ))
+		 (dotimes (j pts)
+		   ;; initialize vector X1
+		   (setf (aref x1 j ) 0.0))
+		 (dotimes (j pts)
+		 ;; add contents of vector X0 to vector X1
+		   (let ((sum (+ (aref x0 j) (aref x1 j))))
+		     (setf (aref x1 j) sum) )))
+	     (incf k kincr)))
+	   
+	 (let* ((g2 (table-lookup gen2 ))
+		(g1 (table-lookup gen1 )))
+	   (outa i (+ g2 (* k (- g1 g2))))))))))
+  
+;;;(with-sound () (scanned 0 4 400 .8))
+;;; (with-sound () (scanned 0 4 2400 .5 ))
+;;;(with-sound () (scanned 0 2 1600 .8))
+;;;(with-sound () (scanned 0 5 100 .8 :recompute-samps 192))
+;;;(with-sound () (scanned 0 5 400 .8 :recompute-samps 72.0))
+;;;(with-sound () (scanned 0 5 160 .8 :wave 4 :recompute-samps 67 :pts 512))
+;;;(with-sound () (scanned 0 1.25 1960 .5 :wave 6 :recompute-samps 14))
+;;;(with-sound () (scanned 0 1.25 2940 .5 :wave 5 :recompute-samps 224))
+;;;(with-sound () (scanned 0 12 243.125 .5 :wave 2 :recompute-samps 134))
+;;;(with-sound () (scanned 0 .06 8271 .5 :wave 7 :recompute-samps 96))
+;;;(with-sound () (scanned 0 5.06 1002 .5 :wave 7 :recompute-samps 32))
+;;;(with-sound () (scanned 0 4 4900 .8 :wave 10 :recompute-samps 61))
+;;;(with-sound () (scanned 0 5.5 406 .5 :wave 9 :recompute-samps 162))
+;;;(with-sound () (scanned 0 5 99.5 .8 : wave 7 :recompute-samps 221))

@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>sprout</title>
+</head>
+<body>
+<div id="content">
+
+
+<!-- Entry: "sprout" -->
+<dl class="dictsyntax">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">sprout</code> <var>object</var> {<var>keyword</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+<p>
+Inserts <var>object</var> into the scheduler according to keyword
+arguments.  Returns no values. It is an error to
+call <code>sprout</code> if <a href="events-fn.html">events</a>
+or <a href="rts-fn.html">rts</a> is not running.
+If <a href="rts-fn.html">rts</a> is running then <code>sprout</code>
+can be called from the REPL or from inside
+a <a href="set-receiver!-fn.html">receiver hook</a> to add objects to
+the scheduler interactively.
+<p id="args"><code class="entry">sprout</code> supports the following keyword arguments:
+</p>
+
+<dl>
+
+<dt>
+<code class="keyword">:at</code> <var>number</var>
+</dt>
+<dd>The initial start time of object in the scheduler. If the value is
+not specified it defaults to the <code>object-time</code>
+of <var>object,</var> or to
+ <a href="now-fn.html">now</a> if <var>object</var> has no <code>object-time</code> method.</dd>
+</dl>
+
+<p><code>sprout</code> is also available as a <a href="process-mac.html">process</a> clause.
+</p>
+
+<h4>Examples</h4>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Using sprout (clausal form).
+</p>
+<pre class="code">
+(<span class="special">define</span> (<span class="defined">wiggle</span> n lb ub dur rate)
+  (<a href="process-mac.html">process</a> repeat n
+           for k = (<a href="between-fn.html">between</a> lb ub)
+           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>) <span class="keyword">:duration</span> dur <span class="keyword">:keynum</span> k)
+           when (<a href="odds-fn.html">odds</a> .3)
+           sprout (<a href="process-mac.html">process</a> with j = (+ k 12) repeat 12
+                           for l = (<a href="between-fn.html">between</a> j (+ j 7))
+                           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>) <span class="keyword">:keynum</span> l 
+                                        <span class="keyword">:duration</span> .1)
+                           wait .1)
+             at (<a href="now-fn.html">now</a>)
+           wait rate))
+
+(<a href="events-fn.html">events</a> (wiggle 30 50 70 .2 .3) <span class="string">"test.mid"</span>)
+<span class="result">&rArr;</span> <span class="string">"test.mid"</span>
+</pre>
+</div>
+
+
+<p>See <a href="rts-fn.html">rts</a> documentation for examples of
+using <code>sprout</code> interactively.</p>
+
+
+<!-- See also -->
+<h4>See also:</h4>
+<ul>
+<li><a href="events-fn.html"><code>events</code></a> [Function]</li>
+<li><a href="now-fn.html"><code>now</code></a> [Function]</li>
+<li><a href="output-fn.html"><code>output</code></a> [Function]</li>
+<li><a href="process-mac.html"><code>process</code></a> [Macro]</li>
+<li><a href="rts-fn.html"><code>rts</code></a> [Function]</li>
+<li><a href="wait-fn.html"><code>wait</code></a> [Function]</li>
+</ul>
+
+
+</div>
+<hr class="inv"/>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
+
+

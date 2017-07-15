@@ -1,0 +1,545 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; Perry Cook's physical model of the vocal tract as described in:
+;;;
+;;; Cook, Perry R. "Synthesis of the Singing Voice Using a Physically Parameterized Model of the Human Vocal Tract"
+;;;     Published in the Proceedings of the International Computer Music Conference, Ohio 1989 
+;;;     and as Stanford University Department of Music Technical Report Stan-M-57, August 1989.
+;;; 
+;;; ---- "Identification of Control Parameters in an Articulatory Vocal Tract Model, with Applications 
+;;;    to the Synthesis of Singing," Ph.D. Thesis, Stanford University Department of Music Technical Report 
+;;;    Stan-M-68, December 1990.
+;;;
+;;; ----  "SPASM, a Real-time Vocal Tract Physical Model Controller; and Singer, the Companion Software 
+;;;    Synthesis System", Computer Music Journal, vol 17 no 1 Spring 1993.
+;;;
+;;; This code is a translation of Perry Cook's singer implementation originally in C.
+;;; Apparently all Perry's data is aimed at srate=22050.
+
+
+(definstrument singer (beg amp data)
+  ;; data is a list of lists very similar to the sequence of synthesize calls in Perry's original implementation.
+  ;;    Each imbedded list has the form: dur shape glot pitch glotamp noiseamps vibramt.
+  ;;    See below for examples.
+  (let* ((setup (first data))
+	 (durs (loop for dat in data collect (first dat)))
+	 (dur (apply #'+ durs))
+	 (begs (let ((bg beg)) (append (list beg) (loop for x in durs do (incf bg x) collect bg))))
+	 (beg-samps (loop for x in begs collect (round (* x *srate*))))
+	 (change-times (make-array (1+ (length beg-samps)) :element-type 'fixnum :initial-contents (append beg-samps (last beg-samps))))
+	 (shps (loop for dat in data collect (second dat)))
+	 (glts (loop for dat in data collect (third dat)))
+
+	 (pfun (append (list 0.0 (float (* .8 (fourth setup))))
+		       (loop for b in (cdr begs) and dat in data collect (- b beg) collect (float (fourth dat)))))
+	 (gfun (append (list 0.0 0.0)
+		       (loop for b in (cdr begs) and dat in data collect (- b beg) collect (float (fifth dat)))))
+	 (nfun (append (list 0.0 (float (sixth setup)))
+		       (loop for b in (cdr begs) and dat in data collect (- b beg) collect (float (sixth dat)))))
+	 (vfun (append (list 0.0 (float (seventh setup)))
+		       (loop for b in (cdr begs) and dat in data collect (- b beg) collect (float (seventh dat)))))
+	 (noiseamps (make-double-array (length data)
+				:initial-contents (loop for dat in data collect (double (sixth dat)))))
+
+	 (frq-env (make-env :envelope pfun :duration dur))
+	 (vib-env (make-env :envelope vfun :duration dur))
+	 (vib-osc (make-oscil :frequency 6.0))
+	 (glot-env (make-env :envelope gfun :duration dur))
+	 (noise-env (make-env :envelope nfun :duration dur))
+	 (ran-vib (make-rand-interp :frequency 10 :amplitude .02))
+
+	 (tractlength 9)		;length of vocal tract
+	 (shape-data (make-double-array (* (length shps) (+ 8 tractlength))))
+	 (glot-datai (make-array (* 2 (length glts)) :element-type 'fixnum))
+	 (glot-datar (make-double-array (* 2 (length glts)))))
+    (loop for gshp in shps and i from 0 by (+ tractlength 8) do
+      (let ((shp (if (symbolp gshp) (eval gshp) gshp)))
+	(if (not (listp shp))
+	    (error "file-based data is not supported")
+	  (loop for j from i and x in (cdr shp) do (setf (aref shape-data j) (double x))))))
+    (loop for gglt in glts and i from 0 by 2 do
+      (let ((glt (if (symbolp gglt) (eval gglt) gglt)))
+	(if (not (listp glt))
+	    (error "file-based data is not supported")
+	  (progn
+	    (setf (aref glot-datai i) 0) ;=>glot var
+	    (setf (aref glot-datai (+ i 1)) (first glt))
+	    (setf (aref glot-datar i) (double (second glt)))
+	    (setf (aref glot-datar (+ i 1)) (double (third glt)))))))
+    (let* ((table-size 1000)		; size of glottis wave-table
+	   (noseposition 3)
+	   (noselength 6)
+	   (nose-ring-time 1000)	; naso pharynx response decay time
+	   (one-over-two-pi  0.159154943)
+	   (two-pi-over-table-size (/ two-pi table-size))
+	   (table-size-over-sampling-rate (/ table-size *srate*))
+	   (dpole 0.998)
+	   (dgain (- 1.0 dpole))
+	   (tong-hump-pole 0.998)
+	   (tong-hump-gain (- 1.0 tong-hump-pole))
+	   (tong-tip-pole 0.998)
+	   (tong-tip-gain (- 1.0 tong-tip-pole))
+	   (glot-table (make-double-array (1+ table-size)))
+	   (glot-table2 (make-double-array (1+ table-size)))
+	   (gn-table (make-double-array (1+ table-size) :initial-element 0.0))
+	   (gn-gain 0.0)
+	   (gn-out 0.0)
+	   (gn-del (make-double-array 4 :initial-element 0.0))
+	   (gn-coeffs (make-double-array 4 :initial-element 0.0))
+	   (sines (make-double-array 200))
+	   (cosines (make-double-array 200))
+	   (table-increment 0.0)
+	   (table-location 0.0)
+	   (glot-refl-gain 0.7)
+	   (pitch 400.0)
+	   (vibr-amt 0.0)
+	   (last-lip-in 0.0)		;for lip reflection/transmission filter
+	   (last-lip-out 0.0)
+	   (last-lip-refl 0.0)
+	   (lip-refl-gain -0.45)
+	   (noise-gain 0.0)		;for vocal tract noise generator
+	   (noise-input 0.0)
+	   (noise-output 0.0)
+	   (noise-c (make-double-array 4 :initial-element 0.0)) ; net coefficients on delayed outputs
+	   (noise-pos 0)
+	   (fnoiseamp 0.0)
+	   (inz1 0.0)
+	   (inz2 0.0)
+	   (outz (make-double-array 4 :initial-element 0.0)) ; delayed versions of input and output
+	   ;; nasal tract acoustic tube structure
+	   (nose-coeffs (make-double-array noselength :initial-contents '(0.0 -0.29 -0.22 0.0 0.24 0.3571)))
+	   (nose1 (make-double-array noselength :initial-element 0.0))
+	   (nose2 (make-double-array noselength :initial-element 0.0))
+	   (velum-pos 0.0)
+	   (alpha (make-double-array 4 :initial-element 0.0))
+	   (nose-last-minus-refl 0.0)
+	   (nose-last-plus-refl 0.0)
+	   (nose-last-output 0.0)
+	   (nose-filt 0.0)
+	   (nose-filt1 0.0)
+	   (time-nose-closed 1000)	; this is a hack used to determine if we need to calculate the nasal acoustics
+	   ;; vocal tract acoustic tube structure
+	   (radii (make-double-array (+ tractlength 8)
+			      :initial-contents '(1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0
+						  0.7 -0.5 0.0 0.0 0.0 0.0 0.0 0.0 0.0)))
+					; the radii array contains the vocal tract section radii
+					; (tractlength-1 of them), then glottal reflection gain
+					; then lip reflection gain, then noise position, then noise gain,
+					; then noise pole angle, then noise pole radius, 
+					; then noise pole angle2, then noise pole radius2, then velum opening radius
+	   (coeffs (make-double-array tractlength :initial-element 0.0))
+	   (dline1 (make-double-array tractlength :initial-element 0.0))
+	   (dline2 (make-double-array tractlength :initial-element 0.0))
+	   ;; throat radiation low-pass filter
+	   (lt (make-double-array 2 :initial-element 0.0))
+	   (ltcoeff .9995)
+	   (ltgain .05)			; a low order iir filter
+	   (lip-radius   0.0)
+	   (s-glot 0.0)
+	   (s-glot-mix 0.0)
+	   (s-noise 0.0)
+	   (last-tract-plus 0.0)
+	   (initial-noise-position 0.0)
+	   (formant-shift 1.0)
+	   (target-radii (make-double-array (+ tractlength 8)
+				     :initial-contents '(1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0
+							 0.7 -0.5 0.0 0.0 0.0 0.0 0.0 0.0 0.0)))
+	   (radii-poles (make-double-array (+ tractlength 8)
+				    :initial-contents (list dpole ; glottis location
+							    dpole
+							    tong-hump-pole
+							    tong-hump-pole
+							    tong-hump-pole
+							    tong-tip-pole ; tongue region
+							    dpole
+							    dpole ; lip/jaw end
+							    dpole dpole dpole dpole dpole dpole dpole dpole dpole)))
+	   (radii-pole-gains (make-double-array (+ tractlength 8)
+					 :initial-contents (list dgain dgain tong-hump-gain tong-hump-gain tong-hump-gain
+								 tong-tip-gain dgain dgain
+								 dgain dgain dgain dgain dgain dgain dgain dgain dgain)))
+	   (change-radii 0) 
+	   (glotsamp 0.0)
+	   (delta 0.0) 
+	   (temp-arr (make-double-array (+ tractlength 1)))
+	   (new-glot 1)
+	   (first-glot 1)
+	   (new-tract 1)
+	   (first-tract 1)
+	   (offset -1)
+	   (bg (floor (* *srate* beg)))
+	   (nd ;(+ bg (floor (* *srate* dur)))
+	    (aref change-times (1- (length change-times))))
+	   (next-offset bg)
+	   (last-sfd -1)
+	   (last-gfd -1))
+      (run
+       (loop for i from bg below nd do
+	 (declare (type integer table-size noseposition noselength nose-ring-time noise-pos time-nose-closed new-glot
+			first-glot new-tract first-tract offset last-sfd last-gfd))
+	 (declare (type float one-over-two-pi two-pi-over-table-size table-size-over-sampling-rate
+			dpole dgain tong-hump-pole tong-hump-gain tong-tip-pole tong-tip-gain gn-gain
+			gn-out table-incremen table-location glot-refl-gain pitch vibr-amt last-lip-in
+			last-lip-out last-lip-refl lip-refl-gain noise-gain noise-input noise-output fnoiseamp
+			inz1 inz2 velum-pos nose-last-minus-refl nose-last-plus-refl nose-last-output nose-filt
+			nose-filt1 ltcoeff ltgain lip-radius s-glot s-glot-mix s-noise last-tract-plus
+			initial-noise-position formant-shift change-radii glotsamp delta))
+	 (when (= i next-offset)
+	   ;; time to check for new tract shapes, glottal pulse shapes etc.
+	   (incf offset)
+	   (setf fnoiseamp (aref noiseamps offset))
+	   (if (= last-sfd -1)
+	       (setf last-sfd 0)
+	     (let ((new-sfd (+ last-sfd 8 tractlength)))
+	       (loop for j from last-sfd below new-sfd and k from new-sfd do
+		 (if (> (abs (- (aref shape-data j) (aref shape-data k))) .001) (setf new-tract 1)))
+	       (setf last-sfd new-sfd)))
+	   (if (= last-gfd -1)
+	       (setf last-gfd 0)
+	     (let ((new-gfd (+ last-gfd 2)))
+	       (setf last-gfd new-gfd)))
+	   (setf next-offset (aref change-times (+ offset 1))))
+
+	 (when (/= new-tract 0)
+	   (loop for j from last-sfd and k from 0 below (+ tractlength 8) do
+	     (setf (aref target-radii k) (aref shape-data j)))
+	   (when (= first-tract 1)
+	     (loop for k from 0 below (+ tractlength 8) do
+	       (setf (aref radii k) (aref target-radii k))))
+	   (setf change-radii 0)
+	   (setf initial-noise-position (aref radii (+ tractlength 1)))
+	   (loop for j from 0 below (+ tractlength 8) do
+	     (if (> (abs (- (aref target-radii j) (aref radii j))) 0.001) (setf change-radii 1))))
+	 
+	 (when (or (= first-tract 1) (/= change-radii 0))
+	   (when (= new-tract 0)
+	     (loop for j from 0 below (+ tractlength 8) do
+	       (setf (aref radii j) (+ (* (aref radii j) (aref radii-poles j)) (* (aref target-radii j) (aref radii-pole-gains j))))))
+	   ;; set tract shape
+	   (setf (aref temp-arr 0) 1.0)
+	   (loop for j from 1 below tractlength do
+	     (setf (aref temp-arr j) (* (aref radii (- j 1)) (aref radii (- j 1))))
+	     (if (= (aref temp-arr j) 0.0) 
+		 (setf (aref temp-arr j) 1e-10)))
+	   (loop for j from 1 below tractlength do
+	     (setf (aref coeffs j) (/ (- (aref temp-arr (- j 1)) (aref temp-arr j)) (+ (aref temp-arr (- j 1)) (aref temp-arr j)))))
+	   (setf glot-refl-gain (aref radii (- tractlength 1)))
+	   (setf lip-refl-gain (aref radii tractlength))
+	   (setf noise-pos (aref radii (+ tractlength 1)))
+	   (setf noise-gain (aref radii (+ tractlength 2)))
+	   (let* ((temp1 (aref radii (+ tractlength 3)))
+		  (r (aref radii (+ tractlength 4)))
+		  (t2 (aref radii (+ tractlength 5)))
+		  (r2 (aref radii (+ tractlength 6)))
+		  ;; fricative noise generator (set noise angle and radius)
+		  (noise-angle (hz->radians temp1))
+		  (noise-radius r)
+		  (noise-a (* -2.0 (cos (/ noise-angle formant-shift)) noise-radius))
+		  (noise-b (* noise-radius noise-radius))
+		  (noise-angle2 (hz->radians t2))
+		  (noise-radius2 r2)
+		  (noise-a2 (* -2.0 (cos (/ noise-angle2 formant-shift)) noise-radius2))
+		  (noise-b2 (* noise-radius2 noise-radius2)))
+	     (setf (aref noise-c 0) (+ noise-a noise-a2))
+	     (setf (aref noise-c 1) (+ noise-b noise-b2 (* noise-a noise-a2)))
+	     (setf (aref noise-c 2) (+ (* noise-a2 noise-b) (* noise-b2 noise-a)))
+	     (setf (aref noise-c 3) (* noise-b2 noise-b)))
+	   (setf lip-radius (aref radii (- tractlength 2)))
+	   (setf velum-pos (aref radii (+ tractlength 7)))
+	   (let ((leftradius (aref radii (- noseposition 2)))
+		 (velumradius velum-pos)
+		 (rightradius (aref radii (- noseposition 1))))
+	     (let ((temp1 0.0) 
+		   (temp 0.0))
+	       ;; nasal tract (set nasal shape)
+	       (setf temp (- rightradius velumradius))
+	       (if (< temp 0.0) (setf temp 0.0))
+	       (setf (aref alpha 1) (* leftradius leftradius))
+	       (setf (aref alpha 2) (* temp temp))
+	       (setf (aref alpha 3) (* velumradius velumradius))
+	       (setf temp1 (/ 2.0 (+ (aref alpha 1) (aref alpha 2) (aref alpha 3))))
+	       (setf (aref alpha 1) (* (aref alpha 1) temp1))
+	       (setf (aref alpha 2) (* (aref alpha 2) temp1))
+	       (setf (aref alpha 3) (* (aref alpha 3) temp1)))))
+	   
+	 (when (/= new-tract 0)
+	   (setf new-tract 0)
+	   (setf first-tract 0)
+	   (if (or (< s-noise 1.0) (< fnoiseamp 0.0001))
+	       (setf (aref target-radii (+ tractlength 1)) initial-noise-position)))
+	 
+	 (when (/= new-glot 0)
+	   (when (= first-glot 0) 
+	     (loop for i from 0 to table-size do (setf (aref glot-table2 i) (aref glot-table i))))
+	   (let* ((harms (aref glot-datai (+ last-gfd 1)))
+		  (temp1 0.0)
+		  (temp 0.0)
+		  (a (aref glot-datar last-gfd))
+		  (b (aref glot-datar (+ last-gfd 1)))
+		  (a2 (* two-pi a))
+		  (b2 (* two-pi b)))
+	     (setf (aref sines 1) 0.0)
+	     (setf (aref cosines 1) 0.0)
+	     (when (/= b a)
+	       (setf temp (/ one-over-two-pi (- b a)))
+	       (setf temp1 (- 1.0 (cos a2)))
+	       (setf (aref sines 1) (* (+ (cos a2) (* (- (sin a2) (sin b2)) temp)) temp1 one-over-two-pi))
+	       (setf (aref cosines 1) (* (+ (- (sin a2)) (* (- (cos a2) (cos b2)) temp)) temp1 one-over-two-pi)))
+	     (incf (aref sines 1) (* (+ 0.75 (- (cos a2)) (* (cos (* 2 a2)) 0.25)) one-over-two-pi))
+	     (incf (aref cosines 1) (- (* (- (sin a2) (* (sin (* 2 a2)) 0.25)) one-over-two-pi) (* a 0.5)))
+	     (loop for k from 2 to harms and ka2 from (* 2 a2) by a2 and ka1 from a2 by a2 and ka3 from (* 3 a2) by a2 do
+	       (setf (aref sines k) 0.0)
+	       (setf (aref cosines k) 0.0)
+	       (when (/= b a)
+		 (setf temp (/ one-over-two-pi (* (- b a) k)))
+		 (setf (aref sines k) (* (+ (cos ka2) (* (- (sin ka2) (sin (* k b2))) temp)) (/ temp1 k)))
+		 (setf (aref cosines k) (* (+ (- (sin ka2)) (* (- (cos ka2) (cos (* k b2))) temp)) (/ temp1 k))))
+	       (incf (aref sines k) (+ (/ (- 1.0 (cos ka2)) k) (/ (* (- (cos ka1) 1.0) 0.5) (- k 1)) (/ (* (- (cos ka3) 1.0) 0.5) (+ k 1))))
+	       (setf (aref sines k) (* (aref sines k) one-over-two-pi))
+	       (incf (aref cosines k) (- (/ (sin ka2) k) (/ (* (sin ka1) 0.5) (- k 1)) (/ (* (sin ka3) 0.5) (+ k 1))))
+	       (setf (aref cosines k) (* (aref cosines k) one-over-two-pi)))
+	     (loop for j from 0 to table-size and x from 0.0 by two-pi-over-table-size do
+	       (setf (aref glot-table j) 0.0)
+	       (loop for k from 1 to harms do
+		 (incf (aref glot-table j) (+ (* (aref cosines k) (cos (* k x))) (* (aref sines k) (sin (* k x))))))))
+	   (setf s-glot-mix 1.0)
+	   (setf delta (/ 1.0 (- next-offset i)))
+	   (when (/= first-glot 0)
+	     (loop for i from 0 to table-size do (setf (aref glot-table2 i) (aref glot-table i)))
+	     (setf first-glot 0))
+	   (setf new-glot 0))
+	 
+	 (decf s-glot-mix delta)
+	 (setf s-glot (env glot-env))
+	 (setf s-noise (env noise-env))
+	 (setf pitch (env frq-env))
+	 (setf vibr-amt (env vib-env))
+	 (setf table-increment (* pitch (+ 1.0 (* vibr-amt (oscil vib-osc)) (rand-interp ran-vib)) table-size-over-sampling-rate))
+	 (setf last-lip-out (+ last-lip-in last-tract-plus))
+	 (setf last-lip-refl (* (+ last-lip-in last-tract-plus) lip-refl-gain))
+	 (setf last-lip-in last-tract-plus)
+	 ;; next glot tick
+	 (let ((table1 0.0)
+	       (table2 0.0)
+	       (int-loc 0))
+	   (setf glotsamp (* (aref dline2 1) glot-refl-gain))
+	   (when (/= table-increment 0.0)
+	     (incf table-location table-increment)
+	     (when (>= table-location table-size)
+	       (decf table-location table-size))
+	     (setf int-loc (floor table-location))
+	     (setf table1 (aref glot-table int-loc))
+	     (setf table2 (aref glot-table2 int-loc))
+	     (incf glotsamp (* s-glot (+ table1 (* s-glot-mix (- table2 table1)))))
+	     ;; glot noise tick
+	     (when (and (/= (aref gn-table int-loc) 0.0)
+			(/= gn-gain 0.0))
+	       (setf gn-out (- (* gn-gain s-glot (- 1.0 (random 2.0))) ;guessing here about random()
+			       (* (aref gn-coeffs 3) (aref gn-del 3)) 
+			       (* (aref gn-coeffs 2) (aref gn-del 2))
+			       (* (aref gn-coeffs 1) (aref gn-del 1))
+			       (* (aref gn-coeffs 0) (aref gn-del 0))))
+	       (loop for j from 3 downto 1 and k from 2 by -1 do (setf (aref gn-del j) (aref gn-del k)))
+	       (setf (aref gn-del 0) gn-out))
+	     (incf glotsamp (* gn-out (aref gn-table int-loc)))))
+	 
+	 ;; next tract tick
+	 (let ((j 0) (temp1 0.0) (temp 0.0))
+	   (setf (aref lt 0) (+ (aref dline1 2) (aref dline2 2)))
+	   (setf (aref dline2 1) (+ (aref dline2 2) (* (aref coeffs 1) (- glotsamp (aref dline2 2)))))
+	   (setf temp (+ glotsamp (- (aref dline2 1) (aref dline2 2))))
+	   (loop for j from 2 below noseposition do
+	     (setf (aref dline2 j) (+ (aref dline2 (+ j 1)) (* (aref coeffs j) (- (aref dline1 (- j 1)) (aref dline2 (+ j 1))))))
+	     (setf temp1 temp)
+	     (setf temp (+ (aref dline1 (- j 1)) (- (aref dline2 j) (aref dline2 (+ j 1)))))
+	     (setf (aref dline1 (- j 1)) temp1))
+	   (setf j noseposition)	;added
+	   ;;next nasal tick
+	   (let ((plussamp (aref dline1 (- j 1)))
+		 (minussamp (aref dline2 (+ j 1)))
+		 (nose-reftemp 0.0))
+	     (if (and (= velum-pos 0.0)
+		      (>= time-nose-closed nose-ring-time))
+		 (progn
+		   (setf nose-reftemp (+ (* (aref alpha 1) plussamp) (* (aref alpha 2) minussamp) (* (aref alpha 3) (aref nose2 1))))
+		   (setf nose-last-minus-refl (- nose-reftemp plussamp))
+		   (setf nose-last-plus-refl (- nose-reftemp minussamp)))
+	       (progn
+		 (if (/= velum-pos 0.0) (setf time-nose-closed 0) (incf time-nose-closed))
+		 ;; nasal tick
+		 (let* ((nose-t1 0.0)
+			(nose-temp 0.0)
+			(nose-reftemp (+ (* (aref alpha 1) plussamp) (* (aref alpha 2) minussamp) (* (aref alpha 3) (aref nose2 1))))
+			(plus-in (* velum-pos (- nose-reftemp (aref nose2 1)))))
+		   (setf nose-last-minus-refl (- nose-reftemp plussamp))
+		   (setf nose-last-plus-refl (- nose-reftemp minussamp))
+		   (setf nose-reftemp (* (aref nose-coeffs 1) (- plus-in (aref nose2 2))))
+		   (setf (aref nose2 1) (+ (aref nose2 2) nose-reftemp))
+		   (setf nose-temp (+ plus-in nose-reftemp))
+		   (loop for j from 2 below (1- noselength) do
+		     (setf nose-reftemp (* (aref nose-coeffs j) (- (aref nose1 (- j 1)) (aref nose2 (+ j 1)))))
+		     (setf (aref nose2 j) (+ (aref nose2 (+ j 1)) nose-reftemp))
+		     (setf nose-t1 nose-temp)
+		     (setf nose-temp (+ (aref nose1 (- j 1)) nose-reftemp))
+		     (setf (aref nose1 (- j 1)) nose-t1))
+		   (setf nose-reftemp (* (aref nose-coeffs (- noselength 1))
+					 (- (aref nose1 (- noselength 2)) (* nose-last-output 0.25))))
+		   (setf (aref nose2 (- noselength 1)) (+ (* nose-last-output 0.25) nose-reftemp))
+		   (setf (aref nose1 (- noselength 1)) (+ (aref nose1 (- noselength 2)) nose-reftemp))
+		   (setf (aref nose1 (- noselength 2)) nose-temp)
+		   (setf nose-filt1 nose-filt)
+		   (setf nose-filt (aref nose1 (- noselength 1)))
+		   (setf nose-last-output (* (+ nose-filt nose-filt1) 0.5)))))
+	     (setf (aref dline2 j) nose-last-minus-refl))
+	   
+	   (setf temp1 temp)
+	   (setf temp nose-last-plus-refl)
+	   (setf (aref dline1 (- j 1)) temp1)
+	   (loop for j from (+ noseposition 1) below (- tractlength 1) do
+	     (setf (aref dline2 j) (+ (aref dline2 (+ j 1)) (* (aref coeffs j) (- (aref dline1 (- j 1)) (aref dline2 (+ j 1))))))
+	     (setf temp1 temp)
+	     (setf temp (+ (aref dline1 (- j 1)) (- (aref dline2 j) (aref dline2 (+ j 1)))))
+	     (setf (aref dline1 (- j 1)) temp1))
+	   (setf (aref dline2 (- tractlength 1)) (+ last-lip-refl (* (aref coeffs (- tractlength 1)) 
+								     (- (aref dline1 (- tractlength 2)) last-lip-refl))))
+	   (setf (aref dline1 (- tractlength 1)) (+ (aref dline1 (- tractlength 2)) 
+						    (- (aref dline2 (- tractlength 1)) last-lip-refl)))
+	   (setf (aref dline1 (- tractlength 2)) temp)
+	   (when (/= noise-gain 0.0)
+	     (setf noise-input (- 1.0 (random 2.0))) ;a guess
+	     (loop for j from 3 downto 1 and k from 2 by -1 do (setf (aref outz j) (aref outz k)))
+	     (setf (aref outz 0) noise-output)
+	     (setf noise-output (- noise-input inz2))
+	     (loop for i from 0 below 4 do
+	       (decf noise-output (* (aref noise-c i) (aref outz i))))
+	     (setf inz2 inz1)
+	     (setf inz1 noise-input)
+	     (incf (aref dline1 (floor noise-pos)) (* noise-output noise-gain s-noise)))
+	   (setf last-tract-plus (* (aref dline1 (- tractlength 1)) lip-radius)))
+	 (setf (aref lt 1) (* ltgain (+ (aref lt 0) (* ltcoeff (aref lt 1)))))
+	 (outa i (* amp (+ last-lip-out nose-last-output (aref lt 1))))))
+      )))
+
+#|
+(with-sound () (singer 0 .1 '((.4 ehh.shp test.glt 523.0 .8 0.0 .01) (.6 oo.shp test.glt 523.0 .7 .1 .01))))
+
+(with-sound () (singer 0 .1 '((.05 ehh.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.15 ehh.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.05 kkk.shp test.glt 523.0 0.0 0.0 .01) 
+			      (.05 kkk.shp test.glt 523.0 0.0 0.0 .01) 
+			      (.02 kk+.shp test.glt 523.0 0.0 1.0 .01) 
+			      (.08 kk+.shp test.glt 523.0 0.0 0.2 .01) 
+			      (.05 ooo.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.15 ooo.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.05 eee.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.15 eee.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.05 ehh.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.15 ehh.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.05 mmm.shp test.glt 523.0 0.8 0.0 .01) 
+			      (.15 mmm.shp test.glt 523.0 0.8 0.0 .01) 			      
+			      (.10 mmm.shp test.glt 523.0 0.0 0.0 .01) )))
+
+(with-sound () (singer 0 .1 '((.05 ehh.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.15 ehh.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.05 kkk.shp "pistol.snd" 523.0 0.0 0.0 .01) 
+			      (.05 kkk.shp "pistol.snd" 523.0 0.0 0.0 .01) 
+			      (.02 kk+.shp "pistol.snd" 523.0 0.0 1.0 .01) 
+			      (.08 kk+.shp "pistol.snd" 523.0 0.0 0.2 .01) 
+			      (.05 ooo.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.15 ooo.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.05 eee.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.15 eee.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.05 ehh.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.15 ehh.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.05 mmm.shp "pistol.snd" 523.0 0.8 0.0 .01) 
+			      (.15 mmm.shp "pistol.snd" 523.0 0.8 0.0 .01) 			      
+			      (.10 mmm.shp "pistol.snd" 523.0 0.0 0.0 .01) )))
+
+|#
+
+(defvar test.glt (list 10 .65 .65))
+(defvar loud.glt (list 13 .6 .6))
+(defvar soft.glt (list 13 0.65 0.73))
+(defvar wide4.glt (list 18 0.534 0.56))
+(defvar wide5.glt (list 10 0.65 0.65))
+(defvar greekdefault.glt (list 20 0.65 0.672472))
+(defvar lowbass.glt (list 99 0.5 0.17737593))
+
+
+(defvar aa.shp (list 8 0.63110816 0.94615144 1.0756062 0.9254686 0.9928594 0.98307705 1.4507878 0.95167005 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar hh2.shp (list 8 0.928177 0.61326 0.39779 0.530387 0.679558 0.961326 1.44199 1.09392 0.7 -0.203125 1.0 0.0 554.1667 0.8 2000.0 0.772222 0.0))
+(defvar dhh.shp (list 8 0.828729 1.45856 0.9882353 0.662983 0.9352941 1.2529411 0.40588236 1.1740758 0.7 -0.140625 7.0 0.023333002 3039.613 0.691692 1264.1677 0.404788 0.0))
+(defvar aah.shp (list 8 0.8214024 0.7839217 1.0981537 0.9937591 0.817757 1.1907763 1.3149668 1.0705689 0.7 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar hhh.shp (list 8 0.928177 0.61326 0.39779 0.530387 0.679558 0.961326 1.44199 1.09392 0.7 -0.203125 1.0 0.046296295 554.1667 0.8 2000.0 0.7722222 0.0))
+(defvar ohh.shp (list 8 1.02762 0.696133 0.39779 0.513812 0.6371682 1.4070797 1.80663 0.5044248 0.7 -0.2 1.0 0.0 1000.0 0.0 0.0 0.0 0.0))
+(defvar ah.shp (list 8 0.7162393 0.6389201 0.8881412 0.6060006 1.293248 1.4140776 1.8503952 0.8622935 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar oo.shp (list 8 0.46043858 1.0865723 0.33916336 0.88724023 0.9989101 1.224445 0.39867023 0.506609 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar ahh.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 1.65746 1.62431 0.944751 0.7 -0.45 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar ee-.shp (list 8 0.928177 1.37569 1.37569 0.679558 0.629834 0.24817872 0.56896555 0.662983 0.7 -0.403125 1.0 0.0 0.0 0.0 0.0 0.0 0.09677419))
+(defvar hoo.shp (list 8 1.32597 1.29282 0.39779 0.530387 1.32597 1.34254 1.78182 0.46408796 0.7 -0.4 1.0 0.031045755 2215.7856 0.82698005 1026.6984 0.96960765 0.0))
+(defvar ooo.shp (list 8 1.32597 1.29282 0.39779 0.530387 1.32597 1.34254 1.78182 0.464088 0.7 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar ee.shp (list 8 1.02 1.637 1.67 1.558 0.952 0.501 0.681 0.675 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar ih.shp (list 8 0.72092783 1.2719809 1.3881364 0.6532612 0.7501422 0.65654784 0.8194081 0.6556785 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar ee2.shp (list 8 0.9180887 1.3481673 1.3433423 0.74573994 0.593326 0.5647744 0.6692766 0.7419633 0.7 -0.405254 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar ihh.shp (list 8 0.7906788 1.272475 1.4089537 0.68072784 0.62673146 0.7479623 0.7506758 0.7054355 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar open.shp (list 8 3.0 3.0 3.0 3.0 3.0 3.0 3.0 3.0 0.7 -0.45 1.0 0.0 0.0 0.0 1.0 0.0 0.0))
+(defvar thh.shp (list 8 0.828729 1.45856 0.9882353 0.662983 0.9352941 1.2529411 0.40588236 1.1740758 0.7 -0.140625 7.0 0.101764 3039.613 0.691692 1264.1677 0.404788 0.0))
+(defvar aw.shp (list 8 1.0525645 0.643587 0.935229 0.4901642 1.0743295 1.1822895 1.4161918 0.82537806 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar eee.shp (list 8 0.928177 1.37569 1.37569 0.679558 0.629834 0.646409 0.56896555 0.662983 0.7 -0.403125 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar tt+.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.18584079 1.62431 0.944751 0.7 -0.45 6.0 0.388889 10514.583 0.854335 1315.2043 0.280428 0.0))
+(defvar aww.shp (list 8 1.02762 0.696133 0.563536 0.513812 0.977901 1.37569 1.80663 0.712707 0.7 -0.2 1.0 0.0 1000.0 0.0 0.0 0.0 0.0))
+(defvar eee2.shp (list 8 0.928177 1.37569 1.37569 0.679558 0.629834 0.646409 0.5117647 0.662983 0.7 -0.203125 7.3688526 0.0 5214.53 0.975806 0.0 0.0 0.0))
+(defvar jjj.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.1592921 1.1464338 0.944751 0.7 -0.45 6.0 0.098039 2315.7278 0.7089554 3066.7 0.7983351 0.0))
+(defvar ttt.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.0 1.62431 0.944751 0.7 -0.45 6.0 0.388889 10514.583 0.854335 1315.2043 0.280428 0.0))
+(defvar bb2.shp (list 8 1.0 1.0 0.46902645 0.5486725 0.65486723 1.079646 1.3982301 0.0 0.7 -0.2 8.0 0.03 500.0 0.98 0.0 0.0 0.0))
+(defvar eh.shp (list 8 0.7866194 1.1630946 1.2335452 0.93186677 0.94121367 0.7586716 1.3509308 0.8279036 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar kk+.shp (list 8 0.8214024 0.7839217 1.0981537 0.1592921 1.061947 1.1907763 1.3149668 1.0705689 0.7 -0.4 4.0 0.4 2000.0 0.93 0.0 0.0 0.0))
+(defvar pipe1.shp (list 8 1.0 1.0 1.0 0.7 0.7 0.7 0.7 0.7 0.0 0.0 1.0 0.0 100.0 0.0 0.0 0.0 0.0))
+(defvar tzz.shp (list 8 0.828729 1.45856 0.9882353 0.662983 0.9352941 1.2529411 0.40588236 1.1740758 0.7 -0.140625 7.0 0.101764 3039.613 0.691692 1264.1677 0.404788 0.0))
+(defvar bbb.shp (list 8 1.0 1.0 0.46902645 0.5486725 0.65486723 1.079646 1.3982301 0.0 0.7 -0.2 8.0 0.03 500.0 0.98 0.0 0.0 0.0))
+(defvar ehh.shp (list 8 0.682 1.554 1.581 1.367 1.315 1.579 0.843 1.476 0.7 -0.24507 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar kk2.shp (list 8 0.82140243 0.7839217 1.0981537 0.0 1.061947 1.1907763 1.3149668 1.0705689 0.7 -0.4 5.0 0.01 2000.0 0.93 0.0 0.0 0.0))
+(defvar pp+.shp (list 8 1.0 1.0 0.3362832 0.49557513 0.7079646 1.2389379 1.1327434 0.29203534 0.7 -0.2 8.0 0.040740736 0.0 0.89649165 2082.2144 0.8713607 0.0))
+(defvar uhh.shp (list 8 0.928177 0.61326 0.39779 0.530387 0.679558 0.961326 1.44199 1.09392 0.7 -0.203125 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar big.shp (list 8 3.0 3.0 3.0 3.0 3.0 3.0 3.0 3.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0 0.0 0.0))
+(defvar euu.shp (list 8 0.9285748 1.3756071 1.3747121 0.6794088 0.60398144 0.43471563 0.8356653 0.7158814 0.7 -0.403122 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar kkk.shp (list 8 0.8214024 0.7839217 1.0981537 0.0 1.061947 1.1907763 1.3149668 1.0705689 0.7 -0.4 4.0 0.09444445 2000.0 0.93 0.0 0.0 0.0))
+(defvar ppp.shp (list 8 1.0 1.0 0.3362832 0.49557513 0.7079646 1.2389379 1.1327434 0.0 0.7 -0.2 8.0 0.05 500.0 0.98 0.0 0.0 0.0))
+(defvar uu.shp (list 8 0.45291674 1.0539645 0.39576897 0.8116293 1.0510263 1.1789232 0.47529656 0.62563825 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar fff.shp (list 8 0.93787295 0.70496833 0.8969878 0.60815966 0.9375178 0.7412625 1.1285298 0.2665695 0.7 -0.202603 8.0 0.10341219 8236.909 0.945306 79.28094 0.498648 0.0))
+(defvar ll2.shp (list 8 0.928177 0.779006 0.71772796 0.807417 1.02762 1.65746 0.36206907 0.86510503 0.7 -0.258055 1.0 0.0 0.0 0.0 0.0 0.0 0.20806663))
+(defvar uuu.shp (list 8 0.55 0.943094 1.035 0.434071 1.14681 1.487 0.555 0.656 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar lll.shp (list 8 0.928177 0.779006 0.7330638 0.8156748 1.02762 1.65746 0.3620689 0.944751 0.7 -0.103125 1.0 0.0 0.0 0.0 0.0 0.0 0.21774194))
+(defvar rolledr.shp (list 8 0.3365169 0.9244819 1.0542682 0.4485168 1.0597233 0.054845095 0.66896766 0.8336522 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar vvv.shp (list 8 0.9400966 0.6775904 0.88759726 0.59890866 0.9485658 0.737778 1.1542239 0.23893797 0.7 -0.2 8.0 0.5 8500.0 0.95 0.0 0.5 0.0))
+(defvar rolledrc.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.0 1.62431 0.944751 0.7 -0.45 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar mmm.shp (list 8 1.0 1.0 1.0 1.0 1.0 1.0 1.0 0.0 0.7 -0.2 1.0 0.0 0.0 0.0 0.0 0.0 0.503268))
+(defvar rolledro.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.42477876 1.62431 0.944751 0.7 -0.45 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar breath.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 1.65746 1.62431 0.944751 0.7 -0.45 1.0 0.018518519 2588.6013 0.90612125 812.6343 0.9814815 0.0))
+(defvar moo.shp (list 8 1.32597 1.29282 0.39779 0.530387 1.32597 1.34254 1.78182 0.0 0.7 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.30645162))
+(defvar rr2.shp (list 8 0.3365169 0.9244819 1.0542682 0.4485168 1.0597233 0.71856207 0.66896766 0.7274576 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 32.000004 0.0))
+(defvar chh.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.1592921 1.1464338 0.944751 0.7 -0.45 6.0 0.098039 2315.7278 0.7089554 3066.7 0.7983351 0.0))
+(defvar gg2.shp (list 8 0.8214024 0.4122405 0.40788835 0.0 0.8495575 0.7129002 0.7308959 0.7785335 0.7 -0.4 4.0 0.05 2000.0 0.9 0.0 0.0 0.0))
+(defvar nng.shp (list 8 1.0 1.0 1.0333333 0.0 1.0 0.99999994 0.9568965 1.3189656 0.7 -0.2 1.0 0.0 0.0 0.0 0.0 0.0 1.0))
+(defvar rrr.shp (list 8 0.3365169 0.9244819 1.0542682 0.4485168 1.0597233 0.71856207 0.66896766 0.7274576 0.9 -0.4 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar wsp.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 1.65746 1.62431 0.944751 0.7 -0.45 1.0 0.018518519 0.0 0.97 0.0 0.0 0.0))
+(defvar ggg.shp (list 8 0.8214024 0.7839217 1.0981537 0.0 0.8495575 0.7129002 0.7308959 0.7785335 0.7 -0.4 4.0 0.05 2000.0 0.9 0.0 0.0 0.0))
+(defvar nnn.shp (list 8 1.0 1.0 1.0 1.4579439 1.0 0.0 0.9568965 1.3189656 0.7 -0.2 1.0 0.0 0.0 0.0 0.0 0.0 0.503268))
+(defvar sh2.shp (list 8 0.828729 1.45856 0.9882353 0.662983 0.9352941 1.2529411 0.40588236 0.9882353 0.7 -0.140625 7.0 0.0 2451.5984 0.928097 2957.0518 0.883636 0.0))
+(defvar xx2.shp (list 8 0.928177 1.37569 1.37569 0.8495575 0.3451327 0.646409 0.56896555 0.662983 0.7 -0.403125 5.0 0.022222 2102.0833 0.805556 1735.4166 0.759259 0.0))
+(defvar dd2.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.0 0.72165513 0.5996184 0.7 -0.45 6.0 0.02 4851.6665 0.953704 2500.0 0.966296 0.0))
+(defvar ggg1.shp (list 8 0.8214024 0.7839217 1.0981537 0.18584079 1.061947 1.1907763 1.3149668 1.0705689 0.7 -0.4 4.0 0.4 2000.0 0.9 0.0 0.0 0.0))
+(defvar noisahh.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 1.65746 1.62431 0.944751 0.7 -0.45 1.0 0.005 0.0 0.787037 3777.0835 0.759259 0.0))
+(defvar shh.shp (list 8 0.828729 1.45856 0.9882353 0.662983 0.9352941 1.2529411 0.40588236 0.9882353 0.7 -0.140625 7.0 0.023333 2451.5984 0.9280972 2957.0518 0.88363576 0.0))
+(defvar xxx.shp (list 8 0.928177 1.37569 1.37569 0.3451327 0.6371682 0.646409 0.56896555 0.662983 0.7 -0.403125 4.0 0.022222219 2102.0833 0.8055556 612.5 0.7592593 0.0))
+(defvar ddd.shp (list 8 0.928177 0.779006 0.629834 0.629834 1.02762 0.0 0.72165513 0.5996184 0.7 -0.45 6.0 0.02 4851.6665 0.953704 2500.0 0.966296 0.0))
+(defvar gxx.shp (list 8 0.928177 1.37569 1.37569 0.3451327 0.6371682 0.646409 0.56896555 0.662983 0.7 -0.403125 4.0 0.022222 2102.0833 0.805556 612.5 0.759259 0.0))
+(defvar none.shp (list 8 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 0.0 0.0))
+(defvar sss.shp (list 8 0.928177 1.3588235 1.3588235 0.679558 0.61764705 0.63529414 0.31764707 0.65294117 0.7 -0.103125 7.0 0.105292 1500.0 0.916452 4943.75 0.97222227 0.0))
+(defvar zzz.shp (list 8 0.928177 1.3588235 1.3588235 0.679558 0.61764705 0.63529414 0.31764707 0.65294117 0.7 -0.103125 7.0 0.016 1500.0 0.9257112 4943.75 0.925926 0.0))
+
+
+
+
+
+

@@ -1,0 +1,88 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>midi-file</title>
+</head>
+<body>
+<div id="content">
+
+
+<!-- Entry: "midi-file" -->
+<dl class="dictsyntax">
+<dt>[Class]</dt>
+<dd><code class="entry">midi-file</code></dd>
+</dl>
+
+<p>
+A subclass of <a href="midi-stream-cls.html"><code>midi-stream</code></a> that
+implements input and output to MIDI files. A
+<code>midi-file</code> is automatically created when you specify
+a file with a ".midi" or ".mid" extension.
+</p>
+
+<p><code class="entry">midi-file</code> supports the following slot initializations:
+</p>
+<dl>
+
+<dt><code class="keyword">:versioning</code> <var>boolean</var></dt>
+<dd>If true then each time the file is written its output file name
+will include a version number -<var>n</var> appended to its name,
+i.e. test-1.mid, test-2.mid and so on. The version number is
+automatically incremented each time the file is written and insures that
+multiple "takes" of the same file can be generated without overwriting
+the contents of earlier versions.</li>
+
+<dt><code class="keyword">:divisions</code> <var>integer</var></dt>
+<dd>
+The number of divisions per quarter note. Defaults to 480.
+</dd>
+
+<dt><code class="keyword">:tempo</code> <var>number</var></dt>
+<dd>
+The MIDI tempo of the file. Defaults to the tempo of 60 bpm.
+</dd>
+
+
+<dt><code class="keyword">:timesig</code> (<var>numerator</var> <var>denominator</var>)</dt>
+<dd>
+The time signature for the file. Defaults to (4 4). The time signature
+list may contain up to four values: (numerator denominator
+[clocks-per-quarter] [32nds])
+</dd>
+</dl>
+
+<p>
+See <a href="midi-stream-cls.html">midi-stream</a> and <a href="play-fn.html">play</a> for additional keyword initializations.
+</p>
+
+<!-- See also -->
+<h4>See Also:</h4>
+<ul>
+<li><a href="audio-file-cls.html"><code>audio-file</code></a> [Class]</li>
+<li><a href="clm-file-cls.html"><code>clm-file</code></a> [Class]</li>
+<li><a href="cmn-file-cls.html"><code>cmn-file</code></a> [Class]</li>
+<li><a href="io-mac.html"><code>io</code></a> [Macro]</li>
+<li><a href="midi-stream-cls.html"><code>midi-stream</code></a> [Class]</li>
+<li><a href="midishare-stream-cls.html"><code>midishare-stream</code></a> [Class]</li>
+<li><a href="play-fn.html"><code>play</code></a> [Function]</li>
+<li><a href="player-stream-cls.html"><code>player-stream</code></a> [Class]</li>
+<li><a href="sco-file-cls.html"><code>sco-file</code></a> [Class]</li>
+</ul>
+
+
+</div>
+<hr class="inv"/>
+
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
+
+

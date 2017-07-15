@@ -1,0 +1,78 @@
+<html>
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/clm/clm-3/balance.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:46:28 GMT -->
+<head><title>Balance, RMS, Gain</title></head>
+<body bgcolor="#ffffff">
+
+<!--
+;; Written by Sam Heisz, January 1998.
+;; Idea and RMS formulas taken from Csound unit generators 
+;; balance, rms, and gain.
+-->
+
+
+<h4>BALANCE, RMS, GAIN</h4>
+
+<b>Balance</b>, <b>Rms</b> and <b>Gain</b> are used to trace and modify the
+rms value of a signal or signals. <b>Rms</b> traces the rms of a
+signal. <b>Gain</b> modifies a signal so that it has a specified rms
+power. <b>Balance</b> is a combination of the two which modifies a signal so
+that it has rms power equal to that of a compare signal. <b>Balance</b> is
+useful for restoring power to a signal after it has passed through a
+filter.
+
+<pre>
+  <b><i>make-balance</i></b> &amp;optional (<b>hp</b> 10)
+  <b><i>make-rms</i></b> &amp;optional (<b>hp</b> 10)
+  <b><i>make-gain</i></b> &amp;optional (<b>hp</b> 10)
+
+  <a name="balance"><b><i>balance</i></b> <i>b</i> <i>signal</i> <i>compare</i></a>
+  <a name="rms"><b><i>rms</i></b> <i>r</i> <i>signal</i></a>
+  <a name="gain"><b><i>gain</i></b> <i>g</i> <i>signal</i> <i>rms</i></a>
+</pre>
+
+<i>hp</i> is the half-power point (in cps) of a special internal low-pass
+filter.  <b>Balance</b> and <b>gain</b> return a modified signal, <b>rms</b>
+returns the rms of the signal.<p>
+
+Extreme cases will cause spikes in the audio - if this occurs try using a
+gain multiplier to approximate the target rms before applying <b>balance</b>
+or <b>gain</b> to it. It is a good idea to use a multiplier in any case
+because <b>balance</b> and <b>gain</b> work better the less they have to
+gain.</p>
+
+
+The average gain that was applied can be retrieved:
+<pre>
+  <b><i>balance-avg</i></b> <i>b</i>
+  <b><i>gain-avg</i></b> <i>g</i>
+</pre>
+   
+<p>Use <b>Run*</b> and the average functions to suggest a user-supplied
+gain for the next time.</p>
+
+For Example:
+<pre>
+(definstrument formnt-noise (start dur amp 
+		             &amp;key
+                             (freq 440) (r .9) (g 1.0)
+                             (postfilter-gain nil))
+
+  (let* ((st (floor (* start *srate*)))
+	 (nd (+ st (floor (* *srate* dur))))
+	 (rd (make-rand))
+	 (ft (make-formant r freq g))
+	 (postfilter-amp (if postfilter-gain postfilter-gain 1.0))
+	 (bal (<font color="#ff0000">make-balance</font>)))
+    
+    (run* (bal)
+     (loop for i from st to nd do
+       (let ((sig (* amp (rand rd))))
+	 (outa i (<font color="#ff0000">balance</font> bal (* postfilter-amp (formant ft sig)) sig)))))
+    
+    (if (not postfilter-gain) 
+	(format t "~&amp;formnt-noise: specify a :postfiler-gain of ~,5F for best results.~%" (balance-avg bal)))))
+</pre>
+</body>
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/clm/clm-3/balance.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:46:28 GMT -->
+</html>

@@ -1,0 +1,29 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument add-sound (file beg &optional dur
+		                             (orig-beg 0.0) 
+					     (amp 1.0) 
+					     (amp-env '(0 1 100 1))
+					     (rev-amount .1))
+  (let ((f (open-input* file :restartable t)))
+    (unwind-protect
+	(let* ((st (floor (* beg *srate*)))
+	       (new-dur (or dur (- (sound-duration file) orig-beg)))
+	       (amp-val 0.0)
+	       (outa-val 0.0)
+	       (outb-val 0.0)
+	       (orig-start (round (* orig-beg (sound-srate file))))
+	       (rdA (make-readin :file f :start orig-start))
+	       (rdB (if (and (= (mus-channels f) 2) (= (mus-channels *output*) 2))
+			(make-readin :file f :start orig-start :channel 1)))
+	       (ampf (make-env :envelope amp-env :scaler amp :duration new-dur))
+	       (nd (+ st (floor (* *srate* new-dur)))))
+	  (run
+	   (loop for i from st to nd do
+	     (setf amp-val (env ampf))
+	     (setf outa-val (* amp-val (readin rdA)))
+	     (if rdB (setf outb-val (* amp-val (readin rdB))))
+	     (outa i outa-val)
+	     (if *reverb* (outa i (* rev-amount outa-val) *reverb*))
+	     (if rdB (outb i outb-val)))))
+      (close-input f))))

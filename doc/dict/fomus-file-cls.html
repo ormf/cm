@@ -1,0 +1,163 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>fomus-file</title>
+</head>
+
+<body>
+<div id="content"> <!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Class]</dt>
+<dd><code class="entry">fomus-file</code></dd>
+</dl>
+
+<p>
+<p>
+Implements <a href="http://common-lisp.net/project/fomus/">Fomus</a>
+manuscript output
+to <a
+href="http://www.lilypond.org/web/">Lilypond</a>, <a
+href="http://www.musicxml.org/xml.html">MusicXML</a> and Fomus data
+files. This class is automatically chosen when you specify a file with
+a .ly, .xml or .dat extension.  To work with Fomus, load it and then
+compute scores
+using <a
+href="http://common-lisp.net/project/fomus/doc/ch04.html">Fomus
+objects</a>. Use the package prefix <code>fms</code> to reference
+Fomus symbols, for
+example <a
+href="http://common-lisp.net/project/fomus/doc/ch04s02.html">fms:part</a>, <a
+href="http://common-lisp.net/project/fomus/doc/ch04s06.html">fms:note</a>,
+etc.
+</p>
+
+<p id="args"><code class="entry">fomus-file</code> supports the following slot initializations:
+</p>
+
+<dl>
+
+<dt>
+<code class="keyword">:parts</code> {<var>part</var> | <var>list</var>}
+</dt>
+<dd>
+The list
+of <a
+href="file:///Users/hkt/Desktop/fomusdoc/ch04s02.html">fms:part</a>
+objects defining the musical parts to be included in the score.
+</dd>
+
+<dt>
+<code class="keyword">:global</code> {<var>object</var> | <var>list</var>}
+</dt>
+<dd>
+A list
+of <a
+href="http://common-lisp.net/project/fomus/doc/ch05s03.html#setting.global">global</a>
+score objects such as <a href="http://common-lisp.net/project/fomus/doc/ch04s03.html">time signatures</a> and <a href="http://common-lisp.net/project/fomus/doc/ch04s05.html">key signatures</a>.
+</dd>
+
+<dt>
+<code class="keyword">:view</code> <var>boolean</var>
+</dt>
+<dd>If true then Fomus will perform its backend post-processing on the
+computed file, otherwise it will not. The default value is false.</dd>
+</dl>
+
+<p>
+In addition to the initializations listed above,
+all <a href="http://common-lisp.net/project/fomus/doc/ch05.html">Fomus
+keyword settings</a> are also available as keyword initializations
+to <code>fomus-file</code>. There are lots of these Fomus manuscript
+settings to keep track of, the function <code>fms:list-fomus-settings</code> will
+be particularly helpful in this regard.
+</p>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Working with Fomus.
+</p>
+<pre class="code">
+(load <span class="string">"/Lisp/fomus/load"</span>)
+<span class="comment">;; Common Music package detected
+;; FOMUS v0.1.1
+;; Lisp music notation formatter
+;; Copyright (c) 2005 David Psenicka, All Rights Reserved
+;; See file "COPYING" for terms of use and distribution.</span>
+
+<span class="result">&rArr;</span> #P<span class="string">"/Lisp/fomus/load.lisp"</span>
+
+<span class="comment">;;; use rational tempo and beat values to avoid rhythmic quantization
+;;; errors.</span>
+
+(<span class="special">defparameter</span> <span class="defined">*tempo*</span> 60)
+
+(<span class="special">defparameter</span> <span class="defined">*beat*</span> 1/4)
+
+(<span class="special">defparameter</span> <span class="defined">*ins*</span>  (<a href="new-mac.html">new</a> fms:part <span class="keyword">:instr</span> '<span class="keyword">:piano</span>
+                          <span class="keyword">:partid</span> '<span class="keyword">:piano</span> ))
+
+(<span class="special">defun</span> <span class="defined">ranpiano</span> (len lb ub )
+  (<a href="process-mac.html">process</a> repeat len
+           for r = (<a href="rhythm-fn.html">rhythm</a> (<a href="pick-fn.html">pick</a> 1/4 1/8 1/16))
+           output (<a href="new-mac.html">new</a> fms:note <span class="keyword">:off</span> (<a href="now-fn.html">now</a>)
+                      <span class="keyword">:partid</span> '<span class="keyword">:piano</span>
+                      <span class="keyword">:note</span> (<a href="between-fn.html">between</a> lb ub)
+                      <span class="keyword">:dur</span> r)
+           wait r))
+
+(<a href="events-fn.html">events</a> (ranpiano 20 40 80) <span class="string">"test.ly"</span> <span class="keyword">:parts</span> *ins*)
+<span class="result">&rArr;</span> <span class="string">"test.ly"</span>
+
+<span class="comment">;;; quarter tones</span>
+
+(<a href="events-fn.html">events</a> (ranpiano 20 40.0 80.0) <span class="string">"test.ly"</span> <span class="keyword">:parts</span> (list *ins*)
+        <span class="keyword">:quartertones</span> t
+        <span class="keyword">:title</span> <span class="string">"HiHo!"</span>
+        <span class="keyword">:view</span> t <span class="keyword">:composer</span> <span class="string">"Anon."</span>)
+<span class="result">&rArr;</span> <span class="string">"test.ly"</span>
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Manuscripting imported MIDI data.
+</p>
+<pre class="code">
+<span class="comment">;;; best to override tempo maps with tempo 60 so
+;;; Fomus has a fighting chance of parsing the time line correctly.</span>
+
+(<span class="special">defparameter</span> <span class="defined">prelude</span>
+  (<a href="import-events-fn.html">import-events</a> <span class="string">"/Users/hkt/Desktop/Prelude_Suite_no4_BWV1006a_Prelude.mid"</span>
+                 <span class="keyword">:tempo</span> 60 <span class="keyword">:tracks</span> '(1 2)))
+
+<span class="comment">;;; Timesigs and such can be "global" data in Fomus</span>
+
+(<span class="special">defparamater</span> <span class="defined">timesig</span>
+  (<a href="new-mac.html">new</a> fms:timesig <span class="keyword">:off</span> 0 <span class="keyword">:time</span> '(3 4))
+
+(<a href="events-fn.html">events</a> prelude <span class="string">"test.ly"</span> <span class="keyword">:global</span> (list timesig) <span class="keyword">:view</span> t)
+<span class="result">&rArr;</span> <span class="string">"test.ly"</span>
+</pre>
+</div>
+
+
+
+<h4>See also:</h4>
+<ul>
+<li><a href="cmn-file-cls.html"><code>cmn-file</code></a> [Class]</li>
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

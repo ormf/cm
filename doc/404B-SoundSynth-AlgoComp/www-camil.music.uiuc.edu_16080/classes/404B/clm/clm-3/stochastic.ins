@@ -1,0 +1,107 @@
+;; CLM implementation of Xenakis' Dynamic Stochastic Synthesis as heard in
+;; his GENDY3, S.709, Legende d'Eer, etc.
+;; 12/17/03
+;; Bill Sack wsack@buffalo.edu
+
+(definstrument stochastic
+  (start dur &key 
+	 (amp .9) (bits 16) (xmin 1) (xmax 20) (xwig 0) (ywig 0) (xfb 0)
+	 (init-array '((10 0) (10 1) (10 0) (10 -.7) (10 0) (10 .5) 
+			  (10 0) (10 -.3) (10 0) (10 .2) (10 0) (10 -.1))))
+  ;;some explanation of the parameters:
+  ;;amp - scales overall amplitude
+  ;;bits - the resolution of the wave's y dimension
+  ;;xmin - minimum number of samples between time breakpoints. must be equal to or greater than 1
+  (let* ((y 0) (dx 0) (prev-dx 0) (dy 0)
+	 (j 0) (m 0) (dt 0) (output 0) 
+	 (oldy 0) (xdev 0) (xqu 0)(ydev 0) (yqu 0)
+	 (beg (floor (* start *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (b (ash 1 (- bits 1))); because we use signed ints - see (- b) below
+	 (xy-array-d (list (length init-array) (length (first init-array))))
+	 ;;make array to hold x,y breakpoints
+	 (xy-array (make-array xy-array-d
+		      :initial-contents init-array))
+	 (xy-array-i (array-dimension xy-array 0)))
+    ;;converts signed float y values into signed integers
+    (dotimes (num xy-array-i)(setf (aref xy-array num 1) (round (* (aref xy-array num 1) b))))
+    (run
+     (loop for i from beg to end do
+       (when (= dx dt);;when current sample is a breakpoint
+	 (setf y (aref xy-array (mod m xy-array-i) 1)
+	       dx (aref xy-array (mod m xy-array-i) 0)
+	       prev-dx (aref xy-array (mod (- m 1) xy-array-i) 0)
+	       dy (- y oldy)
+	       oldy y
+	       yqu (floor (* .01 b ywig))
+	       ;;straight uniform distribution for y
+	       ydev (- (random (+ 1 (* 2 yqu))) yqu)
+	       xqu xwig
+	       ;;homebrew gaussian stuff for x
+	       xdev (round (* xqu (* (sqrt (* -2.0 (log (- 1 (random 1.0)))))
+				   (cos (* 6.283185307179586 (random 1.0)))))))
+	 (setf (aref xy-array (mod m xy-array-i) 1)
+	       ;;mirror stuff for y 
+	       (cond ((or (< b (+ y ydev))
+			  (> (- b) (+ y ydev)))
+		      (max (min (+ y (- ydev)) b) (- b)))
+		     (t (+ y ydev))))
+	 (setf (aref xy-array (mod m xy-array-i) 0)
+	       ;;mirror stuff for x
+	       (cond ((or  (< (round xmax) (+ dx xdev))
+			   (> (round xmin)(+ dx xdev)))
+		      (max (min ;;this mirror is attentuated
+			    (round (+ (* xfb prev-dx) (* (- 1  xfb) (+ dx (- xdev))))) 
+			    (round xmax)) (round xmin)))
+		     (t (round (+ (* xfb prev-dx)
+				  (* (- 1  xfb) (+ dx xdev)))))))
+	 (incf m)
+	 (setf dt 0))
+       (incf dt)
+       (incf j (/ dy dx));linear interpolation
+       (setf output (/ j b));normalization -1 to 1
+       (outa i (* amp output))))))
+
+;(with-sound ()(stochastic 0 10 :xwig 1.0 :ywig 10.0))
+#|
+;if you have cm-2.4 loaded, evaluate the following 
+;for some gendy3-like noise
+
+(defun ran-list (numx xmn xsp)
+  (let ((qua '()))
+    (loop repeat numx do 
+      (push (list (+ xmn (random (+ 1 xsp))) 0) qua))
+    qua))
+
+(define (two num total-dur)
+  (let ((xnums (new heap :of '(4 5 6 7 8 9 10 12 16))))
+    (process repeat num 
+	     for xnum = (next xnums) 
+	     do
+	     (sprout
+	      (process for sound? = (random 1.0)
+		       for amplitude = (/ 1.0 num)
+		       for timefac = (/ total-dur 8.0)
+		       for dur = (ran :below timefac :type :exp :a 2)
+		       for ywig = (ran :below 50 :type :exp :a 10)
+		       for xwig = (ran :below 10 :type :exp :a 15)
+		       for xmin = (round (ran :from 1 :below 10 :type :exp :a 1))
+		       for x-spread = (round (ran :below 20 :type :exp :a 10))
+		       for numx = xnum
+		       for init-list = (ran-list numx xmin x-spread)
+		       until (< total-dur (now))
+		       do
+		       (when (> sound? .8)
+			 (output (new stochastic start (now) dur (min dur (- total-dur (now))) 
+				      amp amplitude
+				      ywig ywig 
+				      xwig xwig 
+				      xmin xmin
+				      init-array init-list
+				      xmax (+ xmin x-spread))))
+		       wait dur)
+	      (now)))))
+;make 16 'tracks' for 2-1/2 minutes
+;(events (two 16 180) "/zap/test.aiff" :statistics t :srate 44100 :scaled-to .99)
+
+|#

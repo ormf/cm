@@ -1,0 +1,672 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/CLM/Filtering/filtering.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:57 GMT -->
+<head>
+<meta content="text/html; charset=iso-8859-1" http-equiv="content-type">
+<style media="all" type="text/css">
+@import "http://www-camil.music.uiuc.edu:16080/classes/css/cm.css";
+</style><title>Filtering and Delay</title></head>
+
+<body>
+
+
+<div id="content">
+<!-- Title -->
+<h1>Filtering and Delay</h1>
+
+<h3>Digital Filtering</h3>
+
+<p>
+A filters boosts or reduces (attenuates) the amplitude of certain
+frequencies in a signal.  Several types of filters are commonly used
+in audio processing:
+</p>
+
+<ul>
+<li>
+A <i>low-pass</i> filter attenuates higher frequency components
+relative to lower ones.
+</li>
+<li>
+A <i>high-pass</i> filter attenuates lower frequency components
+relative to higher ones.  </li>
+<li>
+A <i>band-pass</i> filter passes a range of frequency components
+through and attenuates the rest.  The pass range is ususally described
+in terms of a <i>center frequency</i> and a <i>bandwidth</i>.
+</li>
+<li>
+A <i>band-reject</i> filter rejects a range of frequency components
+and allows the others to pass through.</li> <li>A <i>comb</i> filter
+alloes multiple frequency ranges to pass through and attenuates the
+rest.
+</li>
+</ul>
+
+<p>
+The portion of the spectrum that the filter does not attenuate is
+called the <em>pass band</em> of the filter. The portion that is
+attenuated (or not boosted) is called the <em>stop band</em>.  In a
+perfect world the pass band and the stop band of a filter would be
+sharply delimited, but in fact filters always <em>transition</em> from
+one band to the other. Some point along this transition curve is
+designated to be the <em>cutoff frequency</em>, the point in the
+spectrum at which the signal's power has been reduced to half its
+value, or -3 dB.  The half-power cutoff value is sometime expressed as
+a .707 amplitude value (since power ranges with the square of the
+amplitude, .707^2 = .5 = half-power attenuation).
+</p>
+
+<p>
+The perceived effect of a filter will vary greatly depending on the
+spectrum of the input signal.  For example, applying a low-pass filter
+to a signal with no high frequencies will have no percievable
+effect. The natural freuency of a comb filter will not "ring" if the
+signal does not contain components near that frequency.  In order to
+work effectivly with filters the composer must first understand the
+spectral makeup of the input signal and then be prepared to experiment
+with various filter parameters to achieve optimal results.
+</p>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span>
+The pass band, cutoff frequency and stop band of a low-pass filter.
+</p>
+<img align="middle" alt="[filt1.jpg]" src="filt1.jpg">
+</div>
+
+<p>
+A band-pass filter has <em>two</em> cutoff frequencies, one on either
+side of a single pass band whose characteristices are determined by
+the filter's <i>center frquenency</i> and <i>bandwidth</i>.  The ratio
+of the center frequency to the bandwidth is called the <i>filter Q</i>
+and determines how resonant the filter is around the center
+frequency. A filter with a high Q is tightly focused and will
+resonate, or "ring" near the center frequency more than a filter with
+a low Q.  Band-pass filters also have a <i>gain</i> factor that
+determines the total amplitude of the resonance. The gain on a filter
+that employs a <i>feedback loop</i> (a comb filter, for examnple) must
+always be less than 1.0 or else filter's output will eventually
+overflow and cause distortion in the output signal.
+</p>
+
+<h3>Filter Response Time</h3>
+
+<p>
+A filter works by controlling the rate of change between samples of
+the signal passing through it.  Higher frequencies have faster rates
+of change than lower ones which means that the <em>slope</em> or
+differences between sample values are larger for higher frequency than
+for slower frequencies.
+
+If a filter only permits a certain maximum rate of change to flow
+through then the amplitudes of the output samples will be altered for
+any rates above that limit in the input signal.  This affects the
+spectrum because the maximum rate of change the filter allows
+determines the maximum slopes that output waveforms can possess.  The
+cutoff frequnecy determimes the maximum slope that the filter.  All
+filters have a time response that is <em>inversly proportinoal</em> to
+the "width" of the filter in the frequency domain.  That is, if the
+filter is exact, or sharp, in the frequency domain then is inexact in
+the time domain: the more narrow the filter, the longer it will
+"ring".  The more "narrow" the filter the lesser the rate of change,
+which means that the "amplitude envelope" of the output signal will
+vary more slowly over time.
+
+
+</p><h3>Frequency and Impulse Response</h3>
+
+A graph such as the one shown in Example 1 is called an <i>amplitude
+vs frequency response curve</i>, it depicts the effects of a filter
+in the frequency domain.  Every type filter has its own characterisitc
+freqeuncy reponse curve and the names of the most common filter types
+(low-pass, comb, etc) indicate the general shape of their response.
+To measure frequency response an input signal of white noise is used
+
+
+because white noise contains all 
+frequencies at equal ampliutudes thus allowing the effects of the filter on the ouput spectrum 
+to be visible over the entire frequency range.
+
+<p>
+The <i>impulse response</i> (IR) of a filter is a measurement of the
+output signal's amplitude in the time domain. To observe the inpulse
+response a single sample containing all frequencys at maximum
+amplitude, called the <i>unit impulse</i> is input into the filter and
+the output signal is measured over time.  According to Fourier's
+theorem, a single frequency, or sine wave, has infinite
+duration. Shorter signals may be created by adding sine waves together
+such that they cancel out at a certain points to create signals of a
+specific duration. The shorter a signal's duration, the more sine
+waves must be added together, and hence, the wider its spectrum. In
+the digital domain a one sample signal contains all the frequencies
+below the Nyqiust limit.
+<!-- Some filters have a very short (local) time effect.Other filters that involing feedback loops may have very long impulse responsetimes. -->
+
+
+</p><h3>Digital filter descriptions</h3>
+
+<p>
+A <i>digital filter</i> is an algorithm whose output spectrum differs
+from its input stream. Since just about the only requirement for a
+filter is that it operate on inputs and outputs almost any piece of
+software can be considered to be a filter!  This includes many common
+processing effects such as delay, chorus, flanging and reverberation.
+</p>
+
+<p>
+Digital filtering is performed on a series of <i>indexed
+samples</i>. For example, for an input signal <var>x</var>
+then <var>x(n)</var> would denote the current input sample
+and <var>x(n-1)</var> references thee last (previous) input
+sample. The <em>filter order</em> indicates how many past values
+involved in the calculation of an output sample. Filter equations are
+typically expressed as a series of indexed samples that are added,
+subtracted and scaled by <i>filter coefficients</i>.  Sample terms can
+reference the input or the output signal of the filter. In filter
+descriptions the input signal is often named <var>x</var>
+while <var>y</var> is used to designate the output signal. Filter
+coefficients are named in a simiar manner: <tt>a</tt> coeffients are
+applied to the input signal and <tt>b</tt> coefficients apply to the
+output signal.
+</p>
+
+<p>
+An filter that references only input terms in the calculation of the
+output signal is called a <i>feed-forward</i> filter.  Such filters
+are also called <i>finite impules response</i> (FIR) filters because
+their impulse reponse is guaranteed to reach zero after a finite
+period of time.
+</p>
+
+<p>
+If a filter references past output values in its calculation of the
+next output it is called a <i>recursive</i>, or <i>feed-backward</i>
+filter. Such filters have an <i>infinite impulse response</i> (IIR)
+because the output may never reach zero. In fact, the <i>gain</i>
+factor for an IIR filters must always be less then 1.0 or else the
+filter will produce amplitude overflow at some point.  IIR filters can
+produce sharp, exponentially shaped response curves. Their drawback is
+that the recursivce "memory" can produce a ringing sound on
+transients.
+</p>
+
+<p>
+As an example of a simple digital filter consider the following
+equation for an averaging low-pass filter:
+</p>
+
+<blockquote> <pre>y(n) = .5*x(n) + .5*x(n-1)</pre>
+</blockquote>
+
+<p>
+This equation implements a low pass filter because averaging has a
+greater effect on numbers with high rates of change than on numbers
+with a low rate of change. For example, if .4 and .6 are averaged the
+result is .5, a value close to both input numbers.  However, .1 and .9
+also average to .5 but output value is not close to either input.  The
+equation "smoothes out" larger rates of change much more than smaller
+ones.
+</p>
+
+<p>
+A more general description of the low-pass filter shown above is:
+</p>
+
+<blockquote>
+  <code>y(n) = a0*x(n) + a1*x(n-1)</code>
+</blockquote>
+
+<p>
+where <var>a0</var> and <var>a1</var> are <em>coefficients</em>, or
+scalars, on the input signal. We can use these same terms and
+coefficients to describe a high-pass filter:
+</p>
+
+<blockquote>
+  <code>y(n)= a0*x(n) - a1*x(n-1)</code>
+</blockquote>
+
+<p>
+This example acts as a high-pass filter because subtraction has more
+effect on values close to one another than on values with higher rates
+of change.  For example the input samples .4 and .6 become .2 in the
+output, while the inputs .9 and .1 produce .8 as the output.
+</p>
+
+<h3>Filtering in CLM</h3>
+
+<p>
+CLM provides a number of different CLM generators related to
+filtering. The most basic of these is the
+<a href="clm.html#make-one-zero">one-zero,</a> generator, whose equation is:
+</p>
+
+<blockquote>
+<code> y(n) = a0 x(n) + a1 x(n-1)</code>
+</blockquote>
+
+<p>
+Note that by providing different coefficients the one-zero generator
+can implement both the low-pass and high-pass examples discussed in
+the previous section. We can demonstrate this by designing a little
+instrument that uses one-zero to filter a noisy input signal:
+</p>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">
+<a href="filt.ins">filt.ins</a></span> A simple noise filtering instrument.
+</p>
+<pre class="code">(definstrument filt-noise (start dur amp a0 a1)
+  (let* ((beg (seconds->samples start))
+         (end (+ beg (seconds->samples dur)))
+         (flt (make-one-zero :a0 a0 :a1 a1))
+         (noi (make-rand-interp :frequency (* .5 *srate*))))
+    (run 
+      (loop for i from beg to end
+            do (outa i (* amp (one-zero flt (rand-interp noi))))))))</pre>
+</div>
+
+<p>
+If the <var>a1</var> coefficient is 0 then no filtering occurs. If
+ <var>a0</var> and <var>a1</var> are less than 1.0 then low-pass
+filtering is described, if <var>a1</var> is less than 0.0
+then <code>filt-noise</code> performs high-pass filtering.
+</p>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example n.</span>
+Listening to unfiltered, low-pass and high-pass noise:
+</p>
+<pre class="shell")>? <span class="input">(with-sound () (filt-noise 0 2 .2 1 0))</span>
+<span class="output">"test.aiff"</span>
+? <span class="input">(with-sound () (filt-noise 0 2 .2 .5 .5))</span>
+<span class="output">"test.aiff"</span>
+? <span class="input">(with-sound () (filt-noise 0 2 .2 1 -1))</span>
+<span class="output">"test.aiff"</span></pre>
+</div>
+
+<p>
+CLM provides a number of different generators related to
+filtering. The most most general of theses are:
+</p>
+
+<ul>
+<li>
+<a href="clm.html#make-fir-filter">FIR filtering</a></li>
+<li><a href="clm.html#make-iir-filter">IIR filtering</a></li>
+<li><a href="clm.html#make-formant">Formant (band-pass) filtering</a></li>
+<li><a href="clm.html#envelope-%3Ecoeffs">Frequency response envelopes</a></li>
+</ul>
+
+<p>
+We can use <code>envelope-&gt;coeffs</code> and a FIR filter to place
+an arbitrary frequency response envelope on a sound source:
+</p>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">
+<a href="filtenv.ins">filtenv.ins</a></span> Appying filter envelope to a sound source.
+</p>
+<pre class="code">(definstrument filtenv-noise (beg dur amp order env)
+  (let* ((beg (seconds->samples beg))
+         (end (+ beg (seconds-samples dur)))
+         (noi (make-rand :frequency (* .5 *srate*) :amplitude amp))
+         (flt (make-filter :xcoeffs (envelope->coeffs :order order :envelope env)))
+    (run
+      (loop for i from beg to end
+         do (outa i (filter flt (rand noi)))))))</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example n.</span>
+Filtering with a spectral envelope.
+</p>
+<pre class="shell")>(defparameter fltenv 
+  '(0 0.0 .125 0.5 .2 0.0 .3 1.0 .5 0.0 1.0 0.0))
+
+(with-sound () 
+  (filtenv-noise 0 1 .2 12 env))</pre>
+</div>
+
+<p>
+The CLM distribition contains several noise filtering instruments:
+</p>
+
+<ul>
+<li><a href="fltnoi.ins"><code>filter-noise</code></a></li>
+<li><a href="addflt.ins"><code>resflt</code></a></li>
+<li><a href="fltsnd.ins"><code>fltsnd.ins</code></a></li>
+</ul>
+
+
+
+
+<h2>Delay</h2> <p>
+
+When a signal is delayed it is only mixed into the output after first
+waiting a specified period of time.  In a typical delay line
+a <i>feedback loop</i> is used to reroute a portion of the delayed
+signal back into the delay again, which provides an efficient
+mechanism for implementing multiple delays of the same material.  The
+feedback process is controlled by a gain factor that attenenuates the
+signal each time it is delayed.  The speed at which the signal
+attenuates depends both on the gain and the delay time.  A gain factor
+less than 1.0 causes the delayed material to diminsih in amplitude
+over time until its effect dissapears into the background noise. Gains
+greater than 1.0 will cause the signal's amplitude to become unstable
+and overflow at some point.
+</p>
+
+<p>
+</p><center>
+<table width="50%">
+<tbody><tr>
+<td><b>Example 3. </b>A basic delay unit with feedback loop.</td></tr>
+<tr><td>
+<img alt="[delay.jpg]" src="delay.jpg" align="middle">
+</td>
+</tr>
+</tbody></table>
+</center>
+<p>
+Delays are implemented using <i>delay-lines</i>.  A delay-line is a
+buffer of length <i>n</i> samples into which a signal flows and then
+reappears <i>n</i> sample periods later.  Each time a sample is input
+into the delay-line it "pushes" the current contents in the line one
+more location toward the end.  Since input and output from the delay
+line happens each sample period it takes n/srate seconds for a delayed
+sample to reappear.  One can determine the delay-line length needed to
+produce a particular delay time by multiplying the sampling rate by
+the delay time.  The function <tt>seconds-&gt;samples</tt> can be used
+to convert time to a delay line length.  The
+function <tt>keynum-&gt;samples</tt> (delaysnd.ins) converts a keynum
+or note name into its period length (in samples) for tuning the
+"natural frequency" of the delay line.
+<p>
+
+
+As of yet we have considered reading samples from the end of the
+delay-line.  But in reality a sample can be read from any location
+along a delay-line.  Reading samples from a delay-line is
+called <i>tapping</i>, and the positions in the delay-line from which
+samples are read are called <i>taps</i>.  The closer a tap is to the
+front of the delay-line the less delay time will have occured when the
+signal reaches that tap position.  By using a moveable tap a single
+delay-line can represent a variety of delays at the same time. This is
+called <i>variable length delay</i>.  By "sweeping" a tap between a
+minimum and maxumum delay length the delay-time will evolve over time
+as the distance of the tap grows and shrinks.  The sweeping mation can
+be controlled by an envelope or by a <i>low frequency oscillator</i>,
+or LFO.
+
+</p>
+
+<p><a href="delaysnd.ins">delaysnd.ins</a></p>
+
+<p>
+The <tt>delaysnd</tt> instrument impelements a movable, recursive delay line with controls on feedback gain, ring time and ratio of delayed to non-delayed signal.
+<p>
+<tt>delaysnd</tt> supports the following parameters:
+</p>
+
+<blockquote>
+<dl>
+<dt><tt>time </tt><i>number</i></dt><dd>Start time of note in seconds.
+
+</dd><dt><tt>file </tt><i>string</i></dt><dd>Sound file to process.</dd><dt><tt>length </tt><i>number</i></dt><dd>The length of the delay line in samples. Use the <tt>delay-length</tt> function to
+convert time or frequency to delay length.</dd><dt><tt>input-file-start-time </tt><i>number</i></dt><dd>Start time in file to begin processing.</dd><dt><tt>duration </tt><i>number</i></dt><dd>Duration of sound file to delay. Defaults to the entire sound file.</dd><dt><tt>amplitude </tt><i>number</i></dt><dd>Amplitude scaler on sound file. Defaults to 1.0.</dd><dt><tt>amp-env </tt><i>list</i></dt><dd>Envelope on amplitude.</dd><dt><tt>delay-mix </tt><i>number</i></dt><dd>Ratio of delayed signal to direct. 1.0 is all delayed signal and 0.0 is all direct. 
+ Defaults to .5.</dd><dt><tt>gain&lt; </tt><i>number</i></dt><dd>Amplitude scaler on feedback term. Defaults to .5.</dd><dt><tt>decay-time </tt><i>number</i></dt><dd>The amout of time the delay should "ring" past the end of the soundÊfile.</dd><dt><tt>max-length </tt><i>number</i></dt><dd>The maximum length of the delay. Defaults to <tt>length</tt>.</dd><dt><tt>delay-env </tt><i>list</i></dt><dd>Envelope on tap between <tt>length</tt> and <tt>max-length</tt></dd><dt><tt>flange-rate </tt><i>list</i></dt><dd>Rate of flanging oscillator.</dd></dl>
+</blockquote>
+
+<p>
+<!-- Example -->
+<b><font color="#3d3d4c">Example 2.</font></b>
+Simple delay effects.
+
+</p>
+<blockquote>
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tbody><tr>
+<td bgcolor="gray">
+<table cellpadding="3" cellspacing="1" border="0" width="100%">
+<tbody><tr>
+<td bgcolor="#eeeeee">
+<pre>? (insure-io "test.aiff" :srate 44100 :channels 2)
+#&lt;audio-file: "test.aiff"&gt;
+
+? (events (new delaysnd time 0 
+             file "320:snd;crotales;a6.aiff"
+             length (delay-length .25 ))
+        "test.aiff" :srate 44100 :channels 2)
+"test.aiff"
+
+? (events (new delaysnd time 0 
+             file "320:snd;crotales;a6.aiff"
+             length (delay-length .25 )
+             max-length (delay-length 1)
+             delay-env '(0 0 100 1)
+             decay-time 4)
+        "test.aiff")
+"320:zap;test.aiff"
+</pre></td></tr></tbody></table></td></tr></tbody></table></blockquote>
+<p>
+
+</p><h3>Comb Filtering</h3>
+The <i>comb filter</i> is a simple recirculating delay line with gain control
+on the feedback term. The inpulse response of a comb filter is a train of pulses spaced the length of
+the delay line apart in time. Because this impulse is periodic the comb filter is said to have
+a frequency. This frequency is called the <i>natural frequency</i> of the comb filter
+and is equal to the sampling rate divided by the length of the delay line.
+For example, the natural
+frequency of a .001 second delay is 1/.001 or 1000 Hertz, which at a sampling rate of 44100
+corresonds to a delay-line length of 4410 samples.
+The characteristic of the comb filter is to emphasize multiples of the natural frequency  and
+to attenute other frequencies due to phase-cancellation from the feedback loop. This 
+phase-cancellation at multples of the natural frequency creates the characteristic
+"notches" in the frequency response that resemble the teeth of a comb.
+<p>
+</p><center><img alt="[flanger-f2.gif]" src="flanger-f2.gif"></center>
+
+With a variable length delay line, the emphasised frequencies of the comb 
+filter can change during the course of a computed soundfile, causing frequency 
+`sweeps'. The following instrument is identical to the previous comb-filter 
+instrument except that the delay line length (tap location) is controlled by 
+
+<p>
+<!-- Example -->
+<b><font color="#3d3d4c">Example 2.</font></b>
+Comb effects. The first example applys an amplitude envelope to the
+file and resonates at its "natural frequency" of A4, or 440 Hz.
+The second example performs a glissando from C5 to A4.
+</p>
+<blockquote>
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tbody><tr>
+<td bgcolor="gray">
+<table cellpadding="3" cellspacing="1" border="0" width="100%">
+<tbody><tr>
+<td bgcolor="#eeeeee">
+<pre>? (events (new delaysnd 
+               time 0 
+               file "wind-gusting-cold.aiff"
+               length (delay-length 'a4)  
+               amplitude .5 
+               amp-env '(0 1 .5 .4 .7 .1  1 0)
+               delay-mix 1 
+               gain .9 )
+          "test.aiff")
+"test.aiff"
+
+? (events (new delaysnd time 0 
+               file "wind-gusting-cold.aiff"
+               length (delay-length 'c5)   
+               max-length (delay-length 'a4)
+               amplitude .5
+               delay-mix 1
+               gain .9
+               delay-env '(0 0 100 1)
+               decay-time 2)
+          "test.aiff")
+"test.aiff"
+</pre></td></tr></tbody></table></td></tr></tbody></table></blockquote>
+<p>
+
+</p><h3>Flanging</h3>
+<p>
+The <i>flange</i> effect occurs when a signal is added to a slightly
+delayed version of itself. Typical delay times for flanging
+are between 1 to 10 milliseconds.  To flange the signal the amount of delay 
+is made to oscillate between a minimum and maximum length at slow rate
+ called the flange rate
+Modulation can be implemented by an oscillator generating a sinewave or
+triangle wave at a low frequency.  Because delay time in flanging are so short 
+no "echo effect" in the delay is heard. Instead, flanging produces
+a filtered "whooshing" sound  that is caused by phase cancellation
+brought about by  the feeback in the signal.  As is the
+case with the comb filter the frequency respose of a flanger is a series
+of notches in the spectrum.
+
+
+
+
+
+The first example has a flange delay of 1-5 millisecond and 
+a flange rate of .25 herz. The second example creates a noise
+using a high flange rate. The third example uses longer delays
+of 30-50 millisecond and no feedback to create a chorus effect.
+
+</p><p>
+<!-- Example -->
+<b><font color="#3d3d4c">Example 3.</font></b>
+Comb effects. The first example applys an amplitude envelope to the
+file and resonates at its "natural frequency" of A4, or 440 Hz.
+The second example performs a glissando from C5 to A4.
+</p>
+<blockquote>
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+<tbody><tr>
+<td bgcolor="gray">
+<table cellpadding="3" cellspacing="1" border="0" width="100%">
+<tbody><tr>
+<td bgcolor="#eeeeee">
+<pre>(insure-io "test.aiff" :channels 1 :srate 22050)
+#&lt;audio-file: "test.aiff"&gt;
+
+? (events (new delaysnd time 0
+               file "oboe.aiff"
+               length (delay-length .001)
+               max-length (delay-length .005) 
+               flange-rate .25
+               delay-mix 1
+               gain .9
+               decay-time .5)
+          "test.aiff")
+"test.aiff"
+
+? (events (new delaysnd time 0
+               file "oboe.aiff"
+               length (delay-length .05)
+               max-length (delay-length .10) 
+               flange-rate 25
+               delay-mix 1
+               gain .9
+               decay-time 2)
+          "test.aiff")
+"test.aiff"
+
+(events (new delaysnd time 0
+             file "oboe.aiff"
+             length (delay-length .03)
+             max-length (delay-length .035) 
+             flange-rate 1
+             gain 0)
+        "test.aiff")
+"test.aiff"
+</pre></td></tr></tbody></table></td></tr></tbody></table></blockquote>
+<p>
+</p>
+
+<h3>Convolution</h3>
+
+<p>
+Convolution is the "cross-product" result of mutiplying every sample
+of a source sound by every sample of a filtering sound.  This
+effectively adds the charactistics of the "filter" sound to the
+source. To see why this is so, consider what happens when you clap
+your hands in a reverberant environment. A very short handclap serves
+as an <em>impulse</em> into the reverberant surroundings.  If you were
+to graph that inpulse over time, it might look something like this:
+</p>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example n.</span>
+Impulse response of a reverberant  room.
+</p>
+<img align="middle" alt="[impulseResponse.gif]" src="impulseResponse.gif">
+</div>
+
+<p>
+Givin an initial inpulse there is a build-up of sound "density" at the
+beginning followed by a smooth decay toward zero.  In the digital
+domain, it's easy to realize that each sample point of the response
+can be viewed as a discrete echo of the impulse. Since, ideally, the
+impulse is a single non-zero sample, it's not a stretch to realize
+that a series of samples -- a sound played in the room -- Ñwould be the sum
+of the responses of each individual sample at their respective times
+</p?
+
+<p>
+In other words, if we have a digitized impulse response, we can easily
+add that exact room characteristic to any digitized dry
+sound. Multiplying each point of the impulse response by the amplitude
+of a sample yields the room's response to that sample; we simply do
+that for each sample of the sound that we want to "place" into that
+room. This yields a bunch -- as many as we have samples -- of overlapping
+responses that we simply add together.
+
+Unfortunately, convolution is extremely expensive computationally if
+it is done by "brute force" multiplication and addition.  Since each
+sample of the input is multiplied individually by each sample of the
+impulse response and then added to the mix, then if we have n samples
+to process, and the impulse response is m samples long, we need to
+perform n+m multiplications and additions. So, if the impulse response
+is three seconds (a big room), and we need to process one minute of
+music, we need to do about 350 trillion multiplications and the same
+number of additions (assuming a 44.1KHz sampling rate).
+</p>
+
+<p><a href="cnv.ins">cnv.ins</a></p>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span>
+Convolution of two sound files.
+</p>
+<pre class="shell")>(with-sound (:statistics t :srate 44100 :channels 2)
+  (cnvrev "/Users/hkt/Music/Sounds/percussion/large-gong.aiff"
+          "/Users/hkt/Music/Sounds/percussion/claves.aiff"
+          .9))
+
+(with-sound (:statistics t :srate 44100 :channels 1)
+  (cnvrev "/Users/hkt/Music/Sounds/percussion/large-gong.aiff"
+          "/Users/hkt/Music/Sounds/Flute/ff/c4.aiff"
+   .5))</pre>
+</div>
+
+<p>
+You can find various impulse responses on the net, 
+For example, <a href="http://www.cksde.com/p_6_250.htm">
+http://www.cksde.com/p_6_250.htm</a>.
+</p>
+
+
+
+</div></body>
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/CLM/Filtering/filtering.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:57 GMT -->
+</html>

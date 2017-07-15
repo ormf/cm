@@ -1,0 +1,89 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/clm/clm-3/freeverb/index.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:46:30 GMT -->
+<head>
+    <title>freeverb for clm-2</title>
+  </head>
+
+  <body bgcolor="#ffffff">
+
+    <p><table width=100% bgcolor="#e0e0e0"><tr><td>
+    <h1><a href="freeverb.ins">freeverb</a>: a multichannel reverb instrument</h1></table></p>
+
+
+<p><font size="-1">translated to clm-2 by <a href="http://www-ccrma.stanford.edu/~nando/">Fernando Lopez-Lezcano</a>, <a href="mailto:nando@ccrma.stanford.edu">nando@ccrma.stanford.edu</a></font>
+
+<p>Freeverb, a free studio-quality reverb, was created by <strong>Jezar Wakefield</strong> at <a href="http://www.dreampoint.co.uk/">Dreampoint Design and Engineering</a>. Here's the <a href="readme.txt">readme.txt</a> that is part of the <a href="http://home.onet.co.uk/~jzracc/source_code.htm">C++ source package</a> I downloaded. This clm-2 instrument uses the same reverberation model and tuning for the filters as the original freeverb source code. </p>
+
+<p>Here's a list of some differences with respect to the original freeverb code:</p>
+
+<ul>
+<li>freeverb.ins can process either mono or multichannel input soundfiles, in the latter case the input and output number of channels must match. This has been tailored to function with <a href="http://www-ccrma.stanford.edu/~nando/clm/dlocsig/">dlocsig</a>, a multichannel spatialization unit generator for clm. The latest version of dlocsig can output to multichannel reverberation streams and can thus generate local and global reverberation. 
+<li>there no <em>wet</em> parameter to freeverb.ins as it would not apply to the way clm generates and processes reverberation.
+<li>the name of the <em>width</em> parameter has been changed to <em>global</em>, which better reflects the effect in a multichanenl environment
+<li>it has predelays
+<li>it is possible to control damping individually in each channel
+</ul>
+
+<table>
+
+<tr valign="top"><td bgcolor="#e0e0e0" colspan="2">
+<p><font size="+1">Parameters</font></p>
+</td>
+
+<tr><td bgcolor="#e0e0e0" width="10%"></td>
+<td><p>All parameters have similarly named global bindings that you can use in a <em>let</em> statement to change the behavior of the reverberator (instead of passing parameters to the reverb instrument through <em>:reverb-data</em> in a <em>with-sound</em>). Prepend <em>freeverb-</em> to the parameter name to get the global binding name. </p> 
+
+<p><table>
+
+<tr valign=top><td><a name="start-time"><font color="b01010">start-time</font></a><br>[num]</td>
+<td>Start time of the instrument in the output stream (this is normally supplied automatically by <em>with-sound</em>). <p></td>
+
+<tr valign=top><td><a name="duration"><font color="b01010">duration</font></a><br>[num]</td>
+<td><p>Duration of the reverberation (this is normally supplied automatically by <em>with-sound</em>, use the <em>:decay-time</em> parameter to allow the reverb to ring for more time). </p></td>
+
+<tr valign=top><td><a name="room-decay"><font color="b01010">room-decay</font></a><br>[num]</td>
+<td><p>Determines the decay time of the reverberation. </p></td>
+
+<tr valign=top><td><a name="damping"><font color="b01010">damping</font></a>
+<br>[num|array|list]</td>
+
+<td><p>High frequency damping. This parameter can be a number, or an array or list (with same number of elements as output channels). It is possible to control the damping for each output channel. </p></td>
+
+<tr valign=top><td><a name="global"><font color="b01010">global</font></a>
+<br>[num|matrix]</td>
+<td><p>Controls how the outputs of all reverbs (one per channel) is mixed into the output stream. Specifying "0" will connect each reverberator directly to each output channel, "1" will mix all reverberated channels equally into all output channels. Intermediate values will allow for an arbitrary balance between local and global reverberation. The overall gain of the mixing matrix is kept constant. See <font color="b01010">output-mixer</font> for a complete override to this parameter. </p></td>
+
+<tr valign=top><td><a name="predelay"><font color="b01010">predelay</font></a>
+<br>[num|array|list]</td>
+<td><p>Determines the predelay that is applied to the input streams. An array or list lets you specify the individual predelays for all chanenels. </p></td>
+
+<tr valign=top><td><a name="output-gain"><font color="b01010">output-gain</font></a>
+<br>[num]<br>1.0</td>
+<td><p>Overall gain multiplier for the output streams. </p></td>
+
+<tr valign=top><td><a name="output-mixer"><font color="b01010">output-mixer</font></a>
+<br>[mixer|matrix]<br>nil</td>
+<td><p>Overrides <font color="b01010">global</font> and sets the output mixing matrix directly (for example, you might want to change the contribution to global reverb of a particular channel so that it is proportional to the distance between speakers). </p></td>
+
+</table>
+</table>
+
+<hr>
+
+<table><tr><td><!--- <img src="/CCRMA/Images/Logo:Small.gif" alt=""> -->
+  <td><p><font size="2">&copy; 2001 Fernando Lopez-Lezcano. All Rights Reserved.<br>
+  Created and mantained by Fernando Lopez-Lezcano, 
+  <a href="mailto:nando@ccrma.stanford.edu">nando@ccrma.stanford.edu</a></font></p>
+<font size="2">
+<!-- Created: Wed Jan 24 20:05:29 PST 2001 -->
+<!-- hhmts start -->
+Last modified: Wed Jan 24 21:32:00 PST 2001
+<!-- hhmts end -->
+</font>
+</table>
+  </body>
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/clm/clm-3/freeverb/index.html by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:46:30 GMT -->
+</html>

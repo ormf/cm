@@ -1,0 +1,241 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument gran-synth (start-time duration audio-freq grain-dur grain-interval amp)
+  (multiple-value-bind (beg end) (times->samples start-time duration)
+    (let* ((grain-env (make-env :envelope '(0 0 25 1 75 1 100 0)
+				:duration grain-dur))
+	   (carrier (make-oscil :frequency audio-freq))
+	   (grain-size (ceiling (* (max grain-dur grain-interval) *srate*)))
+	   (grain (make-double-array grain-size))
+	   (grains (make-wave-train :wave grain :frequency (/ 1.0 grain-interval))))
+      (loop for i from 0 below grain-size do
+	(setf (aref grain i) (double (* (env grain-env) (oscil carrier)))))
+      (run
+       (loop for i from beg to end do
+	 (outa i (* amp (wave-train grains))))))))
+	 
+;;; (with-sound () (gran-synth 0 2 100 .0189 .02 .4))
+
+;;; --------
+(defvar touch-tab-1 nil)
+(defvar touch-tab-2 nil)
+(setf touch-tab-1 '(0 697 697 697 770 770 770 852 852 852 941 941 941))
+(setf touch-tab-2 '(0 1209 1336 1477 1209 1336 1477 1209 1336 1477 1209 1336 1477))
+ 
+(definstrument touch-tone-telephone (telephone-number)
+  (loop for k in telephone-number and 
+            beg from 0 by (floor (* .4 *srate*)) do
+    (let* ((i (if (integerp k)
+		  (if (/= 0 k) k 11)
+		(if (eq k '*) 10 12)))
+	   (frq1 (make-oscil :frequency (nth i touch-tab-1)))
+	   (frq2 (make-oscil :frequency (nth i touch-tab-2)))
+	   (end (floor (+ beg (* .3 *srate*)))))
+      (run
+       (loop for j from beg to end do
+	 (outa j (* 0.25 (+ (oscil frq1) (oscil frq2)))))))))
+
+;;; (with-sound () (touch-tone-telephone '(7 2 3 4 9 7 1))
+
+;;; --------
+(definstrument spectrum (start-time duration frequency amplitude
+		         &optional (partials '(1 1 2 0.5))
+			           (amp-envelope '(0 0 50 1 100 0))
+			           (vibrato-amplitude 0.005)
+			           (vibrato-speed 5.0)
+			           (degree 0.0)
+			           (distance 1.0)
+			           (reverb-amount 0.005))
+  (multiple-value-bind (beg end) (times->samples start-time duration)
+    (let* ((waveform (partials->wave partials))
+	   (freq (hz->radians frequency))
+	   (s (make-table-lookup :frequency frequency :wave waveform))
+	   (amp-env (make-env :envelope amp-envelope :scaler amplitude :duration duration))
+	   (per-vib (make-triangle-wave :frequency vibrato-speed
+					:amplitude (* vibrato-amplitude freq)))
+	   (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	   (ran-vib (make-rand-interp :frequency (+ vibrato-speed 1.0)
+				:amplitude (* vibrato-amplitude freq))))
+      (run 
+       (loop for i from beg to end do
+	 (locsig loc i (* (env amp-env) 
+			  (table-lookup s (+ (triangle-wave per-vib)
+					     (rand-interp ran-vib))))))))))
+
+;;; (with-sound ()  (spectrum 0 1 440.0 .1 p-a4 '(0.0 0.0 1.0 1.0 5.0 0.9 12.0 0.5 25.0 0.25 100.0 0.0))
+;;; using p-a4 from spectr.clm
+
+;;; --------
+;;; interpolate between two waveforms (this could be extended to implement all the various
+;;; wavetable-based synthesis techniques).
+
+(definstrument two-tab (start-time duration frequency amplitude
+		        &optional (partial-1 '(1.0 1.0 2.0 0.5))
+			          (partial-2 '(1.0 0.0 3.0 1.0))
+			          (amp-envelope '(0 0 50 1 100 0))
+			          (interp-func '(0 1 100 0))
+			          (vibrato-amplitude 0.005)
+			          (vibrato-speed 5.0)
+			          (degree 0.0)
+			          (distance 1.0)
+			          (reverb-amount 0.005))
+  (multiple-value-bind (beg end) (times->samples start-time duration)
+    (let* ((waveform-1 (partials->wave partial-1))
+	   (waveform-2 (partials->wave partial-2))
+	   (freq (hz->radians frequency))
+	   (s-1 (make-table-lookup :frequency frequency :wave waveform-1))
+	   (s-2 (make-table-lookup :frequency frequency :wave waveform-2))
+	   (amp-env (make-env :envelope amp-envelope :scaler amplitude :duration duration))
+	   (interp-env (make-env :envelope interp-func :duration duration))
+	   (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	   (per-vib (make-triangle-wave :frequency vibrato-speed
+					:amplitude (* vibrato-amplitude freq)))
+	   (ran-vib (make-rand-interp :frequency (+ vibrato-speed 1.0)
+				:amplitude (* vibrato-amplitude freq))))
+      (run
+       (loop for i from beg to end do
+	 (let ((vib (+ (triangle-wave per-vib) 
+		       (rand-interp ran-vib)))
+	       (intrp (env interp-env)))
+	   (locsig loc i (* (env amp-env) 
+			    (+ (* intrp (table-lookup s-1 vib))
+			       (* (- 1.0 intrp) 
+				  (table-lookup s-2 vib)))))))))))
+
+(defvar formants 
+    '((I 390 1990 2550)  (E 530 1840 2480)  (AE 660 1720 2410)
+      (UH 520 1190 2390) (A 730 1090 2440)  (OW 570 840 2410)
+      (U 440 1020 2240)  (OO 300 870 2240)  (ER 490 1350 1690)
+      (W 300 610 2200)   (LL 380 880 2575)  (R 420 1300 1600)
+      (Y 300 2200 3065)  (EE 260 3500 3800) (LH 280 1450 1600)
+      (L 300 1300 3000)  (I2 350 2300 3340) (B 200 800 1750)
+      (D 300 1700 2600)  (G 250 1350 2000)  (M 280 900 2200)
+      (N 280 1700 2600)  (NG 280 2300 2750) (P 300 800 1750)
+      (T 200 1700 2600)  (K 350 1350 2000)  (F 175 900 4400)
+      (TH 200 1400 2200) (S 200 1300 2500)  (SH 200 1800 2000)
+      (V 175 1100 2400)  (THE 200 1600 2200)(Z 200 1300 2500)
+      (ZH 175 1800 2000) (ZZ 900 2400 3800) (VV 565 1045 2400)))
+                   ;;formant center frequencies for a male speaker
+
+(defun get-phoneme-data (phoneme form)
+  (if (eql phoneme (caar form)) (cdar form)
+    (get-phoneme-data phoneme (cdr form))))
+
+(defun formant-table (center-freq amplitude carrier-freq)
+  (let* ((harm (round center-freq carrier-freq))
+	 (amps '(0.05  0.2  0.7  0.2  0.1))
+	 (tab nil)
+	 (partial 0))
+    (loop for i from 0 below (length amps) do
+      (setf partial (+ harm -2 i))
+      (if (plusp partial)
+	  (setf tab (append tab (list partial 
+				      (* amplitude (nth i amps)))))))
+    tab))
+
+(defun make-formant-list (phoneme frequency)
+  (let* ((phon (get-phoneme-data phoneme formants))
+	 (amps '(0.8 0.15 0.05))
+	 (tab nil))
+    (loop for i in phon and j in amps do
+      (setf tab (append tab (formant-table i j frequency))))
+    tab))
+
+(defun make-phoneme (begin-time duration frequency amplitude 
+		     phoneme-1 phoneme-2
+		     &optional (amp-envelope '(0 0 50 1 100 0))
+			       (interp-func '(0 1 100 0))
+			       (vibrato-amplitude 0.025)
+			       (vibrato-speed 6.0))
+  (two-tab begin-time duration frequency amplitude
+	   (make-formant-list phoneme-1 frequency)
+	   (make-formant-list phoneme-2 frequency)
+	   amp-envelope interp-func vibrato-amplitude vibrato-speed))
+
+
+;;; (with-sound () (make-phoneme 0 1.0 150 0.5 'OO 'ER))
+
+
+;;; --------
+;;; provided by C. Penrose:
+;;;
+;;; formants sliding around in white noise
+
+(defmacro zformant (R freq G x0 x2 y0 y1 y2)
+  `(let ((tG (* ,G (- 1.0 ,R))))
+     (setf ,y2 ,y1)
+     (setf ,y1 ,y0)
+     (setf ,y0 (- (+ (* tG ,x0) 
+		     (* 2 ,R (cos (hz->radians ,freq)) ,y1)) 
+		  (+ (* tG ,R ,x2) 
+		     (* ,R ,R ,y2))))))
+
+(definstrument noi-attempt (beg dur amp R freq)
+  (let* ((a0 1.)
+	 (a1 .4)
+	 (a2 .25)
+	 (a3 .1)
+	 (noi (make-rand :frequency 11025 :amplitude amp))
+	 (vib0 (make-rand :frequency 5. :amplitude .0183))
+	 (vib1 (make-rand :frequency 7.07 :amplitude .013))
+	 (vib2 (make-rand :frequency 3.14 :amplitude .02))
+	 (vib3 (make-rand :frequency 8.33 :amplitude .015))
+	 (x2 0.0)
+	 (x1 0.0)
+	 (x0 0.0)
+	 (st (floor (* *srate* beg)))
+	 (nd (+ st (floor (* *srate* dur))))
+	 (f0y2 0.0) (f0y1 0.0) (f0y0 0.0)
+	 (f1y2 0.0) (f1y1 0.0) (f1y0 0.0)
+	 (f2y2 0.0) (f2y1 0.0) (f2y0 0.0)
+	 (f3y2 0.0) (f3y1 0.0) (f3y0 0.0))
+    (run
+      (loop for i from st to nd do
+	(setf x2 x1)
+	(setf x1 x0)
+	(setf x0 (rand noi))
+	(outa i (* amp
+		   (+ (zformant R (* freq (+ 1. (rand vib0))) a0 x0 x2 f0y0 f0y1 f0y2)
+		      (zformant R (* freq 3.006 (+ 1. (rand vib1))) a1 x0 x2 f1y0 f1y1 f1y2)
+		      (zformant R (* freq 3.984 (+ 1. (rand vib2))) a2 x0 x2 f2y0 f2y1 f2y2)
+		      (zformant R (* freq 5. (+ 1. (rand vib3))) a3 x0 x2 f3y0 f3y1 f3y2))))))))
+
+;;; (with-sound () (noi-attempt 0 2 .3 .99 1200))
+
+
+
+(definstrument filter-white-noise (beg end R freq G)
+  (let* ((amp .5)
+         (f (make-formant R freq G))
+         (noi (make-rand :frequency 5000 :amplitude .1)))
+    (run
+      (loop for i from beg to end do
+        (outa i (* amp (formant f (rand noi))))))))
+
+;;; (with-sound () (filter-white-noise 0 10000 .99 1000 1.0))
+
+(definstrument filter-white-noise-1 (beg end R freq G)
+  (let* ((amp .5)
+         (f (make-formant R freq G))
+         (noi (make-rand :frequency 1000 :amplitude .1))
+	 (er (make-env '(0 .99 1 .5) :scaler 1.0 :end end))
+	 (ef (make-env '(0 1 1 .1) :scaler 5000 :end end)))
+    (run
+      (loop for i from beg to end do
+	(outa i (* amp (formant f (rand noi))))
+	(setf (mus-frequency f) (env ef))
+	(setf (mus-formant-radius f) (env er))))))
+
+;;; (with-sound () (filter-white-noise-1 0 100000 .99 1000 10.0))
+
+(definstrument testR (beg end R0 R1 freq G)
+  (let* ((amp .5)
+         (f (make-formant R0 freq G))
+         (noi (make-rand :frequency 5000))
+	 (R R0)
+	 (incR (/ (- R1 R0) (- end beg))))
+    (run
+     (loop for i from beg to end do
+       (outa i (* amp (formant f (rand noi))))
+       (setf (mus-formant-radius f) R)
+       (incf R incR)))))

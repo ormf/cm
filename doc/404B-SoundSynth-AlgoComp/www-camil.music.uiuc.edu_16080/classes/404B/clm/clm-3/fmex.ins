@@ -1,0 +1,148 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; examples of FM
+;;;
+;;; Michael McNabb's fm bell:
+
+(definstrument fm-bell (start-time duration frequency amplitude amp-env index-env index
+		        &key (degree 0.0) (distance 1.0) (reverb-amount 0.005))
+  (let* ((beg (floor (* start-time *srate*)))
+	 (end (+ beg (floor (* duration *srate*))))
+	 (fmind1 (hz->radians (* 32.0 frequency)))
+	 (fmind2 (hz->radians (* 4.0 (- 8.0 (/ frequency 50.0)))))
+	 (fmind3 (* fmind2 0.705 (- 1.4 (/ frequency 250.0))))  
+	 ;;(no hz->radians because included in fmind2)
+	 (fmind4 (hz->radians (* 32.0 (- 20 (/ frequency 20)))))
+	 (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	 (mod1 (make-oscil :frequency (* frequency 2)))
+	 (mod2 (make-oscil :frequency (* frequency 1.41)))
+	 (mod3 (make-oscil :frequency (* frequency 2.82)))
+	 (mod4 (make-oscil :frequency (* frequency 2.4)))
+	 (car1 (make-oscil :frequency frequency))
+	 (car2 (make-oscil :frequency frequency))
+	 (car3 (make-oscil :frequency (* frequency 2.4)))
+	 (indf (make-env :envelope index-env :scaler index :duration duration))
+	 (ampf (make-env :envelope amp-env :scaler amplitude :duration duration)))
+    (run
+     (loop for i from beg to end do
+       (let ((fmenv (env indf)))
+	 (locsig loc i 
+		 (* (env ampf)
+		    (+ (oscil car1 (* fmenv fmind1 (oscil mod1)))
+		       (* .15 (oscil car2 (* fmenv 
+					     (+ (* fmind2 (oscil mod2))
+						(* fmind3 (oscil mod3))))))
+		       (* .15 (oscil car3 (* fmenv fmind4 (oscil mod4))))))))))))
+#|
+(with-sound ()
+  (let ((fbell '(0 1 2 1.1 25 .75 75 .5 100 .2))
+	(abell '(0 0 .1 1 10 .6 25 .3 50 .15 90 .1 100 0)))
+    (fm-bell 0 5.000 233.046 .028 abell fbell .750)
+    (fm-bell 5.912 2.000 205.641 .019 abell fbell .650)
+    (fm-bell 6.085 5.000 207.152 .017 abell fbell .750)
+    (fm-bell 6.785 7.000 205.641 .010 abell fbell .650)
+    (fm-bell 15.000 .500  880    .060 abell fbell .500)
+    (fm-bell 15.006 6.500 293.66 .1 abell fbell 0.500)
+    (fm-bell 15.007 7.000 146.5  .1 abell fbell 1.000)
+    (fm-bell 15.008 6.000 110    .1 abell fbell 1.000)
+    (fm-bell 15.010 10.00 73.415 .028 abell fbell 0.500)
+    (fm-bell 15.014 4.000 698.46 .068 abell fbell 0.500)))
+|#
+
+;;; Jan Mattox's fm drum:
+
+(definstrument fm-drum (start-time duration frequency amplitude index 
+			&optional (high nil) (degree 0.0) (distance 1.0) (reverb-amount 0.01))
+  (let* ((beg (floor (* start-time *srate*)))
+	 (end (+ beg (floor (* duration *srate*))))
+	 ;; many of the following variables were originally passed as arguments
+	 (casrat (if high 8.525 3.515))
+	 (fmrat (if high 3.414 1.414))
+	 (glsfun '(0 0  25 0  75 1  100 1))
+	 (glsf (make-env :envelope glsfun :scaler (if high (hz->radians 66) 0.0) :duration duration))
+	 (ampfun '(0 0  3 .05  5 .2  7 .8  8 .95  10 1.0  12 .95  20 .3  30 .1  100 0))
+	 (atdrpt (* 100 (/ (if high .01 .015) duration)))
+	 (ampf (make-env :envelope (stretch-envelope ampfun 
+					   10 atdrpt 
+					   15 (max (+ atdrpt 1) 
+						   (- 100 (* 100 (/ (- duration .2) duration)))))
+		  :scaler amplitude :duration duration))
+	 (indxfun '(0  0     5  .014  10 .033  15 .061  20 .099  
+		    25 .153  30 .228  35 .332  40 .477  
+		    45 .681  50 .964  55 .681  60 .478  65 .332  
+		    70 .228  75 .153  80 .099  85 .061  
+		    90 .033  95 .0141 100 0))
+	 (indxpt (- 100 (* 100 (/ (- duration .1) duration))))
+	 (divindxf (stretch-envelope indxfun 50 atdrpt 65 indxpt))
+	 (indxf (make-env :envelope divindxf :scaler (min (hz->radians (* index fmrat frequency)) pi) :duration duration))
+	 (mindxf (make-env :envelope divindxf :scaler (min (hz->radians (* index casrat frequency)) pi) :duration duration))
+	 (devf (make-env :envelope (stretch-envelope ampfun 
+					   10 atdrpt 
+					   90 (max (+ atdrpt 1) 
+						   (- 100 (* 100 (/ (- duration .05) duration)))))
+			 :scaler (min pi (hz->radians 7000)) :duration duration))
+	 (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	 (rn (make-rand :frequency 7000 :amplitude 1.0))
+	 (carrier (make-oscil :frequency frequency))
+	 (fmosc (make-oscil :frequency (* frequency fmrat)))
+	 (cascade (make-oscil :frequency (* frequency casrat))))
+    (run
+     (loop for i from beg to end do
+       (let ((gls (env glsf)))
+	 (locsig loc i (* (env ampf) 
+			  (oscil carrier 
+				 (+ gls 
+				    (* (env indxf)
+				       (oscil fmosc 
+					      (+ (* gls fmrat)
+						 (* (env mindxf) (oscil cascade 
+									(+ (* gls casrat)
+									   (* (env devf) (rand rn)))))))))))))))))
+#|			
+(with-sound ()
+  (fm-drum 0 1.5 55 .3 5 nil)
+  (fm-drum 2 1.5 66 .3 4 t))
+|#
+
+;;; Paul Weineke's gong.
+
+(definstrument gong (start-time duration frequency amplitude
+		     &key (degree 0.0) (distance 1.0) (reverb-amount 0.005))
+  (let* ((mfq1 (* frequency 1.16))
+	 (mfq2 (* frequency 3.14))
+	 (mfq3 (* frequency 1.005))
+	 (indx01 (hz->radians (* .01 mfq1)))
+	 (indx11 (hz->radians (* .30 mfq1)))
+	 (indx02 (hz->radians (* .01 mfq2)))
+	 (indx12 (hz->radians (* .38 mfq2)))
+	 (indx03 (hz->radians (* .01 mfq3)))
+	 (indx13 (hz->radians (* .50 mfq3)))
+	 (atpt 5)
+	 (atdur (* 100 (/ .002 duration)))
+	 (expf '(0 0  3 1  15 .5  27 .25  50 .1  100 0))  
+	 (rise '(0 0  15 .3  30 1.0  75 .5  100 0))
+	 (fmup '(0 0  75 1.0  98 1.0  100 0))
+	 (fmdwn '(0 0  2 1.0  100 0))
+	 (ampfun (make-env :envelope (stretch-envelope expf atpt atdur)
+			   :scaler amplitude :duration duration))
+	 (indxfun1 (make-env :envelope fmup :duration duration
+			     :scaler (- indx11 indx01) :offset indx01))
+	 (indxfun2 (make-env :envelope fmdwn :duration duration
+			     :scaler (- indx12 indx02) :offset indx02))
+	 (indxfun3 (make-env :envelope rise :duration duration
+			     :scaler (- indx13 indx03) :offset indx03))
+	 (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	 (carrier (make-oscil :frequency frequency))
+	 (mod1 (make-oscil :frequency mfq1))
+	 (mod2 (make-oscil :frequency mfq2))
+	 (mod3 (make-oscil :frequency mfq3))
+	 (beg (floor (* start-time *srate*)))
+	 (end (+ beg (floor (* duration *srate*)))))
+    (run
+     (loop for i from beg to end do
+       (locsig loc i (* (env ampfun) 
+			(oscil carrier (+ (* (env indxfun1) (oscil mod1))
+					  (* (env indxfun2) (oscil mod2))
+					  (* (env indxfun3) (oscil mod3))))))))))
+
+;;; (with-sound () (gong 0 3 261.61 .6))

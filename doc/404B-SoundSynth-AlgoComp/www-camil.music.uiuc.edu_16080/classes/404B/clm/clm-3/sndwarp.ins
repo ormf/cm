@@ -1,0 +1,372 @@
+;;; ALTERED TO FORCE MONO OUTPUT AND KILL REVERB SEND JUL 27 2002 PLUS TURNED OFF COMPILE OPTIONS
+;;; BUT ALL HACKS THAT NEED TO BE CLEANED UP
+;;; June 27 2002 compile-options off for MCL only
+;;; July 29 2003 wsize takes envelope
+
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+;;; for Common Lisp Music 2.0
+
+;;; SNDWARP
+;;;
+;;; CLM 2.0 implementation of Richard Karpen's SNDWARP Csound Ugen.
+;;; By Bret Battey. http://www.BatHatMedia.com
+;;; Except as noted below, the parameters are modeled directly after
+;;; the Csound version of sndwarp. 
+;;; Will adapt automatically for stereo or monophonic input or output.
+
+;;; version: beta1.1 04/27/2002
+
+;;; ISSUES
+;;;
+;;; Output in this new CLM version is seeming quite noisy/clipped (?)
+;;; Varying stereo/mono input/output has not been tested in clm2 alterations.
+;;; Make work with dlocsig?
+;;; Hasn't been tested with differing input and output file sampling rates.
+;;; Uses half-sine envelope only; doesn't support alternative windowing envs.
+;;; Csound-style attack doesn't strictly match Csound results
+
+;;; SNDWARP KEY PARAMETERS
+;;;
+;;; amp = Amplitude 
+;;;       [number] 
+;;;
+;;; amp-env = Amplitude envelope 
+;;;           [envelope]
+;;;
+;;; stretch = Stretch value or time pointer envelope (see 'time-ptr')
+;;;           [number or envelope expressed in either stretch values 
+;;;            (for stretch mode) or in seconds (in time-ptr mode)]
+;;;
+;;; srate = Resampling scalar (1 = same pitch, .5 = 1 octave lower, etc.)
+;;;         A negative srate will read backwards into the soundfile from
+;;;         the start of each read window (not available in Csound version).
+;;;         [number or envelope]
+;;;
+;;; inputbeg = Source file input offset. In 'stretch' mode (see 'time-ptr'),
+;;;            soundfile read will begin at inputbeg. In 'time-ptr' mode,
+;;;            inputbeg will be added to the time pointer.  
+;;;            [number, in seconds]
+;;;
+;;; wsize = Size of the sndwarp windows.
+;;;         [number, in seconds]
+;;;
+;;; randw = Range of random values to be added to wsize
+;;;         [number, in seconds]
+;;;
+;;; overlaps = number of window overlaps
+;;;            [number per second]
+;;;
+;;; time-ptr = Flag to determine whether stretching or time-pointer mode
+;;;            is to be used in interpreting the 'stretch' parameter.
+;;;               In stretch mode, the value of 'stretch' will scale the time 
+;;;            of the sound. For example, a value of 2 will stretch the sound 
+;;;            by 2 times. Note that stretch values of or near 0 are not
+;;;            viable since window advance times are determined by dividing
+;;;            by the stretch value.
+;;;               In time-ptr mode, the value(s) of stretch are readin pointers
+;;;            into the soundfile. For example, to read through a file
+;;;            backwards from 2 seconds at half speed, one would use a 
+;;;            stretch envelope like [0 2 1 0] with a 4 second note duration.
+;;;            [NIL = stretch mode, T = time-ptr mode]
+;;;
+;;; scale-time-ptr = Flag to determine whether the time-ptr envelope will be
+;;;                  interpreted in absolute seconds or rescaled to fit the 
+;;;                  duration of the input sound file.
+;;;                  {not part of csound implementation}
+;;;                  [NIL = absolute, T = rescale]
+;;;
+;;; zero-start-time-ptr = Flag to determine when in time-ptr mode whether
+;;;                       the first section of windows will start at 
+;;;                       time-ptr = 0.
+;;;                       The csound sndwarp makes this assumption, so you
+;;;                       always get a bit of the attack of the sound even
+;;;                       if you try to run the time pointer starting in 
+;;;                       the middle or end.
+;;;                       [NIL = 1st section starts according to time-ptr,
+;;;                        T = 1st section always starts at time-ptr = 0]
+;;;
+;;; sndwarp-window-offset = Flag to determine how the windows are offset
+;;;                         in time. T = Csound sndwarp style, windows 
+;;;                         in different layers line up.
+;;;                         NIL = spread evenly.
+;;;
+;;; loc =  Stereo panning position, where 0 = left and 1 = right.
+;;;        Uses simple sqrt method.
+;;;        [number or envelope]
+;;;
+;;; rev = Scalar for reverb sending to a CLM  reverb instrument.
+;;;       [number or envelope]
+;;;
+;;; status = Flag to control whether SNDWARP prints a window %-complete count
+;;;          while working.
+;;;          [NIL = no status printing, T = status printing]
+;;;
+;;; srcwidth = width of the sinc function used in the interpolation function of
+;;;            CLM's "src" -- which provides the resampling in sndwarp. Defaults to
+;;;            5. If you hear high-frequency artifacts in the output sound, try
+;;;            increasing this number.
+;;;      
+
+;;; SNDWARP DEFAULTS
+
+(defparameter sndwarp-amp 1.0)
+(defparameter sndwarp-amp-env '(0 1 100 1))
+(defparameter sndwarp-stretch 1.0)
+(defparameter sndwarp-srate 1.0)
+(defparameter sndwarp-inputbeg 0.0)
+(defparameter sndwarp-wsize 0.1) ; csound manual recommended start = .1
+(defparameter sndwarp-randw 0.02) ; csound manual recommended start = .02
+(defparameter sndwarp-overlaps 15) ; csound manual recommended start = 15
+(defparameter sndwarp-time-ptr NIL)
+(defparameter sndwarp-scale-time-ptr NIL)
+(defparameter sndwarp-zero-start-time-ptr NIL) ; T to match csound
+(defparameter sndwarp-window-offset NIL) ; T to match csound
+(defparameter sndwarp-loc 0.5)
+(defparameter sndwarp-rev 0.1)
+(defparameter sndwarp-status NIL)
+(defparameter sndwarp-srcwidth 5)
+
+;;; UTILITY FUNCTIONS
+
+(defun clmsw-envelope-or-number (in)
+  (if (numberp in)(list 0 in 1 in) in))
+
+(defparameter clmsw-2pi (* 2 pi))
+
+;;; SNDWARP
+
+(definstrument sndwarp
+               (begtime dur file 
+                        &key
+                        (amp sndwarp-amp)
+                        (amp-env sndwarp-amp-env)
+                        (stretch sndwarp-stretch)
+                        (srate sndwarp-srate)
+                        (inputbeg sndwarp-inputbeg)
+                        (wsize sndwarp-wsize)
+                        (randw sndwarp-randw)
+                        (overlaps sndwarp-overlaps)
+                        (time-ptr sndwarp-time-ptr)
+                        (scale-time-ptr sndwarp-scale-time-ptr)
+                        (zero-start-time-ptr 
+                         sndwarp-zero-start-time-ptr)
+                        (window-offset sndwarp-window-offset)
+                        (loc sndwarp-loc) 
+                        (rev sndwarp-rev)
+                        (status sndwarp-status)
+                        (srcwidth sndwarp-srcwidth))
+  (multiple-value-bind (beg end) (times->samples begtime dur)
+    (let* ((debug NIL)
+           (stereo-i (= (mus-channels  file) 2) )
+	   (stereo-o NIL) ; (= (mus-channels  *output*) 2))
+	   (f-a (open-input file :channel 0))
+           (f-b (if stereo-i (open-input file :channel 1)))
+	   (fsr (sound-srate file))
+	   (fsize (sound-frames file))
+	   (fdur (sound-duration file))
+	   (rev-env (clmsw-envelope-or-number rev))
+	   (loc-env (clmsw-envelope-or-number loc))
+	   (srate-env (clmsw-envelope-or-number srate))
+	   (time-env (clmsw-envelope-or-number stretch))
+           (wsize-env (clmsw-envelope-or-number wsize))
+	   (rdA (make-src :input f-a :srate 0.0 :width srcwidth))
+	   (rdB (if stereo-i (make-src :input f-b :srate 0.0 :width srcwidth)))
+	   (windf (make-oscil))
+           (wsizef (make-env :envelope wsize-env :duration dur))
+	   (ampf (make-env :envelope amp-env :scaler amp 
+			   :duration dur))
+	   (sratef (make-env :envelope srate-env
+			     :duration dur))
+	   (timef (make-env :envelope 
+			    (if (and time-ptr scale-time-ptr)
+                              (normalize-envelope time-env (- fdur inputbeg))
+			      time-env)
+			    :duration dur))
+	   (revf (make-env :envelope rev-env :duration dur))
+	   (locf (make-env :envelope loc-env :duration dur))
+	   (writestart 0)
+	   (readstart inputbeg)
+	   (eof-flag NIL)
+	   (eow-flag NIL)
+	   (overlap-ratio 0)
+	   (overlap-ratio-compl 0)
+	   (window-guess (* (floor (/ dur (nth 1 wsize-env)) overlaps)))
+	   (outA-val 0)
+	   (outB-val 0))
+      ;; run
+      (if debug (clm-print "~%~F sections at wsize = ~F seconds~%" 
+			   (/ dur wsize) wsize))
+      (if status (if (not debug) (clm-print "~%sndwarp percent complete: ")))
+      (run
+       (loop for overlap from 0 do
+             (setf overlap-ratio (/ overlap overlaps))
+             (setf overlap-ratio-compl (- 1 overlap-ratio))
+             (if status (if (not debug) (clm-print "~D " (* overlap-ratio 100))))
+             (if (= overlap overlaps) (progn (if status (clm-print "~%")) 
+                                             (loop-finish)))
+             (setf eow-flag NIL)
+             (if debug (clm-print "~%OVERLAP SET  ~D~%" overlap))
+             (setf writestart beg)
+             (setf (mus-location ampf) beg)
+             (setf (mus-location locf) beg)
+             (setf (mus-location revf) beg)
+             (loop for section from 0 do
+                   (if debug (clm-print "~%Section ~D:~%" section))
+                   (setf (mus-location timef) writestart)
+                   (setf (mus-location sratef) writestart)
+                   (setf (mus-location wsizef) writestart)
+                   (setf wsize (env wsizef))
+                   (let* ((winlen
+                           ;; first section of first overlap isn't randomized
+                           (if (and (zerop overlap) (zerop section))
+                             wsize
+                             (+ wsize (random randw))))
+                          (winsamps (floor (* *srate* winlen)))
+                          (srate-val (env sratef))
+                          (time-val (env timef)))
+                     (if debug (clm-print "srate-val = ~F; time-val = ~F~%"
+                                          srate-val time-val))
+                     ;; Even for the 1st section's truncated envelopes, the
+                     ;; frequency of the envelope must be as if the envelope
+                     ;; were full duration.
+                     (setf (mus-frequency windf) (* .5 (/ (/ winsamps fsr))))
+                     ;; Set windowing oscillator to starting phase and appropriate
+                     ;; frequency to provide half-sine envelope over window.
+                     ;; Phase must be altered for 1st envelope of each overlap stream.
+                     (setf (mus-phase windf) 
+                           (if (zerop section)
+                             (if (zerop overlap)
+                               0
+                               (* .5 clmsw-2pi overlap-ratio-compl))
+                             0))
+                     (if debug 
+                       (if (zerop section)
+                         (clm-print "envelope start phase = ~F~%" 
+                                    (/ (mus-phase windf) pi))))
+                     ;; Either use the absolute time pointer or a scaled increment.
+                     ;; If first section in scaled mode, must initialize 
+                     ;; section readstart
+                     ;; to beginning plus first overlap position.
+                     ;; In both cases, need to 
+                     ;; Alter readstart and length of first section's windows 
+                     ;; based on phase of overlap
+                     (if time-ptr 
+                       ;; TIME-PTR mode
+                       (if (zerop section)
+                         ;; initial section
+                         (let ((overlap-start 
+                                (if window-offset
+                                  ;; Csound style - start each overlap series 
+                                  ;; further into the soundfile
+                                  (* winlen (if (zerop overlap)
+                                              0
+                                              overlap-ratio-compl))
+                                  ;; Alternative style - start each overlap series 
+                                  ;; at 0
+                                  0))
+                               ;; To match csound version, 1st section must start
+                               ;; reading at 0. Using zero-start-time-ptr 
+                               ;; flag = NIL,  however, allows 1st section to 
+                               ;; start as determined by time-ptr instead.
+                               (adj-time-val (if zero-start-time-ptr 0 time-val)))
+                           (setf readstart (* fsr 
+                                              (+ inputbeg overlap-start 
+                                                 adj-time-val))
+                                 winsamps (if (zerop overlap)
+                                            winsamps
+                                            (* winsamps overlap-ratio))))
+                         ;; remaining sections
+                         (setf readstart (* fsr (+ inputbeg time-val))))
+                       ;; STRETCH mode
+                       (if (zerop section)
+                         ;; initial section
+                         (let ((init-read-start 
+                                (if window-offset
+                                  ;; Csound style - start each overlap series 
+                                  ;; further into the soundfile
+                                  (* winlen (if (zerop overlap)
+                                              0
+                                              overlap-ratio-compl))
+                                  ;; Alternative style - start each overlap series 
+                                  ;; at 0
+                                  0)))
+                           (setf readstart (* fsr (+ inputbeg init-read-start))
+                                 winsamps (if (zerop overlap)
+                                            winsamps
+                                            (* winsamps overlap-ratio))))
+                         ;; remaining sections
+                         (incf readstart 
+                               (* fsr (/ winlen time-val)))))
+                     ;; Set readin position and sampling rate
+                     (setf (mus-location rdA) readstart)
+                     (setf (mus-increment rdA) srate-val)
+                     (if stereo-i
+                       (setf (mus-location rdB) readstart
+                             (mus-increment rdB) srate-val))
+                     ;; Write window out
+                     (if debug 
+                       (clm-print "winsamps = ~D; readstart = ~D; writestart = ~D~%" 
+                                  winsamps readstart writestart))
+                     (loop for i from writestart to (+ writestart winsamps) do
+                           (if (> i end)
+                             (progn
+                               (setf eow-flag T)
+                               (loop-finish)))
+                           (if (> (mus-location rdA) fsize)
+                             (if (not eof-flag)
+                               (progn
+                                 (print "~%Warning: sndwarp at last sample frame~%")
+                                 (setf eof-flag T))))
+                           (let*
+                             ((amp-val (env ampf))
+                              (loc-val (env locf))
+                              (rev-val (env revf))
+                              (win-val (oscil windf))
+                              (sampa (* (src rdA) win-val))
+                              (sampb (if stereo-i (* (src rdB) win-val))))
+                             ;; channel panning
+                             (if stereo-o
+                               (let ((apan (sqrt loc-val))
+                                     (bpan (sqrt (- 1 loc-val))))
+                                 ;; stereo in and out
+                                 (if stereo-i
+                                   (setf outa-val (* amp-val apan sampa)
+                                         outb-val (* amp-val bpan sampb))
+                                   ;; mono in, stereo out
+                                   (setf outa-val (* amp-val apan sampa)
+                                         outb-val (* amp-val bpan sampa))))
+                               ;; stereo in, mono out
+                               (if stereo-i
+                                 (setf outa-val (* amp-val (+ sampa sampb) .75))
+                                 ;; mono in, mono out
+                                 (setf outa-val (* amp-val sampa))))
+                             ;; output
+                             (outa i outa-val *output*)
+#|
+                             (if *reverb* 
+                               (outa i (* rev-val outa-val) *reverb*))
+|#
+                             (if stereo-o
+                               (progn
+                                 (outb i outb-val *output*)	     
+                                 (if *reverb* 
+                                   (outb i (* rev-val outb-val) *reverb*))))))
+                     ; end window loop
+                     (if (or eow-flag) 
+                       (progn
+                         (setf eow-flag NIL)
+                         (loop-finish)))
+                     (decf window-guess)
+                     ;; For first section, have to backup readstart
+                     (if (and (zerop section) (plusp overlap) (not time-ptr))
+                       (decf readstart (* fsr winlen overlap-ratio-compl)))
+                     ;	     (incf writestart winsamps 1))) ; end sections loop
+                     (incf writestart winsamps)))
+             )				; end overlaps loop
+       )				; end run loop
+;      (close-input f-a)
+;      (close-input f-b)
+      )))
+
+

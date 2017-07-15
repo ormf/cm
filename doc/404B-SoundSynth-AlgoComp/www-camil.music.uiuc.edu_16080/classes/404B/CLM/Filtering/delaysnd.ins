@@ -1,0 +1,151 @@
+;;; **********************************************************************
+
+(in-package :cm)
+
+(defun hertz->samples (hz)
+  (floor (/ *srate* hz)))
+
+(defun keynum->samples (kn)
+  (hertz->samples (hertz kn)))
+
+(definstrument delaysnd (start-time file length 
+                                    &key amp-env max-length 
+                                    (delay-mix .5)
+                                    (gain .5) duration
+                                    (input-file-start-time 0.0) 
+                                    (amplitude 1.0) (decay-time 0.0)
+                                    delay-env
+                                    flange-rate )
+  (let* ((input (open-input file))
+         (chanb (and (= (mus-channels *output*) 2)
+                     (> (sound-chans file) 1))))
+    (if max-length
+      (if (< max-length length)
+        (rotatef max-length length))
+      (setf max-length length))
+    (unwind-protect
+      (let* ((beg (seconds->samples start-time))
+             (dur (or duration (- (sound-duration input) 
+                                  input-file-start-time)))
+             (end (+ beg (seconds->samples dur)))
+             (readin-a (make-readin
+                        :file input 
+                        :start
+                        (seconds->samples input-file-start-time)))
+             (readin-b (and chanb
+                            (make-readin :file input
+                                         :channel 1
+                                         :start
+                                         (seconds->samples
+                                          input-file-start-time))))
+             (comb-a (make-comb :size length :max-size max-length
+                                  :scaler gain))
+             (comb-b (and chanb (make-comb :size length
+                                             :max-size max-length
+                                             :scaler gain)))
+             (ampenv (make-env :envelope (or amp-env '(0 1 1 1))
+                               :scaler amplitude
+                               :duration dur))
+             (width (floor (- max-length length) 2))
+             (1-mix (- 1 delay-mix))
+             (offset 0.0)
+             oscsweep sweepenv direct-a direct-b mode
+             amp)
+        
+        (if (and (/= length max-length) flange-rate)
+          (progn 
+            (setf mode 1)
+            (setf oscsweep (make-oscil :frequency flange-rate)))
+          (progn
+            (setf mode 2)
+            (setf sweepenv (make-env :envelope (or delay-env '(0 0 100 0))
+                                     :scaler (- max-length length) 
+                                     :duration dur))))
+        (run
+         (loop for i from beg 
+               to (+ end (seconds->samples decay-time)) ; add decay time
+               do
+               ;; an offset is obtained from envelope or lfo
+               ;; to tap the delay line at that position
+               (if (= mode 1)
+                 (setf offset (* width (1+ (oscil oscsweep))))
+                 (setf offset (env sweepenv)))
+               (setf amp (env ampenv))
+               (if (> i end)
+                 (progn (setf direct-a 0.0)
+                        (setf direct-b 0.0))
+                 (progn (setf direct-a (* amp (readin readin-a)))
+                        (if chanb
+                          (setf direct-b 
+                                (* amp (readin readin-b))))))
+               (outa i (+ (* 1-mix direct-a)
+                          (* delay-mix
+                             (comb comb-a direct-a offset))))
+               (if chanb
+                 (outb i (+ (* 1-mix direct-b)
+                            (* delay-mix
+                               (comb comb-b direct-b offset)))))))
+        (close-input input)))))
+
+
+#|
+(defparameter f "/Users/hkt/Music/Samples/crotales/a6.aiff" )
+(defparameter f2 "/Users/hkt/Music/Samples/ccrma/oboe.aiff")
+(defparameter wind "/Users/hkt/Music/Samples/Wind/wind-gusting-cold.aiff")
+(with-sound () 
+  (delaysnd  0 f (seconds->samples .25)))
+
+(with-sound () 
+  (delaysnd  0 f (seconds->samples .25) :decay-time 4))
+
+
+(with-sound () 
+  (delaysnd  0 f2 (seconds->samples .25)
+             :max-length (delay-length 1 )
+             :delay-env '(0 0 100 1)
+             :decay-time 4))
+
+;;; comb effects
+
+(with-sound (:srate 44100 :channels 2) 
+  (delaysnd 0 wind (keynum->samples 'a4)
+            :amplitude .25 :delay-mix 1 :gain .9
+            :amp-env '(0 1 .5 .2 1 0)))
+
+(with-sound (:channels 2)
+  (delaysnd 0 wind (keynum->samples 'c5)   
+            :max-length (keynum->samples 'a4)
+            :amplitude .25
+            :delay-mix 1
+            :gain .9
+            :delay-env '(0 0 100 1)
+            :decay-time 2))
+
+;; flanging effects
+;; .5-1.5 millisecond delay, rate .5 herz, delay-mix .9, gain .75
+
+(with-sound () 
+  (delaysnd 0
+            f
+            (seconds->samples .001)
+            :max-length (seconds->samples .005) 
+            :flange-rate .25 :delay-mix 1 :gain .9 :decay-time .5))
+
+(with-sound () 
+  (delaysnd 0
+            f
+            (delay-length .05)
+            :max-length (delay-length .10) 
+            :flange-rate 35 :delay-mix 1 :gain .9 :decay-time 2))
+
+
+;;; Chorus effect.
+
+(with-sound () 
+  (delaysnd 0
+            f
+            (delay-length .03)
+            :max-length (delay-length .035) 
+            :flange-rate 1 :gain 0))
+
+|#

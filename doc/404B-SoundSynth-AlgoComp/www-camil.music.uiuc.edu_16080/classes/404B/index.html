@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/ by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:51 GMT -->
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "css/cm.css";
+</style>
+<title>Music 404B</title>
+</head>
+
+<body>
+
+<div style="text-align: center;">
+<h1>Music 404B</h1>
+<h1>Sound Synthesis and Algorithmic Composition</h1>
+
+<h3>MW 11-12:50<br/>
+Room 5047 (CAMIL I) School of Music<br/>
+Associate Prof. Rick Taube, Composition/Theory<br/>
+Email: taube@uiuc.edu</h3>
+
+</div>
+
+<div id="content">
+
+<h2 id="about">About</h2>
+<p>
+Music 404B is an intermediate course in software sound synthesis and algorithmic composition. Students should already have had experience with either sound synthesis or algorithmic composition, preferably by taking the preceding course "Introduction to Computer Composition". Topics covered in 404B include:
+</p>
+
+<ul>
+
+<li>
+Real-time scheduling: working with compositional algorithms in real time: integrating algorithms with concurrently running synthesis programs like Supercollider and MAX/MSP.
+</li>
+
+<li>
+Algorithmic notation: how to compute complex notation input into
+programs like Lilypond and Sibelius.
+</li>
+
+<li>
+Spectral composition: how to derive compositional materials from FFT
+analysis and algorithmically manipulate spectral information to produce
+scores for traditional instruments.
+</li>
+
+<li>
+Digital sound processing: applying compositional and sound
+processing/synthesis algorithms to generate multi-channel "tape" pieces.
+</li>
+
+
+</ul>
+<p>
+Students are expected to have had some experience with either sound synthesis, real-time systems or algorithmic composition. Knowledge of Lisp syntax (either Scheme or Common Lisp) is assumed. Grades will be based on class participation and compositional projects.
+</p>
+
+
+<h2 id="links">Course Links</h2>
+
+<ul>
+
+<li>
+<a href="http://commonmusic.sf.net/">Common Music Homepage</a> and <a href="http://commonmusic.sf.net/doc/dict">Dictionary</a></li>
+
+<li> <a href="http://www.lisp.org/HyperSpec/FrontMatter/index.html">Common Lisp HyperSpec</a> 
+</li>
+
+<li>
+<a href="http://www-2.cs.cmu.edu/Groups/AI/html/cltl/cltl2.html">Common Lisp: the Language (2nd Edition), by Guy Steele</a>
+</li>
+
+<li>
+<a href="http://www.indiana.edu/~ucspubs/b131/">Emacs Cheat Sheet</a>
+</li>
+
+
+<li><a href="http://www.gigamonkeys.com/book/">Practical Common Lisp</a> (introductory textbook for Common Lisp)
+</li>
+</ul>
+
+<h2>Course Software Installs</h2>
+<ul>
+
+<li>Emacs at home
+  <ul>
+    <li><a href="http://macemacsjp.sourceforge.jp/package/EmacsCVS-Panther-20050807.dmg">Emacs for Panther</a> (OS X)</li>
+    <li><a href="http://macemacsjp.sourceforge.jp/package/EmacsCVS-Tiger-20050807.dmg">Emacs for Tiger</a> (OS X)</li>
+    <li>Class Emacs init file</a>:
+      <ol>
+        <li>Download <a href="lisp/DOTemacs.txt">init file</a></li>
+        <li>Start Emacs</li>
+        <li>Drag file into Emacs window</li>
+        <li>Edit <code>load-path</code> and <code>inferior-lisp-program</code> for your machine</li>
+        <li>Save buffer as .emacs in home directory:  C-x C-w ~/.emacs</li>
+      </ol>
+      <li>Optional: add <a href="http://bc.tech.coop/blog/040422.html">hyperspec.el</a> to your Emacs site-lisp directory.</li>
+    </li>
+  </ul>
+
+<li><a href="http://openmcl.clozure.com/Distributions/openmcl-release-0.14.3.html">OpenMCL 0.14.3 Common Lisp</a></li>
+<li>
+<a href="http://prdownloads.sourceforge.net/midishare/midishare-1.88.dmg?download">Midishare 1.88</a>
+</li>
+<li><a href="http://timidity.sourceforge.net/">Timidity</a></li>
+<li><a href="http://common-lisp.net/project/fomus">Fomus</a></li>
+</ul>
+
+
+<h2>Schedule</h2>
+
+<h3>Week 1: Introduction to  MidiShare and Real-time scheduling</h3>
+
+<h4>Reading</h4>
+<ul>
+  <li>MidiShare:
+    <ul>
+ 
+      <li> <a href="http://commonmusic.sf.net/doc/dict/midishare-topic.html">Midishare support in CM</a>
+        <ul>
+          <li> <a href="http://commonmusic.sf.net/doc/dict/midishare-topic.html#midishare-open"><code>midishare-open</code></a></li>
+          <li> <a href="http://commonmusic.sf.net/doc/dict/midishare-topic.html#midiEv"><code>midiEv</code></a> foreign objects</li>
+          <li> <a href="http://commonmusic.sf.net/doc/dict/midishare-topic.html#ms:new"><code>ms:new</code></a></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+
+  <li>Real-time scheduling:
+    <ul>
+      <li> <a href="http://commonmusic.sf.net/doc/dict/rts-fn.html"><code>rts</code> </a> </li>
+      <li> <a href="http://commonmusic.sf.net/doc/dict/rtsqmk-fn.html"><code>rts?</code> </a> </li>
+      <li> <a href="http://commonmusic.sf.net/doc/dict/rts-stop-fn.html"><code>rts-stop</code> </a> </li>
+    </ul>
+  </li>
+  <li>Interactive receiving:
+    <ul>
+      <li> <a href="http://commonmusic.sf.net/doc/dict/set-receiver-fn.html"><code>set-receiver!</code> </a> </li>
+      <li> <a href="http://commonmusic.sf.net/doc/dict/receiverqmk-fn.html"><code>receiver?</code> </a> </li>
+      <li> <a href="http://commonmusic.sf.net/doc/dict/remove-receiver-fn.html"><code>remove-receiver!</code> </a> </li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Class</h4>
+<ul>
+<li>Login and run "Setup 5065"</li>
+<li>Set Firefox as default browser (Safari Preferences)</li>
+<li>Add Emacs to your Dock</li>
+<li>The Midishare applications: msDrivers and msController</li>
+<li> <a href="lisp/ms.lisp">ms.lisp</a> (Midishare, rts)</li>
+</ul>
+
+<h3>Week 2: Realtime Concepts, Midishare</h3>
+
+<h4>Monday</h4>
+<ul>
+<li> <a href="lisp/ms.lisp">ms.lisp</a> (Receiving)</li>
+<li> <a href="lisp/ms-answers.lisp">ms-answers.lisp</a> (completed version).</li>
+</ul>
+
+<h4>Wednesday</h4>
+<ul>
+<li> Create class directory ~/404b</li>
+<li> Download <a href="lisp/msutils.lisp">msutils.lisp</a> into ~/404b class directory </li>
+<li> Download <a href="lisp/cminit.lisp">cminit.lisp</a> and save as ~/.cminit.lisp (use emacs and save doing: C-x C-w ~/.cminit.lisp)</li>
+<li> <a href="lisp/ms2.lisp">ms2.lisp</a> </li>
+<li> <a href="lisp/ms2-answers.lisp">ms2-answers.lisp</a> </li>
+</ul>
+
+
+<h4>Friday (Labor Day Monday)</h4>
+<ul>
+  <li><a href="fomus/fomus.html">FOMUS</a></li>
+
+</ul>
+
+<h3>Week 3: Algorithmic Notation with Fomus (Psenicka)</h3>
+
+<h4>Reading</h4>
+<h4>Class</h4>
+
+<h3>Week 4: Disklavier</h3>
+
+<h4>Reading</h4>
+<ul>
+  <li>Risset handout (<i>Real Time Performance Interaction with a Computer Controlled Acoustic Piano</i>. Risset, J-C and Van Duyne, Scott. Computer Music Journal 20:1, pp.62-75; Spring 1996.)
+</li>
+  <li><a href="http://www.borg.com/~jglatt/tech/midispec/ctllist.htm">Control Changes</a></li>
+  <li>Chapter 15: Diskavier Manual</li>
+</ul>
+
+<h4>Class</h4>
+
+<ul>
+  <li><a href="lisp/dk1.lisp">dk1.lisp</a></li>
+  <li><a href="lisp/dk1-answers.lisp">dk1-answers.lisp</a></li>
+</ul>
+
+<h4>Friday</h4>
+
+<ul>
+  <li><a href="lisp/recording.lisp">recording.lisp</a></li>
+</ul>
+
+<h4>Week 5: Project #1 Interactive Composition for Disklavier and Performer</h4>
+
+<h4>Class</h4>
+
+<ul>
+  <li><a href="lisp/cache.lisp">cache.lisp</a></li>
+  <li><a href="lisp/boxes.lisp">boxes.lisp</a></li>
+</ul>
+
+<p>
+Compose an interactive piece for Disklavier and human
+performer. Performer's score should contain at least some material
+that is computed algorithmically. Score to be generated in using Fomus.
+</p>
+
+
+<h4>Week 6: Spectral Composition</h4>
+
+<h4>Monday</h4>
+
+<h5>Read:</h5>
+
+<ul>
+  <li><a href="http://commonmusic.sourceforge.net/doc/dict/midi-stream-cls.html">Channel Tuning</a></li>
+</ul>
+
+<h5>Practice:</h5>
+<ul>
+  <li><a href="lisp/harms.lisp">harms.lisp</a></li>
+  <li><a href="lisp/class-harms.lisp">class-harms.lisp</a> (In class)</li>
+</ul>
+
+<h4>Wednesday</h4>
+
+<h5>Read:</h5>
+
+<ul>
+  <li><a href="http://commonmusic.sourceforge.net/doc/dict/tuning-cls.html">tunings</a></li>
+  <li><a href="http://commonmusic.sourceforge.net/doc/dict/keynum-fn.html">keynum</a></li>
+  <li><a href="http://commonmusic.sourceforge.net/doc/dict/rm-spectrum-fn.html">rm-spectrum</a></li>
+  <li><a href="http://commonmusic.sourceforge.net/doc/dict/fm-spectrum-fn.html">fm-spectrum</a></li>
+</ul>
+
+<h5>Practice:</h5>
+
+<h4>Week 7: Spectral Composition 2</h4>
+
+
+<h5>Practice:</h5>
+<ul>
+  <li><a href="lisp/spectral-class.lisp">spectral-class.lisp</a> (In class)</li>
+</ul>
+
+
+<h4>MIDTERM  (due Oct. 24)</h4>
+<p>
+Compute a short (1-2 minute) composition for an instrument ensemble of your choice using either fm-spectrum, rm-spectrum or spectral data sets imported from SPEAR analysis of sound file(s). The final composition should be represented by
+<ul>
+<li>
+All lisp source files necessary to genreate your compostion. Your program must be functional, ie not produce any errors or warnings when it executes. The code should be well documented and include a clear explanation on on how to create/generet the piece (or sections of the piece) from the code you provide.</li> 
+<li>A legable, performable notated score (use either Fomus, Finale, or Sibelius), and a midi rendition for playback, including program changes to produce the approximate sound of the composition.
+</li>
+<li>Any analysis files you used as specral data for the compostion.</li>
+</ul>
+
+
+<h4>Week 8: Visualization</h4>
+
+<h5>Read</h5>
+<ul>
+<li>A href-"http:commonmusic.sf.net/doc/dict/cmio-topic.html">CMIO</a></li>
+<li>A href-"http:commonmusic.sf.net/doc/dict/plotter-topic.html">Plotter</a><li>
+</ul>
+
+<h5>Practice:</h5>
+<ul>
+  <li><a href="lisp/gui.lisp">gui.lisp</a></li>
+</ul>
+
+
+<h4>Week 9: Introduction to Common Lisp Music (CLM) 2</h4>
+
+
+<h5>Read:</h5>
+<ul>
+<li><a href="clm/simp.html">An Introduction to CLM</a></li>
+</ul>
+
+<h5>Practice:</h5>
+<ul>
+</ul>
+
+
+<h4>Week 10: Sound File Mixing and Processing</h4>
+
+<h5>Install</h5>
+Download, compile and load the following instruments:
+<ul>
+<li><a href="CLM/clm-3/fullmix.ins">fullmix.ins</a></li>
+<li><a href="lisp/expandn.ins">expandn.ins</a></li>
+<li><a href="lisp/vkey.lisp">vkey.lisp</a></li>
+</ul>
+
+<h5>Practice:</h5>
+
+<ul>
+  <li><a href="lisp/vkey-examples.lisp">vkey-examples.lisp</a></li>
+  <li><a href="sfp/fullmix/fullmix-examples.lisp">fullmix-examples.lisp</a></li>
+</ul>
+
+<h4>Week 11: Granularization</h4>
+
+Read:
+<ul>
+<li><a href="CLM/grani/grani.html">Grani</a></li>
+</ul>
+
+
+<h4>Week 12: Filtering</h4>
+
+Read:
+<ul>
+<li><a href="CLM/Filtering/filtering.html">Filtering</a></li>
+</ul>
+
+</div>
+</body>
+
+<!-- Mirrored from www-camil.music.uiuc.edu:16080/classes/404B/ by HTTrack Website Copier/3.x [XR&CO'2005], Thu, 26 Jan 2006 16:40:51 GMT -->
+</html>
+

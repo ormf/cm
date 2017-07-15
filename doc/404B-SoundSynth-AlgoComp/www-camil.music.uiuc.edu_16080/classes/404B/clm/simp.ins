@@ -1,0 +1,25 @@
+;;; The simp instrument
+
+(defparameter *simpenv* '(0 0 .25 1 .75 1 1 0))
+
+(definstrument simp (start dur freq amp &optional (ampenv *simpenv*))
+  (let* ((beg (seconds->samples start))
+         (end (+ beg (seconds->samples dur)))
+         (osc (make-oscil :frequency freq))
+         (env (make-env :envelope ampenv :scaler amp 
+                        :duration dur)))
+    (run 
+     (loop for i from beg to end 
+           do
+           (outa i (* (env env) (oscil osc)))))))
+
+#|
+(cd)
+(cload "simp.ins")
+(with-sound () (simp 0 1 440 .1 '(0 0 50 1 100 0)))
+(defparameter pluck '(0 0 1 1 25 .2 100 0))
+(with-sound (:output "foo.aiff")
+  (loop repeat 10
+       for i from 0 by .1
+       do (simp i (pick .1 .2 .3) (between 220 880) .2 pluck)))
+|#

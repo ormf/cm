@@ -1,0 +1,155 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+;;; FM VIOLIN ----------------------------------------------
+;;;
+;;; a lot of this instrument is the result of nearly 20 years of use
+;;; in 3 or 4 very different environments -- if I were to start all
+;;; over, it would be simpler.  See fmviolin.clm for some old examples.
+
+(defun bit20 (x)			;Samson box modifier got 2's complement 20 bit interpreted as fraction 
+  (if (>= x (expt 2 19))                ;(this needed to keep fm-violin backwards compatible with old note lists)
+      (float (/ (- x (expt 2 20)) (expt 2 19)))
+    (float (/ x (expt 2 19)))))
+
+(defun make-frobber-function (beg end frobl)
+  (let ((result (list beg))
+	(val (bit20 (cadr frobl))))
+    (loop for x in frobl by #'cddr and 
+              y in (cdr frobl) by #'cddr do
+      (when (and (>= x beg)
+		 (<= x end))
+	(push val result)
+	(push x result)
+	(setf val (bit20 y))))
+    (push val result)
+    (push end result)
+    (push val result)
+    (nreverse result)))
+
+(definstrument fm-violin 
+  (startime dur frequency amplitude &key
+	    (fm-index 1.0)
+	    (amp-env '(0 0  25 1  75 1  100 0))
+	    (periodic-vibrato-rate 5.0) (random-vibrato-rate 16.0)
+	    (periodic-vibrato-amplitude 0.0025) (random-vibrato-amplitude 0.005)
+	    (noise-amount 0.0) (noise-freq 1000.0)
+	    (ind-noise-freq 10.0) (ind-noise-amount 0.0)
+	    (amp-noise-freq 20.0) (amp-noise-amount 0.0)
+	    (gliss-env '(0 0  100 0)) (glissando-amount 0.0) 
+	    (fm1-env '(0 1  25 .4  75 .6  100 0))  (fm2-env '(0 1  25 .4  75 .6  100 0)) (fm3-env '(0 1  25 .4  75 .6  100 0))
+	    (fm1-rat 1.0) (fm2-rat 3.0)	 (fm3-rat 4.0)                    
+	    (fm1-index nil) (fm2-index nil) (fm3-index nil)
+	    (base nil) (frobber nil)
+	    (reverb-amount 0.01)
+	    (index-type :violin)
+	    (degree nil) (distance 1.0) (degrees nil)
+	    (no-waveshaping nil) (denoise nil)
+	    (denoise-dur .1) (denoise-amp .005)
+	    &allow-other-keys)
+  ;(if (> (abs amplitude) 1.0) (setf amplitude (clm-cerror ".1?" .1 #'numberp "amplitude = ~A?" amplitude)))
+  (if (<= (abs frequency) 1.0) (setf frequency (clm-cerror "440.0?" 440.0 #'numberp "frequency = ~A?" frequency)))
+  (let* ((beg (floor (* startime *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (frq-scl (hz->radians frequency))
+	 (modulate (not (zerop fm-index)))
+	 (maxdev (* frq-scl fm-index))
+	 (vln (not (eq index-type :cello)))
+	 (logfreq (log frequency))
+	 (sqrtfreq (sqrt frequency))
+	 (index1 (or fm1-index (min pi (* maxdev (/ (if vln 5.0 7.5) logfreq)))))
+	 (index2 (or fm2-index (min pi (* maxdev 3.0 (if vln 
+							     (/ (- 8.5 logfreq) (+ 3.0 (* frequency .001)))
+							   (/ 15.0 sqrtfreq))))))
+	 (index3 (or fm3-index (min pi (* maxdev (/ (if vln 4.0 8.0) sqrtfreq)))))
+
+;	 (easy-case (and (not no-waveshaping)
+;			 (zerop noise-amount)
+;			 (eq fm1-env fm2-env)
+;			 (eq fm1-env fm3-env)
+;			 (zerop (- fm1-rat (floor fm1-rat)))
+;			 (zerop (- fm2-rat (floor fm2-rat)))
+;			 (zerop (- fm3-rat (floor fm3-rat)))))
+;	 ;; if the envelopes are all the same, and each ratio is an integer, we can use
+;	 ;; waveshaping to get the modulation very cheaply
+;	 (coeffs (and easy-case modulate
+;	 	      (partials->polynomial
+;	 	       (list fm1-rat index1
+;	 		     fm2-rat index2
+;	 		     fm3-rat index3))))
+;
+;	 ;; 26-June-99 -- this is not right!  It should be:
+	 (easy-case (and (not no-waveshaping)
+			 (zerop noise-amount)
+			 (eq fm1-env fm2-env)
+			 (eq fm1-env fm3-env)
+			 (zerop (- fm1-rat (floor fm1-rat)))
+			 (zerop (- fm2-rat (floor fm2-rat)))
+			 (zerop (- fm3-rat (floor fm3-rat)))
+			 (zerop (nth-value 1 (floor fm2-rat fm1-rat)))
+			 (zerop (nth-value 1 (floor fm3-rat fm1-rat)))))
+	 (coeffs (and easy-case modulate
+	 	      (partials->polynomial
+	 	       (list fm1-rat index1
+	 		     (floor fm2-rat fm1-rat) index2
+	 		     (floor fm3-rat fm1-rat) index3))))
+	 ;; that is, we're doing the polynomial evaluation using fm1osc running at fm1-rat * frequency
+	 ;; so everything in the polynomial table should be in terms of harmonics of fm1-rat
+	 
+	 (norm (or (and easy-case modulate 1.0) index1))
+	 
+	 (carrier (make-oscil frequency))
+	 (fmosc1  (and modulate (make-oscil (* fm1-rat frequency))))
+	 (fmosc2  (and modulate (or easy-case (make-oscil (* fm2-rat frequency)))))
+	 (fmosc3  (and modulate (or easy-case (make-oscil (* fm3-rat frequency)))))
+	 (ampf  (make-env (if denoise (reduce-amplitude-quantization-noise amp-env dur amplitude denoise-dur denoise-amp) amp-env)
+			  amplitude :base base :duration dur))
+	 (indf1 (and modulate (make-env fm1-env norm :duration dur)))
+	 (indf2 (and modulate (or easy-case (make-env fm2-env index2 :duration dur))))
+	 (indf3 (and modulate (or easy-case (make-env fm3-env index3 :duration dur))))
+	 (frqf (make-env gliss-env (* glissando-amount frq-scl) :duration dur))
+	 (pervib (make-triangle-wave periodic-vibrato-rate (* periodic-vibrato-amplitude frq-scl)))
+	 (ranvib (make-rand-interp random-vibrato-rate (* random-vibrato-amplitude frq-scl)))
+	 (fm-noi (if (and (/= 0.0 noise-amount)
+			  (null frobber))
+		     (make-rand noise-freq (* pi noise-amount))))
+	 (ind-noi (if (and (/= 0.0 ind-noise-amount) (/= 0.0 ind-noise-freq))
+		      (make-rand-interp ind-noise-freq ind-noise-amount)))
+	 (amp-noi (if (and (/= 0.0 amp-noise-amount) (/= 0.0 amp-noise-freq))
+		      (make-rand-interp amp-noise-freq amp-noise-amount)))
+	 (frb-env (if (and (/= 0.0 noise-amount) frobber)
+		      (make-env (make-frobber-function startime (+ startime dur) frobber) :duration dur
+				:base 0	:scaler (* two-pi noise-amount))))
+	 (vib 0.0) 
+	 (modulation 0.0)
+	 (loc (make-locsig :degree (or degree degrees (random 90.0)) :reverb reverb-amount :distance distance))
+	 (fuzz 0.0)
+	 (ind-fuzz 1.0)
+	 (amp-fuzz 1.0))
+    (run
+     (loop for i from beg to end do
+       (declare (type :float noise-amount fuzz ind-fuzz amp-fuzz modulation fm1-rat fm2-rat fm3-rat vib)
+		(type :mus-any ind-noi amp-noi)
+		(type :double* coeffs)
+		(type :boolean frobber easy-case modulate))
+       (if (/= 0.0 noise-amount)
+	   (if (null frobber)
+	       (setf fuzz (rand fm-noi))
+	     (setf fuzz (env frb-env))))
+       (setf vib (+ (env frqf) (triangle-wave pervib) (rand-interp ranvib)))
+       (if ind-noi (setf ind-fuzz (+ 1.0 (rand-interp ind-noi))))
+       (if amp-noi (setf amp-fuzz (+ 1.0 (rand-interp amp-noi))))
+       (if modulate
+	   (if easy-case
+	       (setf modulation
+		 (* (env indf1) 
+		    (polynomial coeffs (oscil fmosc1 vib)))) ;(* vib fm1-rat)??
+	     (setf modulation
+	       (+ (* (env indf1) (oscil fmosc1 (+ (* fm1-rat vib) fuzz)))
+		  (* (env indf2) (oscil fmosc2 (+ (* fm2-rat vib) fuzz)))
+		  (* (env indf3) (oscil fmosc3 (+ (* fm3-rat vib) fuzz)))))))
+       (locsig loc i
+	     (* (env ampf) amp-fuzz
+		(oscil carrier (+ vib (* ind-fuzz modulation)))))))))
+
+
+;;; the "fuzz" term is not scaled to fit each modulator (this is the way the SAM version worked)

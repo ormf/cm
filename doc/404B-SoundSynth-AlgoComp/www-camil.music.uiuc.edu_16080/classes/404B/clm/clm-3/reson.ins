@@ -1,0 +1,69 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+
+(definstrument reson
+    (startime dur pitch amp numformants indxfun skewfun pcskew skewat skewdc
+	      vibfreq vibpc ranvibfreq ranvibpc degree distance reverb-amount &rest data)
+  ;; data is a list of lists of form '(ampf resonfrq resonamp ampat ampdc dev0 dev1 indxat indxdc)
+  (let* ((beg (floor (* startime *srate*)))
+	 (end (+ beg (floor (* dur *srate*))))
+	 (carriers (make-array numformants))
+	 (modulator (make-oscil :frequency pitch))
+	 (ampfs (make-array numformants))
+	 (indfs (make-array numformants))
+	 (c-rats (make-integer-array numformants))
+	 (frqf (make-env :envelope (stretch-envelope skewfun 25 (* 100 (/ skewat dur)) 75 (- 100 (* 100 (/ skewdc dur))))
+			  :scaler (hz->radians (* pcskew pitch)) :duration dur))
+	 (vib 0.0)
+	 (outsum 0.0)
+	 (totalamp 0.0)
+	 (modsig 0.0)
+	 (loc (make-locsig :degree degree :distance distance :reverb reverb-amount))
+	 (pervib (make-triangle-wave :frequency vibfreq
+				     :amplitude (hz->radians (* vibpc pitch))))
+	 (ranvib (make-rand-interp :frequency ranvibfreq
+			     :amplitude (hz->radians (* ranvibpc pitch)))))
+
+    ;; initialize the "formant" generators
+    (loop for i from 0 below numformants do (incf totalamp (nth 2 (nth i data))))
+    (loop for i from 0 below numformants do
+      (let* ((frmdat (nth i data))
+	     (freq (nth 1 frmdat))
+	     (ampf (nth 0 frmdat))
+	     (rfamp  (nth 2 frmdat))
+	     (ampat (* 100 (/ (nth 3 frmdat) dur)))
+	     (ampdc (- 100 (* 100 (/ (nth 4 frmdat) dur))))
+	     (dev0 (hz->radians (* (nth 5 frmdat) freq)))
+	     (dev1 (hz->radians (* (nth 6 frmdat) freq)))
+	     (indxat (* 100 (/ (nth 7 frmdat) dur)))
+	     (indxdc (- 100 (* 100 (/ (nth 8 frmdat) dur))))
+	     (harm (round freq pitch))
+	     (rsamp (- 1.0 (abs (- harm (/ freq pitch)))))
+	     (cfq (* pitch harm)))
+	(if (zerop ampat) (setf ampat 25))
+	(if (zerop ampdc) (setf ampdc 75))
+	(if (zerop indxat) (setf indxat 25))
+	(if (zerop indxdc) (setf indxdc 75))
+	(setf (aref indfs i) (make-env :envelope (stretch-envelope indxfun 25 indxat 75 indxdc) :duration dur
+					:scaler (- dev1 dev0) :offset dev0))
+	(setf (aref ampfs i) (make-env :envelope (stretch-envelope ampf 25 ampat 75 ampdc) :duration dur
+					:scaler (* rsamp amp (/ rfamp totalamp))))
+	(setf (aref c-rats i) harm)
+	(setf (aref carriers i) (make-oscil :frequency cfq))))
+    (run
+     (loop for i from beg to end do 
+       (setf outsum 0.0)
+       (setf vib (+ (triangle-wave pervib) (rand-interp ranvib) (env frqf)))
+       (setf modsig (oscil modulator vib))
+       (dotimes (k numformants)
+	 (incf outsum (* (env (aref ampfs k)) 
+			 (oscil (aref carriers k) (+ (* vib (aref c-rats k))
+						     (* (env (aref indfs k)) modsig))))))
+       (locsig loc i outsum)))))
+
+#|
+
+(reson 0 1.0 440 .1 2 '(0 0 100 1) '(0 0 100 1) .1 .1 .1 5 .01 5 .01 0 1.0 0.01
+         '((0 0 100 1) 1200 .5 .1 .1 0 1.0 .1 .1)
+         '((0 1 100 0) 2400 .5 .1 .1 0 1.0 .1 .1))
+
+|#

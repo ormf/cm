@@ -1,0 +1,119 @@
+;;; taken from Perry Cook's stkv1.tar.Z (Synthesis Toolkit), but I was
+;;; in a bit of a hurry and may not have made slavishly accurate translations.
+;;; Please let me (bil@ccrma.stanford.edu) know of any serious (non-envelope) errors.
+
+(definstrument tubebell (beg dur freq amp &optional (base 32))
+  ;; from Perry Cook's TubeBell.cpp
+  (let* ((osc0 (make-oscil (* freq 0.995)))
+	 (osc1 (make-oscil (* freq 1.414 0.995)))
+	 (osc2 (make-oscil (* freq 1.005)))
+	 (osc3 (make-oscil (* freq 1.414)))
+	 (ampenv1 (make-env (list 0 0 .005 1 dur 0) :base base :duration dur))
+	 (ampenv2 (make-env (list 0 0 .001 1 dur 0) :base (* 2 base) :duration dur))
+	 (ampmod (make-oscil 2.0))
+	 (g0 (* .5 amp .707))
+	 (g1 .203)
+	 (g2 (* .5 amp 1.0))
+	 (g3 .144)
+	 (st (floor (* beg *srate*)))
+	 (nd (+ st (floor (* dur *srate*)))))
+    (run
+     (loop for i from st below nd do
+       (outa i (* (+ (* .007 (oscil ampmod)) .993)
+		  (+ (* g0 (env ampenv1) (oscil osc0 (* g1 (oscil osc1))))
+		     (* g2 (env ampenv2) (oscil osc2 (* g3 (oscil osc3)))))))))))
+
+(definstrument wurley (beg dur freq amp)
+  ;; from Perry Cook's Wurley.cpp
+  (let* ((osc0 (make-oscil freq))
+	 (osc1 (make-oscil (* freq 4.0)))
+	 (osc2 (make-oscil 510.0))
+	 (osc3 (make-oscil 510.0))
+	 (ampmod (make-oscil 8.0))
+	 (g0 (* .5 amp))
+	 (g1 .307)
+	 (g2 (* .5 amp .307))
+	 (g3 .117)
+	 (ampenv (make-env '(0 0 1 1 9 1 10 0) :duration dur))
+	 (indenv (make-env (list 0 0 .001 1 .15 0 dur 0) :duration dur))
+	 (resenv (make-env (list 0 0 .001 1 .25 0 dur 0) :duration dur))
+	 (st (floor (* beg *srate*)))
+	 (nd (+ st (floor (* dur *srate*)))))
+    (run
+     (loop for i from st below nd do
+       (outa i (* (env ampenv)
+		  (+ 1.0 (* .007 (oscil ampmod)))
+		  (+ (* g0 (oscil osc0 (* g1 (oscil osc1))))
+		     (* (env resenv) g2 (oscil osc2 (* g3 (env indenv) (oscil osc3)))))))))))
+
+
+(definstrument Rhodey (beg dur freq amp &optional (base .5))
+  ;; from Perry Cook's Rhodey.cpp
+  (let* ((osc0 (make-oscil freq))
+	 (osc1 (make-oscil (* freq 0.5)))
+	 (osc2 (make-oscil freq))
+	 (osc3 (make-oscil (* freq 15.0)))
+	 (ampenv1 (make-env (list 0 0 .005 1 dur 0) :base base :duration dur))
+	 (ampenv2 (make-env (list 0 0 .001 1 dur 0) :base (* base 1.5) :duration dur))
+	 (ampenv3 (make-env (list 0 0 .001 1 .25 0 dur 0) :base (* base 4) :duration dur))
+	 (g0 (* .5 amp))
+	 (g1 .535)
+	 (g2 (* .5 amp))
+	 (g3 .109)
+	 (st (floor (* beg *srate*)))
+	 (nd (+ st (floor (* dur *srate*)))))
+    (run
+     (loop for i from st below nd do
+       (outa i (+ (* g0 (env ampenv1) (oscil osc0 (* g1 (oscil osc1))))
+		  (* g2 (env ampenv2) (oscil osc2 (* (env ampenv3) g3 (oscil osc3))))))))))
+
+
+(definstrument hammondoid (beg dur freq amp)
+  ;; from Perry Cook's BeeThree.cpp
+  (let* ((osc0 (make-oscil (* freq 0.999)))
+	 (osc1 (make-oscil (* freq 1.997)))
+	 (osc2 (make-oscil (* freq 3.006)))
+	 (osc3 (make-oscil (* freq 6.009)))
+	 (ampenv1 (make-env (list 0 0 .005 1 (- dur .008) 1 dur 0) :duration dur))
+	 (ampenv2 (make-env (list 0 0 .005 1 dur 0) :duration dur))
+	 (g0 (* .25 .75 amp))
+	 (g1 (* .25 .75 amp))
+	 (g2 (* .5 amp))
+	 (g3 (* .5 .75 amp))
+	 (st (floor (* beg *srate*)))
+	 (nd (+ st (floor (* dur *srate*)))))
+    (run
+     (loop for i from st below nd do
+       (outa i (+ (* (env ampenv1)
+		     (+ (* g0 (oscil osc0))
+			(* g1 (oscil osc1))
+			(* g2 (oscil osc2))))
+		  (* (env ampenv2) g3 (oscil osc3))))))))
+
+
+(definstrument metal (beg dur freq amp)
+  ;; from Perry Cook's HeavyMtl.cpp
+  (let* ((osc0 (make-oscil freq))
+	 (osc1 (make-oscil (* freq 4.0 0.999)))
+	 (osc2 (make-oscil (* freq 3.0 1.001)))
+	 (osc3 (make-oscil (* freq 0.50 1.002)))
+	 (ampenv0 (make-env (list 0 0 .001 1 (- dur .002) 1 dur 0) :duration dur))
+	 (ampenv1 (make-env (list 0 0 .001 1 (- dur .011) 1 dur 0) :duration dur))
+	 (ampenv2 (make-env (list 0 0 .01 1 (- dur .015) 1 dur 0) :duration dur))
+	 (ampenv3 (make-env (list 0 0 .03 1 (- dur .040) 1 dur 0) :duration dur))
+	 (g0 (* .615 amp))
+	 (g1 .202)
+	 (g2 .574)
+	 (g3 .116)
+	 (st (floor (* beg *srate*)))
+	 (nd (+ st (floor (* dur *srate*)))))
+    (run
+     (loop for i from st below nd do
+       (outa i (* g0 (env ampenv0) 
+		  (oscil osc0 
+			 (+ (* g1 (env ampenv1) 
+			       (oscil osc1 
+				      (* g2 (env ampenv2) 
+					 (oscil osc2))))
+			    (* g3 (env ampenv3) 
+			       (oscil osc3))))))))))

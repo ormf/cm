@@ -1,0 +1,448 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>Portmidi</title>
+</head>
+
+<body>
+<div id="content"> <!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Topic]</dt>
+
+<dd>Portmidi</dd>
+</dl>
+
+<p>
+Common Music supports reading and writing MIDI messages to and from
+ <a href="http://www-2.cs.cmu.edu/~music/portmusic/">Portmidi</a>, an
+open-source, cross-platform MIDI device library. CM supports Portmidi
+on OS X and Linux in OpenMCL, SBCL and CMUCL. The support consists of
+a <a href="#portmidi-stream"><code>portmidi-stream</code></a> class to
+manage different Portmidi input/output devices and a handful of
+auxiliary functions for querying Portmidi about its current
+configuration and for accessing its millisecond timer. To work with
+Portmidi you must compile the Portmidi and Porttime libraries as
+shared libs (libport*.dylib on OS X and libport*.so on Linux) and install in
+/usr/local/lib.
+
+Note also that on Linux you may have to load the snd-seq-* kernel
+modules before starting CM with Portmidi. These modules are not loaded
+by default, perhaps something like this will work:
+<blockquote>
+<pre><span style="font-weight:bold;">$</span> modprobe snd_seq_midi snd_seq_oss snd_seq_midi_emul</pre>
+</blockquote>
+</p>
+
+<h4>The Portmidi stream</h4>
+
+<dl class="dictsyntax" id="portmidi-stream">
+<dt>[Class]</dt>
+<dd><code class="entry">portmidi-stream</code></dd>
+</dl>
+
+<p>
+Manages resources and connections between CM and Portmidi input and
+output devices. This class is automatically chosen when you specify a
+stream with a .pm extension. The convenience
+functions <a href="#portmidi-open"><code>portmidi-open</code></a>
+and <a href="#portmidi-close"><code>portmidi-close</code></a> are
+provided for the typical case of a single input/output pair.  Opening
+a portmidi-stream initializes the library and starts the millisecond
+timer if they have not been initialized.
+</p>
+
+<p id="args"><code class="entry">portmidi-stream</code> supports the
+following slot initializations:
+</p>
+<dl>
+
+<dt>
+<code class="keyword">:input</code> {<var>string</var>  | <var>integer</var> | <var>boolean</var>}
+</dt>
+<dd>
+The name or integer identifier of a Portmidi input device to open or
+boolean true or false.  The
+function <a href="#pm:getdeviceinfo">pm:GetDeviceInfo</a>
+can be used to determine the names and ids of available Portmidi
+devices.  If the value is boolean true then Portmidi's default input
+device is opened, as determined
+by <a href="#pm:getdefaultinputdeviceid">pm:GetDefaultInputDeviceID</a>.
+If the value is false then no input device is opened.  If no value is
+specified the input device defaults to the global
+variable <a
+href="#*portmidi-default-input*"><code>*portmidi-default-input*</code></a>.
+
+</dd>
+
+<dt>
+<code class="keyword">:output</code> {<var>string</var> | <var>integer</var> | <var>boolean</var>}
+</dt>
+<dd>The name or integer identifier of a Portmidi output device to open
+or boolean true or false. The
+function <a href="#pm:getdeviceinfo">pm:GetDeviceInfo</a>
+can be used to determine the names and ids of available Portmidi
+devices.  If the value is boolean true then Portmidi's default output
+device is opened, as determined
+by <a
+href="#pm:getdefaultoutputdeviceid">pm:GetDefaultOutputDeviceID</a>.  If
+the value is false then no output device is opened.  If no value is
+specified the output device defaults to the global
+variable <a
+href="#*portmidi-default-output*"><code>*portmidi-default-output*</code></a>.
+</dd>
+
+<dt>
+<code class="keyword">:latency</code> <var>integer</var>
+</dt>
+<dd>A millisecond value that determines how Portmidi treats MIDI
+message timestamps. If the value is 0 then Portmidi operates in
+"realtime" mode and MIDI messages are sent to the destination device
+as soon as Portmidi receives them, regardless of message
+timestamps. If the latency value is greater than zero then Portmidi
+delays future messages until
+<var>timestamp</var>+<var>latency</var>. The default value is 100
+milliseconds.  If no value is specified the latency defaults to the
+global
+variable <a
+href="#*portmidi-default-latency*"><code>*portmidi-default-latency*</code></a>.
+</dd>
+
+<dt>
+<code class="keyword" id="receive-mode">:receive-mode</code> {<code class="keyword">:message</code> | <code class="keyword">:raw</code>}
+</dt>
+<dd>
+Determines what values are passed to a Portmidi receiver hook
+established by <a href="set-receiver-fn.html">set-receiver!</a>. If
+the value is <code class="keyword">:message</code> then the receiver
+hook is passed two values: the
+incoming <a href="midi-topic.html#midi_messages">MIDI</a> message its
+a millisecond timestamp. If the value
+is <code class="keyword">:raw</code> then the hook is passed the
+Portmidi event buffer (a pointer to a foreign array) and the number of
+events read. See the EventBuffer functions
+in <a href="../../src/portmidi.lisp">portmidi.lisp</a> for more
+information about reading raw events from Portmidi.
+</dd>
+<dt>
+<code class="keyword">:inbuf-size</code> <var>integer</var>
+</dt>
+<dd>The size of the event buffer that will be allocated to hold
+incoming midi data when the input device is read.  If no value is
+specified the latency defaults to the global
+variable <a
+href="#*portmidi-default-inbuf-size*"><code>*portmidi-default-inbuf-size*</code></a>.
+</dd>
+
+<dt>
+<code class="keyword">:outbuf-size</code> <var>integer</var>
+</dt>
+<dd>
+The size of the event buffer Portmidi allocates to queue future
+messages.  If no value is specified the latency defaults to the global
+variable <a
+href="#*portmidi-default-outbuf-size*"><code>*portmidi-default-outbuf-size*</code></a>.
+
+</dd>
+
+<dt>
+<code class="keyword">:filter</code> <var>integer</var>
+</dt>
+<dd>An optional filter value. Filtered messages will be ignored by the
+open Portmidi devices. The value can be a logical OR (logior) of the
+following constants:
+
+<blockquote>
+<p>
+<code>pm:filt-active pm:filt-sysex pm:filt-clock pm:filt-play pm:filt-f9 pm:filt-fd pm:filt-reset pm:filt-note pm:filt-channel-aftertouch pm:filt-poly-aftertouch pm:filt-program pm:filt-control pm:filt-pitchbend pm:filt-mtc filt-song-position pm:filt-song-select pm:filt-tune
+pm:filt-tick pm:filt-undefined pm:filt-realtime pm:filt-aftertouch pm:filt-systemcommon</code>.
+</p>
+</blockquote>
+If no value is specified the filter defaults to the global
+variable <a
+href="#*portmidi-default-filter*"><code>*portmidi-default-filter*</code></a>.
+</dd>
+
+<dt>
+<code class="keyword">:mask</code> <var>integer</var>
+</dt>
+<dd>An optional bit mask where each 1-bit enables a channel in the
+open device. For example the mask value #b1101 will enable messages
+only on channels 1, 3 and 4. By default all channels are enabled.
+If no value is
+specified the mask defaults to the global
+variable  <a href="#*portmidi-default-mask*"><code>*portmidi-default-mask*</code></a>.
+</dd>
+</dl>
+
+<h4>Auxiliary Functions and Variables</h4>
+
+CM provides some a few functions and variables to facilitate working
+with Portmidi. Some of the functions are exported from the Portmidi
+package and should be referenced using the pm: package prefix.
+
+<dl class="dictsyntax" id="portmidi-open">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">portmidi-open</code> . <var>args</var> <code>)</code></dd>
+</dl>
+<p>
+Opens a <a href="#portmidi-stream">portmidi-stream</a>
+called <span class="string">"midi-port.pm"</span> according to the
+keyword initialization <var>args</var> passed to the stream. The
+function <a href="#getdeviceinfo">pm:GetDeviceInfo</a>
+can be used to determine the names and ids of available Portmidi
+devices.
+</p>
+
+<dl class="dictsyntax" id="portmidi-open?">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">portmidi-open?</code><code>)</code></dd>
+</dl>
+<p>
+Tests to see if <span class="string">"midi-port.pm"</span> has already
+been opened, returns one of four possible
+values: <code
+class="keyword">:in</code>, <code
+class="keyword">:out</code>, <code class="keyword">:inout</code> or
+false.
+</p>
+
+<dl class="dictsyntax" id="portmidi-close">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">portmidi-close</code><code>)</code></dd>
+</dl>
+<p>
+Closes the <a href="portmidi-stream">portmidi-stream</a> called <span class="string">"midi-port.pm"</span> if it is open, otherwise has no effect.
+</p>
+
+
+<dl class="dictsyntax" id="portmidi-record">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">portmidi-record!</code> <var>seq</var> [<var>stream</var>]<code>)</code></dd>
+</dl>
+<p>
+Records MIDI data from the open input <var>stream</var>
+into <a href="seq-cls.html"><var>seq</var></a>. Returns no
+values. If <var>stream</var> is not supplied it defaults
+to <span class="string">"midi-port.pm"</span>.  If <var>seq</var>
+already contains objects when the recording starts the new objects
+will be inserted into the existing list.  The first recorded object is
+always placed at time 0.0 in <var>seq</var>. To stop recording
+call <code>portmidi-record!</code> with false for <var>seq</var>.
+</p>
+
+<dl class="dictsyntax" id="pm:countdevices">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pm:CountDevices</code><code>)</code></dd>
+</dl>
+<p>Returns the number of available Portmidi devices.</p>
+
+
+<dl class="dictsyntax" id="pm:getdeviceinfo">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pm:GetDeviceInfo</code> . <var>id</var><code>)</code></dd>
+</dl>
+<p>
+If <var>id</var> is not specified, returns a list of the device ids
+(integer), names (string) device types (keyword) and open status
+(boolean) of each available Portmidi device. If <var>id</var> is
+specifed only information for that device is returned.  Calling this
+function initializes the Portmidi library if it has not already been
+initialized.  Note that MIDI devices added after the Portmidi library
+has been initializd will not be reflected in the list of descriptions.
+</p>
+
+<dl class="dictsyntax" id="pm:getdefaultinputdeviceid">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pm:GetDefaultInputDeviceID</code><code>)</code></dd>
+</dl>
+<p>Returns the id (integer) of Portmidi's default input device.</p>
+
+<dl class="dictsyntax" id="pm:getdefaultoutputdeviceid">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pm:GetDefaultOutputDeviceID</code><code>)</code></dd>
+</dl>
+<p>Returns the id (integer) of Portmidi's default output device.</p>
+
+
+<dl class="dictsyntax" id="pm:time">
+<dt>[Function]</dt>
+<dd><code>(</code><code class="entry">pm:Time</code><code>)</code></dd>
+</dl>
+<p>
+Returns the current millisecond time from Porttime. This function
+should not be called unless a Portmidi stream has already been opened
+or you have called the <code>pm:TimeStart</code> function to
+initialize Porttime first.
+</p>
+
+<dl class="dictsyntax" id="*portmidi-default-input*">
+<dt>[Variable]</dt>
+<dd><code class="entry">*portmidi-default-input*</code></dd>
+</dl>
+<p>
+The input device to open if none specified to
+<a href="#portmidi-open">portmidi-open</a>. The default value is
+true. The variable can be respecified in a .cminit.lisp file.
+</p>
+
+<dl class="dictsyntax" id="*portmidi-default-output*">
+<dt>[Variable]</dt>
+<dd><code class="entry">*portmidi-default-output*</code></dd>
+</dl>
+<p>
+The output device to open if none specified to
+<a href="#portmidi-open">portmidi-open</a>. The default value is
+true. The variable can be respecified in a .cminit.lisp file.
+</p>
+
+<dl class="dictsyntax" id="*portmidi-default-latency*">
+<dt>[Variable]</dt>
+<dd><code class="entry">*portmidi-default-latency*</code></dd>
+</dl>
+<p>
+The portmidi latency if none specified to
+<a href="#portmidi-open">portmidi-open</a>. The default value is
+100 milliseconds. The variable can be respecified in a .cminit.lisp file.
+</p>
+
+<dl class="dictsyntax" id="*portmidi-default-inbuf-size*">
+<dt>[Variable]</dt>
+<dd><code class="entry">*portmidi-default-outbuf-size*</code></dd>
+</dl>
+<p>
+The input buffer size if none specified to
+<a href="#portmidi-open">portmidi-open</a>. The default value is
+64. The variable can be respecified in a .cminit.lisp file.
+</p>
+
+<dl class="dictsyntax" id="*portmidi-default-outbuf-size*">
+<dt>[Variable]</dt>
+<dd><code class="entry">*portmidi-default-outbuf-size*</code></dd>
+</dl>
+<p>
+The output buffer size if none specified to
+<a href="#portmidi-open">portmidi-open</a>. The default value is
+256. The variable can be respecified in a .cminit.lisp file.
+</p>
+
+<dl class="dictsyntax" id="*portmidi-default-filter*">
+<dt>[Variable]</dt>
+<dd><code class="entry">*portmidi-default-filter*</code></dd>
+</dl>
+<p>
+The message filter specification if none specified to
+<a href="#portmidi-open">portmidi-open</a>. The default value is
+(). The variable can be respecified in a .cminit.lisp file.
+</p>
+
+<dl class="dictsyntax" id="*portmidi-default-mask*">
+<dt>[Variable]</dt>
+<dd><code class="entry">*portmidi-default-mask*</code></dd>
+</dl>
+<p>
+The channel mask specification if none specified to
+<a href="#portmidi-open">portmidi-open</a>. The default value is
+0. The variable can be respecified in a .cminit.lisp file.
+</p>
+
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Accessing Portmidi information and opening a Portmidi stream.
+</p>
+<pre class="code">
+(pm:CountDevices)
+<span class="result">&rArr;</span> 4
+(pm:GetDeviceInfo)
+<span class="result">&rArr;</span> ((<span class="keyword">:id</span> 0 <span class="keyword">:name</span> <span class="string">"IAC Driver: IAC Bus 1"</span> <span class="keyword">:type</span> <span class="keyword">:input</span> <span class="keyword">:open</span> #f)
+    (<span class="keyword">:id</span> 1 <span class="keyword">:name</span> <span class="string">"1x1: Port 1"</span> <span class="keyword">:type</span> <span class="keyword">:input</span> <span class="keyword">:open</span> #f)
+    (<span class="keyword">:id</span> 2 <span class="keyword">:name</span> <span class="string">"IAC Driver: IAC Bus 1"</span> <span class="keyword">:type</span> <span class="keyword">:output</span> <span class="keyword">:open</span> #f)
+    (<span class="keyword">:id</span> 3 <span class="keyword">:name</span> <span class="string">"1x1: Port 1"</span> <span class="keyword">:type</span> <span class="keyword">:output</span> <span class="keyword">:open</span> #f))
+(pm:GetDefaultInputDeviceID)
+<span class="result">&rArr;</span> 0
+(pm:GetDefaultOutputDeviceID)
+<span class="result">&rArr;</span> 2
+(portmidi-open <span class="keyword">:output</span> 3 <span class="keyword">:input</span> #f)
+<span class="result">&rArr;</span> #&lt;portmidi-stream <span class="string">"midi-port.pm"</span> (out:3)&gt;
+(portmidi-open?)
+<span class="result">&rArr;</span> <span class="keyword">:out</span>
+(pm:Time)
+<span class="result">&rArr;</span> 36993
+(portmidi-close)
+<span class="result">&rArr;</span> #t
+</pre>
+</div> 
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 2.</span> Writing MIDI events.
+</p>
+<pre class="code">
+<span class="comment">;; midi output should be open with latency>0</span>
+(portmidi-open <span class="keyword">:output</span> 3 <span class="keyword">:input</span> #f <span class="keyword">:latency</span> 500)
+<span class="result">&rArr;</span> #&lt;portmidi-stream <span class="string">"midi-port.pm"</span> (out:3)&gt;
+(<span class="special">define</span> (<span class="defined">playsome</span> len lb ub)
+  (<a href="process-mac.html">process</a> repeat len
+           for d = (<a href="pick-fn.html">pick</a> .4 .2 .2)
+           output (<a href="new-mac.html">new</a> <a href="midi-cls.html">midi</a> <span class="keyword">:time</span> (<a href="now-fn.html">now</a>) 
+                       <span class="keyword">:duration</span> (* d 1.5)
+                       <span class="keyword">:keynum</span> (<a href="between-fn.html">between</a> lb ub)
+                       <span class="keyword">:amplitude</span> (<a href="odds-fn.html">odds</a> .25 .8 .4))
+           wait d))
+
+(<a href="events-fn.html">events</a> (playsome 20 60 90) <span class="string">"midi-port.pm"</span>)
+<span class="result">&rArr;</span> #&lt;portmidi-stream <span class="string">"midi-port.pm"</span> (out:3)&gt;
+(portmidi-close)
+<span class="result">&rArr;</span> #t
+</pre>
+</div>
+
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 3.</span> Recording messages.
+</p>
+<pre class="code">
+(<span class="special">define</span> <span class="defined">*pm*</span> (portmidi-open <span class="keyword">:latency</span> 0 <span class="keyword">:input</span> 1 <span class="keyword">:output</span> 3))
+
+(<span class="special">define</span> <span class="defined">myseq</span> (<a href="new-mac.html">new</a> <a href="seq-fn.html">seq</a>))
+
+(portmidi-record! myseq)
+
+<span class="comment">;; stop recording</span>
+
+(portmidi-record! #f)
+
+(<a href="list-objects-fn.html">list-objects</a> myseq)
+
+0. #i(midi time 0.0 keynum 60 duration 0.159 amplitude 0.46456692 channel 0)
+1. #i(midi time 0.495 keynum 64 duration 0.147 amplitude 0.6771653 channel 0)
+2. #i(midi time 0.834 keynum 67 duration 0.181 amplitude 0.61417323 channel 0)
+3. #i(midi time 1.108 keynum 65 duration 0.144 amplitude 0.6062992 channel 0)
+4. #i(midi time 1.47 keynum 62 duration 0.214 amplitude 0.61417323 channel 0)
+5. #i(midi time 2.848 keynum 60 duration 0.155 amplitude 0.62204725 channel 0)
+6. #i(midi time 2.837 keynum 64 duration 0.179 amplitude 0.72440946 channel 0)
+7. #i(midi time 2.847 keynum 67 duration 0.191 amplitude 0.56692916 channel 0)
+</pre>
+</div>
+
+
+
+<h4>See also:</h4>
+<ul>
+<li><a href="midi-topic.html">MIDI</a> [Topic]</li>
+<li><a href="receive-fn.html"><code>receive</code></a> [Function]</li>
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>

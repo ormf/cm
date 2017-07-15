@@ -1,0 +1,108 @@
+;;; -*- syntax: common-lisp; base: 10; mode: lisp -*-
+;;;
+;;; The Karplus-Strong algorithm as extended by David Jaffe and Julius Smith -- see 
+;;;  Jaffe and Smith, "Extensions of the Karplus-Strong Plucked-String Algorithm"
+;;;  CMJ vol 7 no 2 Summer 1983, reprinted in "The Music Machine".
+
+#|
+;;; this block of stuff was in the original, but wasn't used anywhere.
+
+(defun magnitude (r i) 
+  (sqrt (+ (* r r) (* i i))))
+
+(defun getGain (frq R)
+  (let* ((x (hz->radians frq))
+	 (r1 (- 1.0 (* R (cos x))))
+	 (i (- (* R (sin x)))))
+    (/ (- 1.0 R) (magnitude r1 i))))
+
+(defun quadraticFormula (a b c)
+  (let ((plusresult (/ (+ (- b) (sqrt (- (* b b) (* 4 a c)))) (* 2 a)))
+	(minusresult (/ (- (- b) (sqrt (- (* b b) (* 4 a c)))) (* 2 a))))
+    (if (and (< plusresult 1.0) (< minusresult 1.0))
+	(max plusresult minusresult)
+      (if (< plusresult 1.0) 
+	  plusresult
+	(if (< minusresult 1.0)
+	    minusresult
+	  (min plusresult minusresult))))))
+
+(defun computeR (freq bw)
+  (let* ((refFreq (exp (* (log (* *srate* .5)) .5)))
+	 (R0 (exp (- (* pi (/ bw *srate*)))))
+	 (Gain (getGain refFreq R0))
+	 (Gain2 (* Gain Gain))
+	 (oT (hz->radians freq)))
+    (quadraticFormula (- Gain2 1.0)
+		      (- 2.0 (* 2.0 (cos oT) Gain2))
+		      (- Gain2 1.0))))
+
+(defun equalS (freq t60)
+  (let* ((tau (/ t60 (log 1000)))
+	 (x (/ (* 2.0 (cos (hz->radians freq))) *srate*)))
+    (quadraticFormula (- 2 x)
+		       (- x 2)
+		       (- 1.0 (exp (/ -1.0 (* .5 freq tau)))))))
+|#
+(defun getOptimumC (S o p)
+  (let* ((pa (* (/ 1.0 o) (atan (* S (sin o)) (+ (- 1.0 S) (* S (cos o))))))
+	 (tmpInt (floor (- p pa)))
+	 (pc (- p pa tmpInt)))
+    (loop while (< pc .1) do 
+      (decf tmpInt)
+      (incf pc))
+    (values tmpInt (/ (- (sin o) (sin (* o pc))) (sin (+ o (* o pc)))))))
+
+(defun tuneIt (f s1)
+  (let* ((p (/ *srate* f))	;period as float
+	 (s (if (zerop s1) 0.5 s1))
+	 (o (hz->radians f)))
+    (multiple-value-bind
+	(T1 C1)
+	(getOptimumC s o p)
+      (multiple-value-bind
+	  (T2 C2)
+	  (getOptimumC (- 1.0 s) o p)
+	(if (and (/= s .5)
+		 (< (abs C1) (abs C2)))
+	    (values (- 1.0 s) C1 T1)
+	  (values s C2 T2))))))
+
+
+(definstrument pluck (start dur freq amp weighting lossfact decaytime attacktime)
+
+  ;; DAJ explains weighting and lossfact as follows:
+  ;; weighting is the ratio of the once-delayed to the twice-delayed samples.  It defaults to .5=shortest decay.
+  ;;     anything other than .5 = longer decay.  Must be between 0 and less than 1.0.
+  ;; lossfact can be used to shorten decays.  Most useful values are between .8 and 1.0.
+  
+  (multiple-value-bind
+      (wt0 c dlen)
+      (tuneIt freq weighting)
+    (let* ((beg (floor (* start *srate*)))
+	   (end (+ beg (floor (* dur *srate*))))
+	   (lf (if (zerop lossfact) 1.0 (min 1.0 lossfact)))
+	   (wt (if (zerop wt0) 0.5 (min 1.0 wt0)))
+	   (tab (make-double-array dlen))
+	   ;; get initial waveform in "tab" -- here we can introduce 0's to simulate different pick
+	   ;; positions, and so on -- see the CMJ article for numerous extensions.  The normal case
+	   ;; is to load it with white noise (between -1 and 1).
+	   (val 0.0)
+	   (allp (make-one-zero (* lf (- 1.0 wt)) (* lf wt)))
+	   (feedb (make-one-zero c 1.0)) ;or (feedb (make-one-zero 1.0 c))
+	   (ctr 0))
+      (loop for i from 0 below dlen do (setf (aref tab i) (double (- 1.0 (random 2.0)))))
+      (run
+       (loop for i from beg to end do
+	 (declare (type integer ctr dlen) (type float val c amp))
+	 (setf val (aref tab ctr))	;current output value
+	 (setf (aref tab ctr) 
+	   (* (- 1.0 c) 
+	      (one-zero feedb 
+			(one-zero allp val))))
+	 (incf ctr)
+	 (if (>= ctr dlen) (setf ctr 0))
+	 (outa i (* amp val)))))))
+	   
+
+

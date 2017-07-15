@@ -1,0 +1,8 @@
++*.gif +*.png -ad.doubleclick.net/* -O ~/websites/# http://www-camil.music.uiuc.edu:16080/classes/404B/
+File generated automatically on Thu, 26 Jan 2006 17:40:49, do NOT edit
+
+To update a mirror, just launch httrack without any parameters
+The existing cache will be used (and modified)
+To have other options, retype all parameters and launch HTTrack
+To continue an interrupted mirror, just launch httrack without any parameters
+

@@ -1,0 +1,294 @@
+;;; examples of the granulate generator in conjunction with sampling rate conversion
+
+(definstrument expsrc (beg dur input-file exp-ratio src-ratio amp &optional rev start-in-file)
+  (let* ((st (floor (* beg *srate*)))
+	 (stf (floor (* (or start-in-file 0) (sound-srate input-file))))
+	 (fdA (open-input* input-file :channel 0 :start stf))
+	 (exA (make-granulate :expansion exp-ratio :input fdA))
+	 (two-chans (and (= (sound-chans input-file) 2) (= (mus-channels *output*) 2)))
+	 (fdB (and two-chans (open-input* input-file :channel 1 :start stf)))
+	 (exB (and two-chans (make-granulate :expansion exp-ratio :input fdB)))
+	 (srcA (make-src :srate src-ratio))
+	 (srcB (and two-chans (make-src :srate src-ratio)))
+	 (revit (if (and *reverb* rev) (if two-chans (* rev .5) rev)))
+	 (nd (+ st (floor (* *srate* dur)))))
+    (run
+     (loop for i from st to nd do
+       (let ((valA               (* amp (src srcA 0.0 #'(lambda (dir) (granulate exA)))))
+	     (valB (if two-chans (* amp (src srcB 0.0 #'(lambda (dir) (granulate exB)))) 0.0)))
+	 (outa i valA)
+	 (if two-chans (outb i valB))
+	 (if revit (outa i (* revit (+ valA valB)) *reverb*)))))
+    (close-input fdA)
+    (if two-chans (close-input fdB))))
+
+(definstrument expsrc1 (beg dur input-file exp-ratio src-ratio amp &optional rev start-in-file)
+  ;; this instrument performs the same transformation as the previous one
+  ;; (it just reverses the src and granulate order as a demo of the input function)
+  (let* ((st (floor (* beg *srate*)))
+	 (stf (floor (* (or start-in-file 0) (sound-srate input-file))))
+	 (fdA (open-input* input-file :channel 0 :start stf))
+	 (exA (make-granulate :expansion exp-ratio))
+	 (two-chans (and (= (sound-chans input-file) 2) (= (mus-channels *output*) 2)))
+	 (fdB (and two-chans (open-input* input-file :channel 1 :start stf)))
+	 (exB (and two-chans (make-granulate :expansion exp-ratio)))
+	 (srcA (make-src :srate src-ratio :input fdA))
+	 (srcB (and two-chans (make-src :srate src-ratio :input fdB)))
+	 (revit (if (and *reverb* rev) (if two-chans (* rev .5) rev)))
+	 (nd (+ st (floor (* *srate* dur)))))
+    (run
+     (loop for i from st to nd do
+       (let ((valA               (* amp (granulate exA #'(lambda (dir) (src srcA 0.0)))))
+	     (valB (if two-chans (* amp (granulate exB #'(lambda (dir) (src srcB 0.0)))) 0.0)))
+	 (outa i valA)
+	 (if two-chans (outb i valB))
+	 (if revit (outa i (* revit (+ valA valB)) *reverb*)))))
+    (close-input fdA)
+    (if two-chans (close-input fdB))))
+
+(definstrument expsnd (file beg dur amp &optional exp-amt ramp seglen sr hop ampenv)
+  ;; granulate with envelopes on the expansion amount, segment envelope shape,
+  ;; segment length, hop length, and input file resampling rate
+  (let ((f (open-input* file)))
+    (when f
+      (unwind-protect
+	  (let* ((st (floor (* beg *srate*)))
+		 (nd (+ st (floor (* dur *srate*))))
+		 (two-chans (and (= (mus-channels f) 2) (= (mus-channels *output*) 2)))
+		 (f1 (if two-chans (open-input* file :channel 1)))
+		 (expenv (make-env :envelope (if (listp exp-amt) 
+						 (or exp-amt (list 0 1 1 1)) 
+					       (list 0 exp-amt 1 exp-amt))
+				   :duration dur))
+		 (lenenv (make-env :envelope (if (listp seglen) 
+						 (or seglen (list 0 .15 1 .15)) 
+					       (list 0 seglen 1 seglen))
+				   :duration dur))
+		 (max-seg-len (if seglen (if (listp seglen) (max-envelope seglen) seglen) .15))
+		 (initial-seg-len (if seglen (if (listp seglen) (second seglen) seglen) .15))
+		 (scaler-amp (if (> max-seg-len .15) (/ (* 0.6 .15) max-seg-len) 0.6))
+		 (srenv  (make-env :envelope (if (listp sr) 
+						 (or sr (list 0 1 1 1)) 
+					       (list 0 sr 1 sr))
+				   :duration dur))
+		 (rampdata (if (listp ramp) 
+			       (or ramp (list 0 .4 1 .4)) 
+			     (list 0 ramp 1 ramp)))
+		 (rampenv (make-env :envelope rampdata :duration dur))
+		 (initial-ramp-time (if ramp (if (listp ramp) (second ramp) ramp) .4))
+		 (minramp-bug (<= (min-envelope rampdata) 0.0))
+		 (maxramp-bug (>= (max-envelope rampdata) 0.5))
+		 (hopenv (make-env :envelope (if (listp hop) 
+						 (or hop (list 0 .05 1 .05)) 
+					       (list 0 hop 1 hop))
+				   :duration dur))
+		 (max-out-hop (if hop (if (listp hop) (max-envelope hop) hop) .05))
+		 (initial-out-hop (if hop (if (listp hop) (second hop) hop) .05))
+		 (min-exp-amt (if exp-amt (if (listp exp-amt) (min-envelope exp-amt) exp-amt) 1.0))
+		 (initial-exp-amt (if exp-amt (if (listp exp-amt) (second exp-amt) exp-amt) 1.0))
+		 (max-in-hop (/ max-out-hop min-exp-amt))
+		 (max-len (ceiling (* *srate* (+ (max max-out-hop max-in-hop) max-seg-len))))
+		 (ampe (make-env :envelope (or ampenv (list 0 0 .5 1 1 0)) :scaler amp :duration dur))
+		 (exA (make-granulate :input f
+				      :expansion initial-exp-amt
+				      :max-size max-len
+				      :ramp initial-ramp-time 
+				      :hop initial-out-hop
+				      :length initial-seg-len 
+				      :scaler scaler-amp))
+		 (exB (if two-chans (make-granulate :input f1
+						    :expansion initial-exp-amt
+						    :max-size max-len
+						    :ramp initial-ramp-time 
+						    :hop initial-out-hop
+						    :length initial-seg-len 
+						    :scaler scaler-amp)))
+		 (ex-samp -1.0)	;these 6 vars used for in-line resampling (rather than use resample generator)
+		 (next-samp 0.0)
+		 (valA0 0.0)		
+		 (valB0 0.0)
+		 (valA1 0.0)
+		 (valB1 0.0))
+	    (if (or minramp-bug maxramp-bug)
+		(warn "ramp argument to expsnd must always be ~A"
+		      (if (and minramp-bug maxramp-bug) "between 0.0 and 0.5"
+			(if minramp-bug "greater than 0.0"
+			  "less than 0.5"))))
+	    (run
+	     (loop for i from st to nd do
+	       (let* ((expa (env expenv)) ;current expansion amount
+		      (segl (env lenenv)) ;current segment length
+		      (resa (env srenv)) ;current resampling increment
+		      (rmpl (env rampenv)) ;current ramp length (0 to .5)
+		      (hp (env hopenv)) ;current hop size
+		      ;; now we set the granulate generator internal state to reflect all these envelopes
+		      (sl (floor (* segl *srate*)))
+		      (rl (floor (* rmpl sl)))
+		      (vol (env ampe)))
+		 (setf (mus-length exA) sl)
+		 (setf (mus-ramp exA) rl)
+		 (setf (mus-frequency exA) hp)
+		 (setf (mus-increment exA) expa)
+		 (when two-chans
+		   (setf (mus-length exB) sl)
+		   (setf (mus-ramp exB) rl)
+		   (setf (mus-frequency exB) hp)
+		   (setf (mus-increment exB) expa))
+		 (if (minusp ex-samp)
+		     (progn
+		       (setf valA0 (* vol (granulate exA)))
+		       (if two-chans (setf valB0 (* vol (granulate exB))))
+		       (setf valA1 (* vol (granulate exA)))
+		       (if two-chans (setf valB1 (* vol (granulate exB))))
+		       (incf ex-samp)
+		       (setf next-samp ex-samp))
+		   (progn
+		     (incf next-samp resa)
+		     (when (> next-samp (1+ ex-samp))
+		       (let ((samps (floor (- next-samp ex-samp))))
+			 (dotimes (k samps)
+			   (setf valA0 valA1)
+			   (setf valB0 valB1)
+			   (setf valA1 (* vol (granulate exA)))
+			   (if two-chans (setf valB1 (* vol (granulate exB))))
+			   (incf ex-samp))))))
+		 (if (= next-samp ex-samp)
+		     (progn
+		       (outa i valA0)
+		       (if two-chans (outb i valB0)))
+		   (progn
+		     (outa i (+ valA0 (* (- next-samp ex-samp) (- valA1 valA0))))
+		     (if two-chans (outb i (+ valB0 (* (- next-samp ex-samp) (- valB1 valB0))))))))))
+	    (close-input f)
+	    (if f1 (close-input f1)))))))
+  
+;;; (with-sound () (expsnd "fyow.snd" 0 3 1 '(0 1 1 3) nil nil '(0 2 1 .5) nil nil))
+;;; (with-sound () (expsnd "oboe.snd" 0 3 1 '(0 1 1 3) nil nil '(0 2 1 .5) 0.2 nil))
+  
+
+;;; this instrument reads two files in parallel, feeding successive portions to a granulate generator.
+
+(definstrument expfil (beg dur exp-amt ramplen steadylen file1 file2)
+  (let* ((exA (make-granulate :expansion exp-amt))
+	 (fil1 (open-input* file1))
+	 (fil2 (open-input* file2))
+	 (ctr1 0)
+	 (ctr2 0)
+	 (whichfile 1)
+	 (segctr 0)
+	 (whichseg 0))
+    (run
+     (loop for i from beg to (+ beg dur) do
+       (outa i (granulate exA
+			  #'(lambda (dir)
+			      (let ((inval 0.0))
+				(if (= whichfile 1)
+				    (progn
+				      (setf inval (ina ctr1 fil1))
+				      (incf ctr1))
+				  (progn
+				    (setf inval (ina ctr2 fil2))
+				    (incf ctr2)))
+				(if (= whichseg 0)	;ramp-up
+				    (progn
+				      (incf segctr)
+				      (when (= segctr ramplen)
+					(setf segctr 0)
+					(incf whichseg)))
+				  (if (= whichseg 1)	;steady-state
+				      (progn
+					(incf segctr)
+					(when (= segctr steadylen)
+					  (setf segctr 0)
+					  (incf whichseg)))
+				    (progn			;ramp-down
+				      (incf segctr)
+				      (when (= segctr ramplen)
+					(if (= whichfile 1) (setf whichfile 2) (setf whichfile 1))
+					(setf segctr 0)
+					(setf whichseg 0)))))
+				inval))))))
+    (close-input fil1)
+    (close-input fil2)))
+
+;;; (with-sound () (expfil 0 60000 2.0 500 10 "fyow.snd" "fyow.snd"))
+
+
+;;; --------------------------------
+;;; a slightly different version reads through two files taking each
+;;; successive grain from the other file (i.e. first one, then the other).
+;;; written here with a "grain" unit-generator to make it easy to add
+;;; more files, have independent hops and envelopes, and so on.
+
+(def-clm-struct grn rampval rampinc loc
+		segctr whichseg
+		ramplen steadylen
+		trigger)
+
+(defmacro grain (file ur-data)
+  `(let ((inval (readin ,file))
+	 (data ,ur-data))
+     (incf (grn-loc data))
+     (if (= (grn-whichseg data) 0)	;ramp-up
+	 (progn
+	   (setf inval (* inval (grn-rampval data)))
+	   (incf (grn-rampval data) (grn-rampinc data))
+	   (incf (grn-segctr data))
+	   (when (= (grn-segctr data) (grn-ramplen data))
+	     (setf (grn-segctr data) 0)
+	     (incf (grn-whichseg data))))
+       (if (= (grn-whichseg data) 1)		;steady-state
+	   (progn
+	     (incf (grn-segctr data))
+	     (when (= (grn-segctr data) (grn-steadylen data))
+	       (setf (grn-segctr data) 0)
+	       (incf (grn-whichseg data))))
+	 (progn				;ramp-down
+	   (setf inval (* inval (grn-rampval data)))
+	   (incf (grn-segctr data))
+	   (decf (grn-rampval data) (grn-rampinc data))
+	   (when (= (grn-segctr data) (grn-ramplen data))
+	     (setf (grn-segctr data) 0)
+	     (setf (grn-trigger data) 1)
+	     (setf (grn-whichseg data) 0)
+	     (setf (grn-rampval data) 0.0)))))
+     inval))
+
+(definstrument interleave-files (start duration hopsecs rampsecs steadysecs &rest files)
+  (let* ((filenum (length files))
+	 (rds (make-array filenum))
+	 (in-files (make-array filenum))
+	 (ob (= (mus-channels *output*) 2)))
+    (loop for i from 0 below filenum and file in files do
+      (setf (aref in-files i) (open-input* file))
+      (setf (aref rds i) (make-readin (aref in-files i))))
+    (let* ((hop (floor (* hopsecs *srate*)))
+	   (file-hop (* hop (1- filenum)))
+	   (ramplen (floor (* rampsecs *srate*)))
+	   (steadylen (floor (* steadysecs *srate*)))
+	   (grains (make-array filenum)))
+      (loop for i from 0 below filenum do
+	(setf (aref grains i) (make-grn :rampval 0.0 :rampinc (/ 1.0 ramplen) :loc 0 :segctr 0 
+					:whichseg 0  :ramplen ramplen :steadylen steadylen :trigger 0)))
+      (let* ((beg (floor (* start *srate*)))
+	     (end (floor (+ beg (* duration *srate*))))
+	     (outs (make-array filenum)))
+	(loop for i from 0 below filenum and j from beg by hop do
+	  (setf (aref outs i) j))
+	(run
+	 (loop for i from beg to end do
+	   (let ((val 0.0))
+	     (dotimes (k filenum)
+	       (when (= i (aref outs k))
+		 (incf val (grain (aref rds k) (aref grains k)))
+		 (incf (aref outs k))
+		 (when (= (grn-trigger (aref grains k)) 1)
+		   (setf (grn-trigger (aref grains k)) 0)
+		   (incf (aref outs k) file-hop))))
+	     (outa i val)
+	     (if ob (outb i val)))))))
+    (loop for i below filenum do (close-input (aref in-files i)))))
+
+;;; (with-sound () (interleave-files 0 2 .2 .01 .1 "oboe.snd" "pistol.snd"))
+
+

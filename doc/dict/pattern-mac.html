@@ -1,0 +1,170 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1"/>
+<style type="text/css" media="all">
+@import "../css/cm.css";
+</style>
+<title>pattern</title>
+</head>
+
+<body>
+<div id="content"> <!-- begin content -->
+<dl class="dictsyntax">
+<dt>[Macro]</dt>
+<!--
+<dd><code>(</code><code class="entry">pattern</code>  {<var>clause</var>}+<code>)</code></dd>
+-->
+<dd><code>(</code><code class="entry">pattern</code>  {<var>variable</var>}* {<var>type</var>} {<var>item</var>}+ {<var>option</var> <var>value</var>}*<code>)</code></dd>
+</dl>
+
+
+<p>
+Creates a pattern from a series of definitional clauses. There are
+four types of clauses: variable definitions, pattern and element
+type specifications, item specifications and pattern initializations.
+</p>
+
+
+<h4>Variable declarations</h4>
+<p>
+Pattern variables are named expressions that can be referenced as
+items inside the pattern's data specification. Only variables are
+evaluated; a pattern treats all other items as constant (unevaluated)
+data. There are two types of pattern variables: normal variables declared
+using <code>with</code> and <em>substitution variables</em> declared
+using <code>alias</code>:
+</p>
+
+<dl>
+<dt><code>with</code> <var>var</var> <code>=</code> <var>expr</var> {<code>and</code> <var>var2</var> <code>=</code> <var>expr2</var>}*</dt>
+<dd><a name="with.clause"></a>Declares variable <var>var</var> whose name is replaced by the value of <var>expr</var> inside the pattern's data specification.
+</dd>
+<dt><code>alias</code> <var>var</var> <code>=</code> <var>form</var> {<code>and</code> <var>var2</var> <code>=</code> <var>form2</var>}*</dt>
+<dd>Declares variable <var>var</var> whose name is replaced by the literal <var>form</var> inside the pattern's data and is evaluated only within the context of a call to <a href="next-fn.html"><code>next</code></a>.</dd>
+</dl>
+
+<div class="float">
+<p class="captxt">The difference between the with and alias variable declarations.</p>
+<pre class="code">
+(<span class="special">define</span> p (pattern with x = (random 10)
+                   cycle a x b x c x))
+(<a href="next-fn.html">next</a> p 12)
+<span class="result">&rArr;</span> (a 7 b 7 c 7 a 7 b 7 c 7)
+
+(<span class="special">define</span> p (pattern alias x = (random 10)
+                   cycle a x b x c x))
+(<a href="next-fn.html">next</a> p 12)
+<span class="result">&rArr;</span> (a 2 b 9 c 3 a 3 b 1 c 5)
+</pre>
+</div>
+
+<h4>Type declarations</h4>
+<p>
+The pattern's type declaration consists of a pattern type followed by
+an optional element type:
+</p>
+
+<dl>
+  <dt><var>pattern-type</var> [<code>of <var>element-type</var>]</dt>
+  <dd>The <var>pattern-type</var> can be one of: <code>cycle weighting
+  heap line palindrome graph markov rewrite rotation</code>. An
+  optional <code>of</code> clause specifies an <var>element-type</var>.
+  If provided it determines how items in the pattern are to be
+  interpreted. The <var>element-type</var> can be one of: <code>notes
+  keynums hertz rhythms amplitudes</code>.
+  </dd>
+  </dl>
+
+<div class="float">
+<p class="captxt">Pattern and element type declarations.</p>
+<pre class="code">
+(<span class="special">define</span> p (pattern cycle c d e f g a))
+
+(<a href="next-fn.html">next</a> p 12)
+<span class="result">&rArr;</span> (c d e f g a c d e f g a)
+
+(<span class="special">define</span> p (pattern heap of keynums c d e f g a))
+
+(<a href="next-fn.html">next</a> p 12)
+<span class="result">&rArr;</span> (60 69 65 69 62 65 64 60 64 67 67 62)
+
+(<span class="special">define</span> p (pattern cycle of rhythms q w e s tempo 90))
+
+(<a href="next-fn.html">next</a> p 8)
+<span class="result">&rArr;</span> (0.6666667 2.6666667 0.33333334 0.16666667 0.6666667 2.6666667 0.33333334 0.16666667)
+</pre>
+</div>
+
+<h4>Item specification</h4>
+<p>
+Following the pattern's type declaration comes one or more item
+specifications. Items that are not pattern variables are unevaluated
+data, that is, they are are constants in the pattern. Certain pattern
+types ( weighting, graph, etc.) allow items to be specified within
+pattern node lists. In these cases the first element in the node lists
+is treaded as the node's item.
+</p>
+
+<div class="float">
+<p class="captxt">Item specification.</p>
+<pre class="code">
+(<span class="special">define</span> p (pattern with x = (pattern cycle 1 2 3)
+                   weighting a (x <span class="keyword">:weight</span> .5)  b c (d <span class="keyword">:weight</span> 2)))
+(<a href="next-fn.html">next</a> p 20)
+<span class="result">&rArr;</span> (a c c d 1 2 3 c d 1 2 3 a d d d c d c a)
+</pre>
+</div>
+
+<h4>Pattern initializations</h4>
+
+<p>After the items have been specified zero or more pattern initializations can be provided, as described in the <a href="patterns-topic.html#pattern_inits">patterns topic help</a>.</p>
+
+
+<div class="float">
+<p class="captxt">Pattern initializations.</p>
+<pre class="code">
+(<span class="special">define</span> p (pattern with x = (pattern cycle 3 4 5)
+                   and y = (pattern heap 60 90 120)
+                   weighting of rhythms q w e s tempo y for x))
+(<a href="next-fn.html">next</a> p #t)
+(0.33333334 0.25 0.25)
+
+(<a href="next-fn.html">next</a> p #t)
+(0.125 1.0 0.16666667 0.5)
+
+(<a href="next-fn.html">next</a> p #t)
+(0.6666667 2.0 0.25 0.16666667 1.0)
+
+(<a href="next-fn.html">next</a> p #t)
+(0.6666667 0.5 4.0)
+<span class="result">&rArr;</span> 
+</pre>
+</div>
+
+<!--
+<h4>Examples:</h4>
+<div class="float">
+<p class="captxt">
+<span class="floatlabel">Example 1.</span> Blah.
+</p>
+<pre class="code">
+</pre>
+</div>
+
+-->
+<h4>See also:</h4>
+<ul>
+<li><a href="patterns-topic.html">Patterns</a> [Topic]</li>
+<li><a href="next-fn.html"><code>next</code></a> [Function]</li>
+</ul>
+
+</div> <!-- end content -->
+<hr class="inv"/>
+<!-- Footer -->
+<div id="footer">
+<div id="version">$Name$</div>
+<div id="cvs-info">($Revision$, $Date$)</div>
+</div>
+</body>
+</html>
