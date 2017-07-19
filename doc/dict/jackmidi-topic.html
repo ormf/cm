@@ -119,8 +119,8 @@ Determines what values are passed to a Portmidi receiver hook
 established by <a href="set-receiver-fn.html">set-receiver!</a>. If
 the value is <code class="keyword">:message</code> then the receiver
 hook is passed two values: the
-incoming <a href="midi-topic.html#midi_messages">MIDI</a> message and
-its millisecond timestamp. If the value
+incoming <a href="midi-topic.html#midi_messages">MIDI</a> message its
+a millisecond timestamp. If the value
 is <code class="keyword">:raw</code> then the hook is passed the
 Portmidi event buffer (a pointer to a foreign array) and the number of
 events read. See the EventBuffer functions

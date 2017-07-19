@@ -9,7 +9,7 @@
 ;; To load:
 (load "/lisp/fomus/load.lisp") ; loads fomus
 (use-package :fomus) ; call this to make all of fomus available (unnecessary if you're just using CM's interface)
-
+(in-package :cm)
 ;; To see output:
 ;; Change the filename in the "events" functions to whatever filename you want (it needs to end in ".ly").
 ;; Example: "/my/favorite/directory/output.ly"
@@ -52,17 +52,15 @@
   (events (cm-example 1/2 10 'pianopart) "output.ly" :parts (list piano)))       ;     referenced by their partids
 
 (progn					; Lisp
-  (fomus-init :backend '(:lilypond :view t))
-  (fomus-newpart 'pianopart :name "Piano" :instr :piano)
+  (fomus:fomus-init :backend '(:lilypond :view t))
+  (fomus:fomus-newpart 'pianopart :name "Piano" :instr :piano)
   (loop
    for off from 0 to 10 by 1/2 do
-   (fomus-newnote 'pianopart
+   (fomus:fomus-newnote 'pianopart
 		  :off off
 		  :dur (if (< off 10) 1/2 1)
 		  :note (+ 48 (random 25))))
-  (fomus-exec))
-
-
+  (fomus:fomus-exec))
 
 ;; ----------------------------------------------------------------------------------------------------
 ;; add another voice
@@ -175,7 +173,7 @@
 			   ("Violin 1" :violin) ("Violin 2" :violin) ("Tuba" :tuba)
 			   ("Oboe" :oboe))
      and id from 0 
-     collect (new part :partid id :name name :instr instr)))
+     collect (make-part :partid id :name name :instr instr)))
   (events (cm-example 1.0 10) "output.ly" :parts parts
 	  :max-tuplet 3 :beat-division 4 :ensemble-type :small-ensemble))
 
@@ -211,8 +209,8 @@
 	until (>= (now) len)
 	wait dur))
   (defparameter timesigs ; <-- FOMUS will correct the 3/4 time signature at offset 0 to fit better with the one at offset 4
-    (loop for off in '(0 4) collect (new timesig :off off :time '(3 4)))) 
-  (defparameter piano (new part :partid 'pianopart :name "Piano" :instr :piano))
+    (loop for off in '(0 4) collect (new timesig :off off :time '(3 4))))
+  (defparameter piano (make-part :partid 'pianopart :name "Piano" :instr :piano))
   (events (cm-example 1/2 10 'pianopart) "output.ly" :parts (list piano) :global timesigs))
 
 (progn					; Lisp
@@ -235,7 +233,7 @@
 (progn					; CM
   (define (cm-example dur len part)
       (process
-	with mark = (new random :of '((nil :weight 2) ((:accent) :weight 1)))
+	with mark = (new weighting :of '((nil :weight 2) ((:accent) :weight 1)))
 	output (new note
 		 :partid part
 		 :off (now)
@@ -244,7 +242,7 @@
 		 :marks (next mark)) ; <-- this must be a list of "marks" or articulations (see the doc for a list of them)
 	until (>= (now) len)
 	wait dur))
-  (defparameter piano (new part :partid 'pianopart :name "Piano" :instr :piano))
+  (defparameter piano (make-part :partid 'pianopart :name "Piano" :instr :piano))
   (events (cm-example 1/2 10 'pianopart) "output.ly" :parts (list piano)))
 
 (progn					; Lisp
@@ -272,8 +270,8 @@
 (progn					; CM
   (define (cm-example dur len part)
       (process
-	with inst = (new random :of '(:woodblock :snaredrum))
-	and skip = (new random :of '(nil t))
+	with inst = (new weighting :of '(:woodblock :snaredrum))
+	and skip = (new weighting :of '(nil t))
 	when (next skip)
 	output (new note
 		 :partid part
@@ -314,6 +312,8 @@
                        :partid part)
            wait beat))
 
+
+
 (defparameter primes '(2 3 5 7 11))
 
 (defparameter cellos (loop for p in primes
@@ -326,6 +326,39 @@
         :max-tuplet 11
         :parts (reverse cellos))
 
+
+(defun harmonics-midi (note rhy harm1 harm2 part)
+  (process with fund = (hertz note) and beat = (rhythm rhy)
+           for harm from harm1 to harm2
+           for knum = (keynum (* fund harm) :hz)
+           output (new midi :time (now) :duration beat :keynum knum)
+           wait beat))
+
+#|
+(events (process for p in primes
+                 sprout (harmonics-midi 'c1 (/ 1 p) p (* p 4) p))
+        (new incudine-stream :channel-tuning 4))
+
+(new incudine-stream :channel-tuning 4)
+
+(progn
+  (defun simple ()
+    (process repeat 5
+             output (new osc
+                      :time (now)
+                      :path "osc/tost"
+                      :types "iiii"
+                      :message '(0 1 2 3))
+             output (new midi
+                      :time (now)
+                      :duration 0.5
+                      :keynum 60)
+             wait 1))
+  (let ((output (new incudine-stream)))
+    (events (simple) output)))
+|#
+
+(new incudine-stream)
 
 
 ;; ----------------------------------------------------------------------------------------------------

@@ -31,20 +31,32 @@ values. --> Receiving remains in effect until canceled by
 <ul>
 <li>
 If <var>stream</var> is
+a <a href="jackmidi-topic.html#portmidi-stream">jackmidi-stream</a>
+then <var>hook</var> is passed two arguments: The
+incoming <a href="midi-topic.html#midi_messages">MIDI</a> message and
+its millisecond timestamp.
+</li>
+
+<li>
+If <var>stream</var> is
 a <a href="portmidi-topic.html#portmidi-stream">portmidi-stream</a>
-then <var>hook</var> is passed two arguments, the values of which
-depend on the <a href="portmidi-topic.html#receive-mode">receive
-mode</a> of <var>stream</var>.
+(unsupported in cm-incudine!) then <var>hook</var> is passed
+two arguments, the values of which depend on
+the <a href="portmidi-topic.html#receive-mode">receive mode</a>
+of <var>stream</var>.
 </li>
 
 <li>
 If <var>stream</var> is
 a <a href="midishare-topic.html#midishare-stream">midishare-stream</a>
-then <var>hook</var> is passed one argument, a <a href="midishare-topic.html#MidiEv">MidiEv</a> foreign object.
+(unsupported in cm-incudine!) then <var>hook</var> is passed one
+argument, a <a href="midishare-topic.html#MidiEv">MidiEv</a> foreign
+object.
 </li>
 
 <li>
-If <var>stream</var> is an <a href="sc-stream.html#">sc-stream</a> then blah blah blah.
+If <var>stream</var> is an <a href="sc-stream.html#">sc-stream</a>
+then (not yet implemented in cm-incudine!).
 </li>
 
 <li id="generic-receiver">
@@ -57,7 +69,8 @@ information about explicitly reading input from streams.
 </ul>
 
 <h4>Implementation and Limitations:</h4>
-<p>Receiving is  implemented in the following Lisp/OS combinations:
+<p>Receiving is implemented in the following Lisp/OS combinations (the
+following only applies to the original version of cm from 2007!):
 </p>
 
 <ul>
@@ -147,6 +160,53 @@ strategies in supported Lisp implementations: LT (Lisp threads) NT
 </dl>
 -->
 <h4>Examples:</h4>
+
+<div class="float">
+  <p class="captxt">
+<span class="floatlabel">Example 0.</span> Receiving input from
+Jackmidi (cm-incudine). 
+</p>
+<pre class="code">
+<span class="comment">;;; open with no latency for interactive work. the input and
+;;; output device ids to open will depend on your MIDI setup.</span>
+
+(<span class="special">define</span> <span class="defined">*midi-in*</span>
+  (<a href="jackmidi-topic.html#jackmidi-open">jackmidi:open</a> <span class="keyword">:direction</span> <span class="keyword">:input</span>)
+(<span class="special">define</span> <span class="defined">*incudine-stream*</span>
+  (<a href="new-mac.html">new</a> <a href="incudine-stream.html">incudine-stream</a>))
+
+<span class="comment">;;; a midi through</span>
+
+(set-receiver! (<span class="special">lambda</span> (mm ms) ms (<a href="output-fn.html">output</a> mm <span class="keyword">:to</span> *incudine-stream*))
+               *midi-in*)
+
+<span class="comment">;;; play your keyboard...then</span>
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *midi-in*)
+
+<span class="comment">;;; make a harmonizer</span>
+
+(set-receiver!
+  (<span class="special">lambda</span> (mm ms) ms
+    (<span class="special">if</span> (or (<a href="midi-topic.html#note-on-p">note-on-p</a> mm)
+            (<a href="midi-topic.html#note-off-p">note-off-p</a> mm))
+      (<span class="special">let</span> ((k (<a href="middi-topic.html#note-on-key">note-on-key</a> mm)))
+        (<a href="output-fn.html">output</a> mm <span class="keyword">:to</span> *incudine-stream*)
+        (<a href="output-fn.html">output</a> (<a href="midi-topic.html#midi-copy-message">midi-copy-message</a> mm <span class="keyword">:data1</span> (+ k 3)) 
+                <span class="keyword">:to</span> *incudine-stream*)
+        (<a href="output-fn.html">output</a> (<a href="midi-topic.html#midi-copy-message">midi-copy-message</a> mm <span class="keyword">:data1</span> (+ k 7)) 
+                <span class="keyword">:to</span> *incudine-stream*))))
+  *midi-in*)
+
+<span class="comment">;;; play your keyboard...then</span>
+
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *midi-in*)
+
+(<a href="jackmidi-topic.html#jackmidi-close">jackmidi:close</a> *midi-in*)
+</pre>
+
+</div>
+
 <div class="float">
 <p class="captxt">
 <span class="floatlabel">Example 1.</span> Receiving input from
@@ -208,16 +268,16 @@ Portmidi.
       (<a href="sprout-fn.html">sprout</a> (tonto 10 (<a href="midi-topic.html#note-on-key">note-on-key</a> mm) .1 
                      (/ (<a href="midi-topic.html#note-on-velocity">note-on-velocity</a> mm) 127.0)))))
 
-(<span class="special">define</span> <span class="defined">*pm*</span>
-  (<a href="portmidi-open-fn.html">portmidi-open</a> <span class="keyword">:input</span> 1 <span class="keyword">:output</span> 3 <span class="keyword">:latency</span> 0))
+(<span class="special">define</span> <span class="defined">*midi-in*</span>
+  (<a href="jackmidi-topic.html#jackmidi-open">jackmidi:open</a> <span class="keyword">:direction</span> <span class="keyword">:input</span>)
+(<span class="special">define</span> <span class="defined">*incudine-stream*</span>
+  (<a href="new-mac.html">new</a> <a href="incudine-stream.html">incudine-stream</a>))
 
-(<a href="rts-fn.html">rts</a> #f *pm*)
-
-(set-receiver! #'trigger *pm*)
+(set-receiver! #'trigger *midi-in*)
 
 <span class="comment">;;; play your keyboard...then</span>
 
-(<a href="remove-receiver-fn.html">remove-receiver!</a> *pm*)
+(<a href="remove-receiver-fn.html">remove-receiver!</a> *midi-in*)
 
 (<a href="rts-stop-fn.html">rts-stop</a>)
 
