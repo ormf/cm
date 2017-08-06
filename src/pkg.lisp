@@ -136,8 +136,6 @@
 (defstub add-note-to-staff)
 (defstub (special *exact-rhythms* staff-descriptors)))
 
-#|
-
 ;;;
 ;;; Fomus stubs
 ;;;
@@ -153,6 +151,7 @@
 
 (in-package :fomus)
 
+#|
 #-fomus
 (progn
 (defclass fomusobj-base ()
@@ -183,7 +182,9 @@
 (defstub get-instr-syms)
 (defstub fomus-file)
 (defstub (special *parts*)))
+
 |#
+
 ;;;
 ;;; The CM package definition.
 ;;;

@@ -1,2 +1,5 @@
 *~
 *.fasl
+*.mid
+*.ly
+*.pdf

@@ -79,7 +79,7 @@
                    (:file "midi2")
                    (:file "midi3")
                    (:file "cmn")
-;;                   (:file "fomus")
+;;;                   (:file "fomus")
                    (:file "sc")
                    (:file "rt")
                    (:file "parse")))))
