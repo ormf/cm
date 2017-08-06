@@ -136,10 +136,11 @@
 (defstub add-note-to-staff)
 (defstub (special *exact-rhythms* staff-descriptors)))
 
+#|
+
 ;;;
 ;;; Fomus stubs
 ;;;
-
 #-fomus
 (defpackage :fomus
   (:use :common-lisp)
@@ -182,7 +183,7 @@
 (defstub get-instr-syms)
 (defstub fomus-file)
 (defstub (special *parts*)))
-
+|#
 ;;;
 ;;; The CM package definition.
 ;;;
@@ -231,10 +232,10 @@
                 :add-staff
                 :add-data-1
                 :add-note-to-staff)
-  (:import-from :fomus :fomus :obj-partid :obj-id :part-events
-                :event-base :event-off :event-note :event-dur :make-part
-                :make-note :*parts* :part-opts
-                :part :note :meas :timesig :keysig :fomus-file)
+  ;; (:import-from :fomus :fomus :obj-partid :obj-id :part-events
+  ;;               :event-base :event-off :event-note :event-dur :make-part
+  ;;               :make-note :*parts* :part-opts
+  ;;               :part :note :meas :timesig :keysig :fomus-file)
   (:export :accumulation :amplitude :append-object :audio-file :axis
            :*beat* :best-normal-form :between :cd :cents->scaler
            :chord :*chromatic-scale* :clm-file :cm :cm-version 
