@@ -300,8 +300,8 @@
             (t (error "message not supported: ~S." m)))))
 
 (defobject midi (event)
- ((keynum :initform 60) (duration :initform 0.5)
-  (amplitude :initform 64)
+ ((keynum :initform 60 :accessor midi-keynum) (duration :initform 0.5 :accessor midi-duration)
+  (amplitude :initform 0.5)
   (channel :initform 0 :accessor midi-channel))
  (:parameters time duration keynum amplitude channel)
  (:event-streams))
