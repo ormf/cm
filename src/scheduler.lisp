@@ -239,14 +239,17 @@
 ;;; 2. It then enqueues all container objects of the subobjects (the
 ;;; "subcontainers") by calling itself with updated start-time.
 
-
 (defmethod schedule-object ((obj seq) start sched)
-           (let ((mystart (+ start (object-time obj))))
-             (enqueue *qentry-seq*
-              (cons obj (container-subobjects obj)) mystart mystart
-              sched)
-             (dolist (sub (subcontainers obj))
-               (schedule-object sub mystart sched))))
+  (let ((mystart (+ start (object-time obj))))
+    (multiple-value-bind (time start)
+        (if (eq sched :events)
+            (values mystart mystart)
+            (values 0 (object-time obj)))
+      (enqueue *qentry-seq*
+               (cons obj (container-subobjects obj))
+               time start sched)
+      (dolist (sub (subcontainers obj))
+        (schedule-object sub mystart sched)))))
 
 (defmethod unschedule-object (obj &rest recurse) obj recurse nil)
 
