@@ -358,6 +358,9 @@ of the io stream. Returns the io stream."
 
 (defmethod set-receive-mode! ((str rt-stream) mode)
            (setf (rt-stream-receive-mode str) mode))
+#|
+
+;; moved to cm-incudine:
 
 (defun set-receiver! (hook stream &rest args)
   (let ((data (rt-stream-receive-data stream)))
@@ -378,6 +381,7 @@ of the io stream. Returns the io stream."
              "set-receiver!: ~s does not support :receive-type ~s."
              stream (rt-stream-receive-type stream))))
           (values)))))
+|#
 
 (defun remove-receiver! (stream)
   (stream-receive-stop stream)

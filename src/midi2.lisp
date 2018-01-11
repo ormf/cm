@@ -477,9 +477,6 @@
                    (error "tuning range ~s-~s not in channel range 0-15 (b)."
                           num1
                           (+ num1 num2)))
-                 (break "tuning range: ~s-~s"
-                          num1
-                          num2)
                  (if (equal tune 1)
                      (progn (microtune-channels io 1
                              (midi-stream-bend-width io) 0)

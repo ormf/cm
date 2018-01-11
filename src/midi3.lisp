@@ -46,7 +46,7 @@
 
 (defobject midi-pitch-bend (midi-channel-event)
  ((opcode :initform +ml-pitch-bend-opcode+ :initarg nil)
-  (bend :initform 0))
+  (bend :initform 0 :accessor midi-pitch-bend-bend))
  (:parameters time channel bend) (:event-streams))
 
 (defmethod midi-event-data1 ((obj midi-pitch-bend))
