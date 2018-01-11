@@ -279,6 +279,7 @@
            :scale-mod :scale-order :*scale* :scale= :scale> :scale>=
            :scale< :scale<= :scaler->cents :sco-file :seq
            :set-clm-output-hook! :set-midi-output-hook!
+           :set-receiver! :remove-receiver!
            :set-sco-output-hook! :shell :shuffle :*softest* :sprout
            :stop :subcontainers :subobjects :sv :sv+ :sv* :*tempo*
            :tendency :thunk :*time-slots* :transpose :transposer :true

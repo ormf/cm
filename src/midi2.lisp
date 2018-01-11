@@ -460,7 +460,7 @@
                             (setf num2 (or (pop tuning) 15)))
                      (progn (setf num1 0) (setf num2 15)))
                  (unless (<= 0 num1 num2 15)
-                   (error "tuning range ~s-~s not in channel range 0-15."
+                   (error "tuning range ~s-~s not in channel range 0-15 (a)."
                           num1
                           num2))
                  (setf data
@@ -473,10 +473,13 @@
                  (setf tune (car type))
                  (setf num1 (if (consp tuning) (pop tuning) 0))
                  (setf num2 tune)
-                 (when (> (+ num1 num2) 15)
-                   (error "tuning range ~s-~s not in channel range 0-15."
+                 (when (> (+ num1 num2) 16)
+                   (error "tuning range ~s-~s not in channel range 0-15 (b)."
                           num1
                           (+ num1 num2)))
+                 (break "tuning range: ~s-~s"
+                          num1
+                          num2)
                  (if (equal tune 1)
                      (progn (microtune-channels io 1
                              (midi-stream-bend-width io) 0)
