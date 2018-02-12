@@ -312,6 +312,7 @@
 
 (defun output (event &key to at (ahead 0))
   (let ((sched (scheduling-mode)))
+;;;    (break "event: ~a, to: ~a, at: ~a, ahead: ~a, sched: ~a" event to at ahead sched)
     (case sched
       ((:events)
        (unless to (setf to *out*))
@@ -334,10 +335,10 @@
       ((:rts)
        (unless to (setf to *rts-out*))
        (progn
-         (write-event event to (samps->secs (+ (or at 0) ahead)))))
+         (write-event event to (+ (or at 0) ahead))))
       (t
        (unless to (setf to *rts-out*))
-       (write-event event to (samps->secs (+ (or at 0) ahead)))))
+       (write-event event to (+ (or at 0) ahead))))
     (values)))
 
 (defun now (&optional abs-time)

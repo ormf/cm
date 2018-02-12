@@ -2449,7 +2449,7 @@
             (next (first data) t)
             (apply #'append (mapcar (lambda (x) (next x t)) data))))))
 
-(defmacro pval (expr) `(lambda nil ,expr))
+(defmacro pval (expr) `(new thunk :of (lambda () ,expr)))
 
 (progn (defclass join (pattern)
          ((format :accessor
