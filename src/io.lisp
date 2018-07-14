@@ -255,16 +255,13 @@ of the io stream. Returns the io stream."
      until res finally (return res)))
 
 (defun events (object &rest args)
-  (let* ((to
-          (if
-           (and (consp args)
-                (special-evt-stream? (first args)))
-           (pop args) (current-output-stream)))
-         (ahead
-          (if
-           (and (consp args)
-                (or (consp (car args)) (numberp (car args))))
-           (pop args) 0))
+  (let* ((to (if (and (consp args) (special-evt-stream? (first args)))
+                 (pop args)
+                 (current-output-stream)))
+         (ahead (if
+                 (and (consp args)
+                      (or (consp (car args)) (numberp (car args))))
+                 (pop args) 0))
          (err? ':error))
     (when (oddp (length args))
       (error "events: uneven initialization list: ~s." args))

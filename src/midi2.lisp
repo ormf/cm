@@ -12,119 +12,36 @@
 
 (defparameter *midi-pitch-bend-width* 2)
 
-(defparameter *midi-channel-map* (let*
-                                  ((l (list nil)) (h l))
-                                  (do
-                                   ((p 0 (+ p 1)))
-                                   ((= p 8)
-                                    (apply #'vector (cdr l)))
-                                   (do
-                                    ((c 0 (+ c 1)))
-                                    ((= c 16) nil)
-                                    (rplacd h (list (list p c)))
-                                    (setf h (cdr h))))))
+(defparameter *midi-channel-map*
+  (let* ((l (list nil)) (h l))
+    (do ((p 0 (+ p 1)))
+        ((= p 8) (apply #'vector (cdr l)))
+      (do ((c 0 (+ c 1)))
+          ((= c 16) nil)
+        (rplacd h (list (list p c)))
+        (setf h (cdr h))))))
 
 (defun logical-channel (chan map)
   (if (vectorp map) (elt map chan) (elt map chan)))
 
-(defparameter %midituningtypes (quote
-                                ((t
-                                  :note
-                                  note
-                                  :note-by-note
-                                  note-by-note)
-                                 (1
-                                  :12-note
-                                  12-note
-                                  :12-tone
-                                  12-tone)
-                                 (2
-                                  24
-                                  :24-note
-                                  24-note
-                                  :24-tone
-                                  24-tone)
-                                 (3
-                                  36
-                                  :36-note
-                                  36-note
-                                  :36-tone
-                                  36-tone)
-                                 (4
-                                  48
-                                  :48-note
-                                  48-note
-                                  :48-tone
-                                  48-tone)
-                                 (5
-                                  60
-                                  :60-note
-                                  60-note
-                                  :60-tone
-                                  60-tone)
-                                 (6
-                                  72
-                                  :72-note
-                                  72-note
-                                  :72-tone
-                                  72-tone)
-                                 (7
-                                  84
-                                  :84-note
-                                  84-note
-                                  :84-tone
-                                  84-tone)
-                                 (8
-                                  96
-                                  :96-note
-                                  96-note
-                                  :96-tone
-                                  96-tone)
-                                 (9
-                                  108
-                                  :108-note
-                                  108-note
-                                  :108-tone
-                                  108-note)
-                                 (10
-                                  120
-                                  :120-note
-                                  120-note
-                                  :120-tone
-                                  120-tone)
-                                 (11
-                                  132
-                                  :132-note
-                                  132-note
-                                  :132-tone
-                                  132-tone)
-                                 (12
-                                  144
-                                  :144-note
-                                  144-note
-                                  :144-tone
-                                  144-tone)
-                                 (13
-                                  156
-                                  :156-note
-                                  156-note
-                                  :156-tone
-                                  156-tone)
-                                 (14
-                                  :168-note
-                                  168-note
-                                  :168-tone
-                                  168-tone)
-                                 (15
-                                  :180-note
-                                  180-note
-                                  :180-tone
-                                  180-tone)
-                                 (16
-                                  :180-note
-                                  180-note
-                                  :180-tone
-                                  180-tone))))
+(defparameter %midituningtypes
+  '((t :note note :note-by-note note-by-note)
+    (1 :12-note 12-note :12-tone 12-tone)
+    (2 24 :24-note 24-note :24-tone 24-tone)
+    (3 36 :36-note 36-note :36-tone 36-tone)
+    (4 48 :48-note 48-note :48-tone 48-tone)
+    (5 60 :60-note 60-note :60-tone 60-tone)
+    (6 72 :72-note 72-note :72-tone 72-tone)
+    (7 84 :84-note 84-note :84-tone 84-tone)
+    (8 96 :96-note 96-note :96-tone 96-tone)
+    (9 108 :108-note 108-note :108-tone 108-note)
+    (10 120 :120-note 120-note :120-tone 120-tone)
+    (11 132 :132-note 132-note :132-tone 132-tone)
+    (12 144 :144-note 144-note :144-tone 144-tone)
+    (13 156 :156-note 156-note :156-tone 156-tone)
+    (14 :168-note 168-note :168-tone 168-tone)
+    (15 :180-note 180-note :180-tone 180-tone)
+    (16 :180-note 180-note :180-tone 180-tone)))
 
 (progn (defclass midi-stream-mixin ()
          ((channel-map :initform *midi-channel-map* :initarg
@@ -496,85 +413,39 @@
                            (channel-offset 0))
   (if (= divisions 1)
       (loop for c below 16
-            for m =
-                (make-instance
-                  (find-class 'midi-pitch-bend)
-                  :channel
-                  c
-                  :time
-                  0
-                  :bend
-                  0)
+            for m = (make-instance (find-class 'midi-pitch-bend)
+                                   :channel c
+                                   :time 0
+                                   :bend 0)
             do (write-event m io 0))
             (loop repeat divisions
                   for c from channel-offset
-                  for m =
-                      (let ((bend
-                             (round
-                              (rescale
-                               (/ c divisions)
-                               (- width)
-                               width
-                               -8192
-                               8191))))
-                        (make-instance
-                          (find-class 'midi-pitch-bend)
-                          :channel
-                          c
-                          :time
-                          0
-                          :bend
-                          bend))
+                  for m = (let ((bend (round (rescale (/ c divisions) (- width) width -8192 8191))))
+                        (make-instance (find-class 'midi-pitch-bend)
+                                       :channel c
+                                       :time 0
+                                       :bend bend))
                   do (write-event m io 0))))
 
 (defparameter %offs (make-cycl))
 
 (dotimes (i 50) (%qe-dealloc %offs (list nil nil nil nil)))
 
-(defmethod open-io :after ((mf midi-file) dir &rest args) args (if
-                                                                (eq
-                                                                 dir
-                                                                 ':output)
-                                                                (let
-                                                                 ((div
-                                                                   (midi-file-divisions
-                                                                    mf)))
-                                                                 (setf
-                                                                  (midi-file-track
-                                                                   mf)
-                                                                  0)
-                                                                 (setf
-                                                                  (midi-file-scaler
-                                                                   mf)
-                                                                  (*
-                                                                   div
-                                                                   1.0))
-                                                                 (midi-file-write-header
-                                                                  mf
-                                                                  0
-                                                                  1
-                                                                  div)
-                                                                 (midi-file-write-track-header
-                                                                  mf
-                                                                  0))
-                                                                (multiple-value-bind
-                                                                 (fmat
-                                                                  tracks
-                                                                  divisions)
-                                                                 (midi-file-read-header
-                                                                  mf)
-                                                                 (setf
-                                                                  (midi-file-format
-                                                                   mf)
-                                                                  fmat)
-                                                                 (setf
-                                                                  (midi-file-tracks
-                                                                   mf)
-                                                                  tracks)
-                                                                 (setf
-                                                                  (midi-file-divisions
-                                                                   mf)
-                                                                  divisions))) mf)
+(defmethod open-io :after ((mf midi-file) dir &rest args)
+  args
+  (if (eq dir ':output)
+   (let
+       ((div (midi-file-divisions mf)))
+     (setf (midi-file-track mf) 0)
+     (setf (midi-file-scaler mf) (* div 1.0))
+     (midi-file-write-header mf 0 1 div)
+     (midi-file-write-track-header mf 0))
+   (multiple-value-bind
+         (fmat tracks divisions) (midi-file-read-header mf)
+     (setf (midi-file-format mf) fmat)
+     (setf (midi-file-tracks mf) tracks)
+     (setf (midi-file-divisions mf) divisions)))
+  mf)
 
 (defmethod initialize-io ((mf midi-file))
   (when (eq (io-direction mf) ':output)
@@ -600,47 +471,19 @@
   (when (eq (io-direction mf) ':output)
     (flush-pending-offs mf most-positive-fixnum)))
 
-(defmethod close-io :before ((mf midi-file) &rest mode) mode (when
-                                                              (eq
-                                                               (io-direction
-                                                                mf)
-                                                               ':output)
-                                                              (multiple-value-bind
-                                                               (m d)
-                                                               (make-eot)
-                                                               (midi-write-message
-                                                                m
-                                                                mf
-                                                                0
-                                                                d))
-                                                              (let*
-                                                               ((fp
-                                                                 (io-open
-                                                                  mf))
-                                                                (off
-                                                                 (+
-                                                                  +midi-file-header-length+
-                                                                  +miditrack-header-length+))
-                                                                (end
-                                                                 (set-file-position
-                                                                  fp
-                                                                  0
-                                                                  nil)))
-                                                               (set-file-position
-                                                                fp
-                                                                +midi-file-header-length+
-                                                                t)
-                                                               (midi-file-write-track-header
-                                                                mf
-                                                                (-
-                                                                 end
-                                                                 off))
-                                                               (setf
-                                                                (midi-file-track
-                                                                 mf)
-                                                                nil)
-                                                               (%q-flush
-                                                                %offs))))
+(defmethod close-io :before ((mf midi-file) &rest mode)
+  mode
+  (when (eq (io-direction mf) ':output)
+    (multiple-value-bind (m d) (make-eot)
+      (midi-write-message m mf 0 d))
+    (let*
+        ((fp (io-open mf))
+         (off (+ +midi-file-header-length+ +miditrack-header-length+))
+         (end
+          (set-file-position fp 0 nil)))
+      (set-file-position fp +midi-file-header-length+ t)
+      (midi-file-write-track-header mf (- end off))
+      (setf (midi-file-track mf) nil) (%q-flush %offs))))
 
 (defun flush-pending-offs (mf time)
   (let ((last (object-time mf)) (scaler (midi-file-scaler mf)))

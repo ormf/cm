@@ -175,317 +175,114 @@
 
 (defmethod default-period-length ((obj pattern)) (pattern-length obj))
 
-(defmethod initialize-instance :after ((obj pattern)
-                                       &rest
-                                       args) args (let
-                                                   ((flags
-                                                     (pattern-flags
-                                                      obj))
-                                                    (data nil)
-                                                    (hook
-                                                     (pattern-hooks
-                                                      obj))
-                                                    (len nil)
-                                                    (parser
-                                                     (pattern-parser
-                                                      obj))
-                                                    (type nil)
-                                                    (optn nil)
-                                                    (valu nil)
-                                                    (constant? nil))
-                                                   (do
-                                                    ((a
-                                                      args
-                                                      (cddr a)))
-                                                    ((null a) nil)
-                                                    (case
-                                                     (car a)
-                                                     ((:of)
-                                                      (setf
-                                                       data
-                                                       (cadr a)))
-                                                     ((:notes
-                                                       :keynums
-                                                       :rhythms
-                                                       :amplitudes
-                                                       :hertz)
-                                                      (setf
-                                                       type
-                                                       (car a))
-                                                      (setf
-                                                       data
-                                                       (cadr a)))
-                                                     ((:tempo
-                                                       :in
-                                                       :from
-                                                       :to
-                                                       :through)
-                                                      (cond
-                                                       ((null type))
-                                                       ((eq
-                                                         type
-                                                         :rhythms)
-                                                        (or
-                                                         (eq
-                                                          (car a)
-                                                          ':tempo)
-                                                         (error
-                                                          "Option ~S does not match data type ~S."
-                                                          (car a)
-                                                          type)))
-                                                       ((member
-                                                         type
-                                                         '(:notes
-                                                           :hertz))
-                                                        (or
-                                                         (member
-                                                          (car a)
-                                                          '(:in
-                                                            :through))
-                                                         (error
-                                                          "Option ~S does not match data type ~S."
-                                                          (car a)
-                                                          type)))
-                                                       ((eq
-                                                         type
-                                                         ':keynums)
-                                                        (or
-                                                         (member
-                                                          (car a)
-                                                          '(:from
-                                                            :to
-                                                            :through))
-                                                         (error
-                                                          "Option ~S does not match data type ~S."
-                                                          (car a)
-                                                          type)))
-                                                       (t
-                                                        (error
-                                                         "Option ~S does not match data type ~S."
-                                                         (car a)
-                                                         type)))
-                                                      (setf
-                                                       optn
-                                                       (car a))
-                                                      (setf
-                                                       valu
-                                                       (cadr a)))))
-                                                   (setf
-                                                    parser
-                                                    (pattern-value-function
-                                                     type
-                                                     optn
-                                                     valu
-                                                     t))
-                                                   (unless
-                                                    (pattern-returning
-                                                     obj)
-                                                    (let
-                                                     ((ret
-                                                       (pattern-value-function
-                                                        type
-                                                        optn
-                                                        valu
-                                                        nil)))
-                                                     (if
-                                                      ret
-                                                      (setf
-                                                       (pattern-returning
-                                                        obj)
-                                                       ret))))
-                                                   (unless
-                                                    (listp data)
-                                                    (setf
-                                                     data
-                                                     (list data)))
-                                                   (with-default-octave
-                                                    *scale*
-                                                    (multiple-value-setq
-                                                     (data
-                                                      len
-                                                      constant?)
-                                                     (canonicalize-pattern-data
-                                                      obj
-                                                      data
-                                                      parser
-                                                      args)))
-                                                   (setf
-                                                    (pattern-data
-                                                     obj)
-                                                    data)
-                                                   (setf
-                                                    (pattern-length
-                                                     obj)
-                                                    len)
-                                                   (let
-                                                    ((counting
-                                                      (pattern-counting
-                                                       obj)))
-                                                    (when
-                                                     counting
-                                                     (case
-                                                      counting
-                                                      ((:periods
-                                                        :period
-                                                        periods
-                                                        period)
-                                                       (setf
-                                                        flags
-                                                        (logior
-                                                         flags
-                                                         +count-periods+)))
-                                                      ((:values
-                                                        :value
-                                                        values
-                                                        value)
-                                                       (setf
-                                                        flags
-                                                        (logior
-                                                         flags
-                                                         +count-values+)))
-                                                      (t
-                                                       (error
-                                                        "~s not one of 'counting' keywords:  periods values."
-                                                        counting)))))
-                                                   (let
-                                                    ((traversing
-                                                      (pattern-traversing
-                                                       obj)))
-                                                    (when
-                                                     traversing
-                                                     (case
-                                                      traversing
-                                                      ((:depth-first
-                                                        :depth
-                                                        depth-first
-                                                        depth)
-                                                       (setf
-                                                        flags
-                                                        (logior
-                                                         flags
-                                                         +depth-first+)))
-                                                      ((:breadth-first
-                                                        :breadth
-                                                        breadth-first
-                                                        breadth)
-                                                       (setf
-                                                        flags
-                                                        (logior
-                                                         flags
-                                                         +breadth-first+)))
-                                                      (t
-                                                       (error
-                                                        "~s not 'traversing' keword: depth-firs,t breadth-first."
-                                                        traversing)))))
-                                                   (when
-                                                    constant?
-                                                    (setf
-                                                     flags
-                                                     (logior
-                                                      flags
-                                                      +constant-data+)))
-                                                   (cond
-                                                    ((logtest
-                                                      flags
-                                                      +count-values+)
-                                                     (setf
-                                                      flags
-                                                      (logand
-                                                       flags
-                                                       (lognot
-                                                        +count-periods+))))
-                                                    (t
-                                                     (if
-                                                      (logtest
-                                                       flags
-                                                       +constant-data+)
-                                                      (setf
-                                                       flags
-                                                       (logior
-                                                        (logand
-                                                         flags
-                                                         (lognot
-                                                          +count-periods+))
-                                                        +count-values+))
-                                                      (setf
-                                                       flags
-                                                       (logior
-                                                        flags
-                                                        +count-periods+)))))
-                                                   (let*
-                                                    ((default
-                                                      (default-period-length
-                                                       obj))
-                                                     (period
-                                                      (if
-                                                       (slot-boundp
-                                                        obj
-                                                        'period)
-                                                       (or
-                                                        (pattern-period
-                                                         obj)
-                                                        default)
-                                                       default))
-                                                     (repeat
-                                                      (pattern-repeat
-                                                       obj)))
-                                                    (when
-                                                     (eq repeat t)
-                                                     (setf
-                                                      (pattern-repeat
-                                                       obj)
-                                                      most-positive-fixnum))
-                                                    (if
-                                                     (and
-                                                      (slot-boundp
-                                                       obj
-                                                       'period)
-                                                      (not
-                                                       (null
-                                                        (slot-value
-                                                         obj
-                                                         'period))))
-                                                     (setf
-                                                      period
-                                                      (slot-value
-                                                       obj
-                                                       'period))
-                                                     (progn
-                                                      (setf
-                                                       period
-                                                       default)
-                                                      (setf
-                                                       flags
-                                                       (logior
-                                                        flags
-                                                        +default-period+))))
-                                                    (setf
-                                                     (pattern-period
-                                                      obj)
-                                                     (if
-                                                      (or
-                                                       (numberp
-                                                        period)
-                                                       (eq period t))
-                                                      (make-period
-                                                       :length
-                                                       period
-                                                       :default
-                                                       default
-                                                       :hook
-                                                       hook)
-                                                      (make-period
-                                                       :stream
-                                                       period
-                                                       :default
-                                                       default
-                                                       :hook
-                                                       hook))))
-                                                   (setf
-                                                    (pattern-flags
-                                                     obj)
-                                                    flags)
-                                                   (values)))
+(defmethod initialize-instance :after ((obj pattern) &rest args) args
+           (let ((flags (pattern-flags obj))
+                 (data nil)
+                 (hook (pattern-hooks obj))
+                 (len nil)
+                 (parser (pattern-parser obj))
+                 (type nil)
+                 (optn nil)
+                 (valu nil)
+                 (constant? nil))
+             (do
+              ((a args (cddr a)))
+              ((null a) nil)
+               (case
+                   (car a)
+                 ((:of) (setf data (cadr a)))
+                 ((:notes :keynums :rhythms :amplitudes :hertz)
+                  (setf type (car a))
+                  (setf data (cadr a)))
+                 ((:tempo :in :from :to :through)
+                  (cond
+                    ((null type))
+                    ((eq type :rhythms)
+                     (or (eq (car a) ':tempo)
+                         (error "Option ~S does not match data type ~S." (car a) type)))
+                    ((member
+                      type
+                      '(:notes
+                        :hertz))
+                     (or
+                      (member (car a) '(:in :through))
+                      (error "Option ~S does not match data type ~S." (car a) type)))
+                    ((eq type ':keynums)
+                     (or
+                      (member (car a) '(:from :to :through))
+                      (error "Option ~S does not match data type ~S." (car a) type)))
+                    (t (error "Option ~S does not match data type ~S." (car a) type)))
+                  (setf optn (car a))
+                  (setf valu (cadr a)))))
+             (setf parser (pattern-value-function type optn valu t))
+             (unless (pattern-returning obj)
+               (let
+                   ((ret (pattern-value-function type optn valu nil)))
+                 (if ret (setf (pattern-returning obj) ret))))
+             (unless
+                 (listp data)
+               (setf data (list data)))
+             (with-default-octave
+                 *scale*
+               (multiple-value-setq (data len constant?)
+                 (canonicalize-pattern-data obj data parser args)))
+             (setf (pattern-data obj) data)
+             (setf (pattern-length obj) len)
+             (let
+                 ((counting (pattern-counting obj)))
+               (when
+                   counting
+                 (case
+                     counting
+                   ((:periods :period periods period)
+                    (setf flags (logior flags +count-periods+)))
+                   ((:values :value values value)
+                    (setf flags (logior flags +count-values+)))
+                   (t
+                    (error "~s not one of 'counting' keywords:  periods values." counting)))))
+             (let ((traversing (pattern-traversing obj)))
+               (when
+                   traversing
+                 (case
+                     traversing
+                   ((:depth-first :depth depth-first depth)
+                    (setf flags (logior flags +depth-first+)))
+                   ((:breadth-first :breadth breadth-first breadth)
+                    (setf flags (logior flags +breadth-first+)))
+                   (t
+                    (error "~s not 'traversing' keword: depth-firs,t breadth-first." traversing)))))
+             (when constant?
+               (setf flags (logior flags +constant-data+)))
+             (cond
+               ((logtest flags +count-values+)
+                (setf
+                 flags (logand flags (lognot +count-periods+))))
+               (t
+                (if (logtest flags +constant-data+)
+                 (setf flags (logior (logand flags (lognot +count-periods+)) +count-values+))
+                 (setf flags (logior flags +count-periods+)))))
+             (let*
+                 ((default (default-period-length obj))
+                  (period
+                   (if (slot-boundp obj 'period)
+                    (or (pattern-period obj) default)
+                    default))
+                  (repeat (pattern-repeat obj)))
+               (when
+                   (eq repeat t)
+                 (setf (pattern-repeat obj) most-positive-fixnum))
+               (if (and (slot-boundp obj 'period)
+                 (not (null (slot-value obj 'period))))
+                (setf period (slot-value obj 'period))
+                (progn
+                  (setf period default)
+                  (setf flags (logior flags +default-period+))))
+               (setf (pattern-period obj)
+                (if (or (numberp period) (eq period t))
+                 (make-period :length period :default default :hook hook)
+                 (make-period :stream period :default default :hook hook))))
+             (setf (pattern-flags obj) flags)
+             (values)))
 
 (defmethod pattern? (obj) obj nil)
 
@@ -677,20 +474,12 @@
 (defmethod default-period-length ((obj palindrome))
   (* 2 (pattern-length obj)))
 
-(defmethod initialize-instance :after ((obj palindrome)
-                                       &rest
-                                       args) args (let
-                                                   ((cyc
-                                                     (make-cycl)))
-                                                   (cycl-data-set!
-                                                    cyc
-                                                    (pattern-data
-                                                     obj))
-                                                   (setf
-                                                    (pattern-data
-                                                     obj)
-                                                    cyc)
-                                                   (values)))
+(defmethod initialize-instance :after ((obj palindrome) &rest args)
+  args
+  (let ((cyc (make-cycl)))
+    (cycl-data-set! cyc (pattern-data obj))
+    (setf (pattern-data obj) cyc)
+    (values)))
 
 (defmethod next-in-pattern ((obj palindrome))
   (let ((cycl (pattern-data obj)))
@@ -740,23 +529,13 @@
                             collect (expand-pattern-value x))))
                 (call-next-method)))
 
-(defmethod initialize-instance :after ((obj line)
-                                       &rest
-                                       args) args (let
-                                                   ((cyc
-                                                     (make-cycl)))
-                                                   (cycl-data-set!
-                                                    cyc
-                                                    (pattern-data
-                                                     obj))
-                                                   (cycl-tail-set!
-                                                    cyc
-                                                    (cycl-data cyc))
-                                                   (setf
-                                                    (pattern-data
-                                                     obj)
-                                                    cyc)
-                                                   (values)))
+(defmethod initialize-instance :after ((obj line) &rest args)
+  args
+  (let ((cyc (make-cycl)))
+    (cycl-data-set! cyc (pattern-data obj))
+    (cycl-tail-set! cyc (cycl-data cyc))
+    (setf (pattern-data obj) cyc)
+    (values)))
 
 (defmethod next-in-pattern ((obj line))
   (let ((cycl (pattern-data obj)))
@@ -764,15 +543,9 @@
         (car (cycl-tail cycl))
         (pop-cycl cycl))))
 
-(defmethod reset-period :before ((obj line)) (if
-                                              (null
-                                               (cdr
-                                                (cycl-tail
-                                                 (pattern-data
-                                                  obj))))
-                                              (setf
-                                               (pattern-length obj)
-                                               1)))
+(defmethod reset-period :before ((obj line))
+  (if (null (cdr (cycl-tail (pattern-data obj))))
+      (setf (pattern-length obj) 1)))
 
 (defmethod map-pattern-data (fn (obj line))
   (map nil fn (cycl-data (pattern-data obj))))
@@ -790,18 +563,11 @@
         inits
         (append inits (list :state (pattern-random-state obj))))))
 
-(defmethod initialize-instance :after ((obj heap)
-                                       &rest
-                                       args) args (let
-                                                   ((cyc
-                                                     (pattern-data
-                                                      obj)))
-                                                   (cycl-data-set!
-                                                    cyc
-                                                    (copy-list
-                                                     (cycl-data
-                                                      cyc)))
-                                                   (values)))
+(defmethod initialize-instance :after ((obj heap) &rest args)
+  args
+  (let ((cyc (pattern-data obj)))
+    (cycl-data-set! cyc (copy-list (cycl-data cyc)))
+    (values)))
 
 (defmethod next-in-pattern ((obj heap))
   (flet ((shufl (lis len state)
@@ -870,136 +636,42 @@
            (if flag 1 (pattern-length obj)))
         (setf flag (pattern? (random-item-datum (car tail)))))))
 
-(defmethod initialize-instance :after ((obj weighting)
-                                       &rest
-                                       args) args (let
-                                                   ((pool
-                                                     (pattern-data
-                                                      obj))
-                                                    (sum
-                                                     (if
-                                                      (integerp
-                                                       *random-range*)
-                                                      0
-                                                      0.0))
-                                                    (adj
-                                                     (weighting-adjustable
-                                                      obj))
-                                                    (const t))
-                                                   (loop for item
-                                                         in
-                                                         pool
-                                                    for min
-                                                    =
-                                                    (random-item-min
-                                                     item)
-                                                    for max
-                                                    =
-                                                    (random-item-max
-                                                     item)
-                                                    unless (and
-                                                            (or
-                                                             (not
-                                                              min)
-                                                             (numberp
-                                                              min))
-                                                            (or
-                                                             (not
-                                                              max)
-                                                             (numberp
-                                                              max)))
-                                                    do (progn
-                                                        (setf
-                                                         const
-                                                         nil)
-                                                        (random-item-min-set!
-                                                         item
-                                                         nil)
-                                                        (random-item-max-set!
-                                                         item
-                                                         nil)
-                                                        (random-item-minmax-set!
-                                                         item
-                                                         (cons
-                                                          min
-                                                          max))))
-                                                    (when
-                                                     const
-                                                     (setf
-                                                      (pattern-flags
-                                                       obj)
-                                                      (logior
-                                                       +constant-minmax+
-                                                       (pattern-flags
-                                                        obj))))
-                                                    (loop for item
-                                                          in
-                                                          pool
-                                                     for weight
-                                                     =
-                                                     (random-item-weight
-                                                      item)
-                                                     while
-                                                     sum
-                                                     if (numberp
-                                                         weight)
-                                                     do (progn
-                                                         (incf
-                                                          sum
-                                                          weight)
-                                                         (random-item-index-set!
-                                                          item
-                                                          sum))
-                                                     else
-                                                     do (setf
-                                                         sum
-                                                         nil)
-                                                     finally (when
-                                                              (and
-                                                               sum
-                                                               *random-range*)
-                                                              (dolist
-                                                               (item
-                                                                pool)
-                                                               (random-item-index-set!
-                                                                item
-                                                                (*
-                                                                 (/
-                                                                  (random-item-index
-                                                                   item)
-                                                                  sum)
-                                                                 *random-range*)))))
-                                                     (cond
-                                                      ((not sum)
-                                                       (when
-                                                        adj
-                                                        (error
-                                                         "Found non-numeric weight in adjustable weighting.")))
-                                                      (t
-                                                       (unless
-                                                        *random-range*
-                                                        (setf
-                                                         (random-pattern-range
-                                                          obj)
-                                                         sum))
-                                                       (unless
-                                                        adj
-                                                        (setf
-                                                         (pattern-flags
-                                                          obj)
-                                                         (logior
-                                                          +constant-weights+
-                                                          (pattern-flags
-                                                           obj))))))
-                                                     (setf
-                                                      (pattern-data
-                                                       obj)
-                                                      (list pool))))
+(defmethod initialize-instance :after ((obj weighting) &rest args)
+  args
+  (let ((pool (pattern-data obj))
+        (sum (if (integerp *random-range*) 0 0.0))
+       (adj (weighting-adjustable obj))
+       (const t))
+    (loop for item
+       in pool
+       for min = (random-item-min item)
+       for max = (random-item-max item)
+       unless (and (or (not min) (numberp min)) (or (not max) (numberp max)))
+       do (progn
+            (setf const nil)
+            (random-item-min-set! item nil)
+            (random-item-max-set! item nil)
+            (random-item-minmax-set! item (cons min max))))
+    (when const
+      (setf (pattern-flags obj) (logior +constant-minmax+ (pattern-flags obj))))
+    (loop for item in pool
+       for weight = (random-item-weight item)
+       while sum
+       if (numberp weight)
+       do (progn
+            (incf sum weight)
+            (random-item-index-set! item sum))
+       else
+       do (setf sum nil)
+       finally (when (and sum *random-range*)
+                 (dolist (item pool)
+                   (random-item-index-set! item (* (/ (random-item-index item) sum) *random-range*)))))
+    (cond ((not sum) (when adj (error "Found non-numeric weight in adjustable weighting.")))
+          (t (unless *random-range* (setf (random-pattern-range obj) sum))
+             (unless adj (setf (pattern-flags obj) (logior +constant-weights+ (pattern-flags obj))))))
+    (setf (pattern-data obj) (list pool))))
 
-(defmethod canonicalize-pattern-data ((obj weighting)
-                                      data
-                                      parser
-                                      inits)
+(defmethod canonicalize-pattern-data ((obj weighting) data parser inits)
   obj
   inits
   (flet ((parse-random-item (extern)
@@ -1011,38 +683,19 @@
                           and val
                           while (not (null keys))
                           do (setf key (pop keys))
-                             (setf
-                              val
-                              (if
-                               keys
-                               (pop keys)
-                               (error
-                                "Uneven weighting list: ~s."
-                                orig)))
+                             (setf val (if keys (pop keys) (error "Uneven weighting list: ~s." orig)))
                              (push val args)
-                             (case
-                              key
+                             (case key
                               ((weight :weight) (push ':weight args))
                               ((min :min) (push ':min args))
                               ((max :max) (push ':max args))
-                              (t
-                               (error
-                                "~s not one of: :weight, :min, :max."
-                                key)))
-                          finally (return
-                                   (apply
-                                    #'make-random-item
-                                    :datum
-                                    datum
-                                    args))))
+                              (t (error "~s not one of: :weight, :min, :max." key)))
+                          finally (return (apply #'make-random-item :datum datum args))))
                     (if (consp extern) extern (list extern)))))
          (let ((intern (mapcar #'parse-random-item data)))
            (values intern
                    (length intern)
-                   (not (some (lambda
-                               (x)
-                               (pattern? (random-item-datum x)))
-                              intern))))))
+                   (not (some (lambda (x) (pattern? (random-item-datum x))) intern))))))
 
 (defun reset-random-range (obj range adj?)
   (let ((data (car (pattern-data obj))))
@@ -1178,13 +831,9 @@
                    (let ((val nil) (pat nil) (wei nil))
                      (if (consp s)
                          (progn (setf val (first s))
-                                (setf
-                                 wei
-                                 (if (null (cdr s)) 1 (second s)))
+                                (setf wei (if (null (cdr s)) 1 (second s)))
                                 (setf pat wei)
-                                (unless
-                                 (numberp wei)
-                                 (setf wei nil)))
+                                (unless (numberp wei) (setf wei nil)))
                          (progn (setf val s)
                                 (setf wei 1)
                                 (setf pat 1)))
@@ -1213,20 +862,12 @@
                (rplacd lis (list p))
                (setf lis (cdr lis)))))))
 
-(defmethod initialize-instance :after ((obj markov)
-                                       &rest
-                                       args) args (unless
-                                                   (consp
-                                                    (markov-pattern-past
-                                                     obj))
-                                                   (setf
-                                                    (markov-pattern-past
-                                                     obj)
-                                                    (make-list
-                                                     (markov-pattern-order
-                                                      obj)
-                                                     :initial-element
-                                                     '*))) (values))
+(defmethod initialize-instance :after ((obj markov) &rest args)
+  args
+  (unless (consp (markov-pattern-past obj))
+    (setf (markov-pattern-past obj)
+     (make-list (markov-pattern-order obj) :initial-element '*)))
+  (values))
 
 (defmethod next-in-pattern ((obj markov))
   (labels ((select-output (range outputs)
@@ -1496,21 +1137,14 @@
 
 (defmethod default-period-length ((obj thunk)) obj 1)
 
-(defmethod initialize-instance :after ((obj thunk)
-                                       &rest
-                                       args) args (let
-                                                   ((data
-                                                     (pattern-data
-                                                      obj)))
-                                                   (unless
-                                                    (and
-                                                     (consp data)
-                                                     (functionp
-                                                      (car data)))
-                                                    (error
-                                                     "Thunk not function: ~s."
-                                                     data))
-                                                   (values)))
+(defmethod initialize-instance :after ((obj thunk) &rest args)
+  args
+  (let
+      ((data (pattern-data obj)))
+    (unless
+        (and (consp data) (functionp (car data)))
+      (error "Thunk not function: ~s." data))
+    (values)))
 
 (defmethod next-in-pattern ((obj thunk))
   (let ((data (pattern-data obj)))
@@ -1548,15 +1182,11 @@
                           (expand-pattern-value
                            (rotation-change obj))))))
 
-(defmethod initialize-instance :after ((obj rotation)
-                                       &rest
-                                       args) args (let
-                                                   ((data
-                                                     (pattern-data
-                                                      obj)))
-                                                   (rplacd
-                                                    data
-                                                    (car data))))
+(defmethod initialize-instance :after ((obj rotation) &rest args)
+  args
+  (let
+      ((data (pattern-data obj)))
+    (rplacd data (car data))))
 
 (defmethod next-in-pattern ((obj rotation))
   (let ((ring (pattern-data obj)))
@@ -1629,112 +1259,34 @@
                               (rewrite-table obj))))
                  (call-next-method))))
 
-(defmethod initialize-instance :after ((obj rewrite)
-                                       &rest
-                                       args) args (let
-                                                   ((table
-                                                     (make-hash-table
-                                                      :size
-                                                      103
-                                                      :test
-                                                      #'equal))
-                                                    (nodes
-                                                     (pattern-data
-                                                      obj))
-                                                    (rules
-                                                     (rewrite-rules
-                                                      obj))
-                                                    (preset nil))
-                                                   (setf
-                                                    preset
-                                                    (or
-                                                     (rewrite-table
-                                                      obj)
-                                                     (list
-                                                      (rewrite-node-id
-                                                       (first
-                                                        nodes)))))
-                                                   (dolist
-                                                    (n nodes)
-                                                    (setf
-                                                     (gethash
-                                                      (rewrite-node-id
-                                                       n)
-                                                      table)
-                                                     n))
-                                                   (dolist
-                                                    (n nodes)
-                                                    (let
-                                                     ((x
-                                                       (rewrite-node-to
-                                                        n)))
-                                                     (if
-                                                      (pattern? x)
-                                                      (progn
-                                                       (rewrite-node-props-set!
-                                                        n
-                                                        (rewrite-node-to
-                                                         n))
-                                                       (rewrite-node-to-set!
-                                                        n
-                                                        nil))
-                                                      (progn
-                                                       (rewrite-node-to-set!
-                                                        n
-                                                        (lookup-successors
-                                                         x
-                                                         table))))))
-                                                   (let
-                                                    ((count
-                                                      (rewrite-generations
-                                                       obj)))
-                                                    (setf
-                                                     (rewrite-generations
-                                                      obj)
-                                                     (cons
-                                                      1
-                                                      (if
-                                                       (> count 1)
-                                                       count
-                                                       (error
-                                                        "Generations: ~s not > 1."
-                                                        count)))))
-                                                   (setf
-                                                    nodes
-                                                    (loop for id
-                                                          in
-                                                          (if
-                                                           (listp
-                                                            preset)
-                                                           preset
-                                                           (list
-                                                            preset))
-                                                     collect (or
-                                                              (gethash
-                                                               id
-                                                               table)
-                                                              (error
-                                                               "Id ~s not in rewrite nodes."
-                                                               id))))
-                                                    (setf
-                                                     (rewrite-table
-                                                      obj)
-                                                     table)
-                                                    (setf
-                                                     (pattern-data
-                                                      obj)
-                                                     (cons
-                                                      nodes
-                                                      nodes))
-                                                    (unless
-                                                     (null rules)
-                                                     (setf
-                                                      (rewrite-rules
-                                                       obj)
-                                                      (parse-rules
-                                                       rules
-                                                       table)))
-                                                    (values)))
+(defmethod initialize-instance :after ((obj rewrite) &rest args)
+  args
+  (let ((table (make-hash-table :size 103 :test #'equal))
+        (nodes (pattern-data obj))
+        (rules (rewrite-rules obj))
+        (preset nil))
+    (setf preset (or (rewrite-table obj)
+                     (list (rewrite-node-id (first nodes)))))
+    (dolist (n nodes)
+      (setf (gethash (rewrite-node-id n) table) n))
+    (dolist (n nodes)
+      (let ((x (rewrite-node-to n)))
+        (if (pattern? x)
+            (progn
+              (rewrite-node-props-set! n (rewrite-node-to n))
+              (rewrite-node-to-set! n nil))
+            (progn
+              (rewrite-node-to-set! n (lookup-successors x table))))))
+    (let ((count (rewrite-generations obj)))
+      (setf (rewrite-generations obj)
+            (cons 1 (if (> count 1) count
+                        (error "Generations: ~s not > 1." count)))))
+    (setf nodes (loop for id in (if (listp preset) preset (list preset))
+                   collect (or (gethash id table) (error "Id ~s not in rewrite nodes." id))))
+    (setf (rewrite-table obj) table)
+    (setf (pattern-data obj) (cons nodes nodes))
+    (unless (null rules) (setf (rewrite-rules obj) (parse-rules rules table)))
+    (values)))
 
 (defmethod canonicalize-pattern-data ((obj rewrite)
                                       data
@@ -1801,71 +1353,35 @@
            (getnodes (ids table rule)
              (loop for id in ids collect (getnode id table rule))))
            (loop for rule in rules
-                 collect (loop with form = rule
-                               and left = t
-                               and x
-                               while (not (null form))
+                 collect (loop with form = rule and left = t and x while (not (null form))
                                do (setf x (pop form))
                                if (or (eq x '->) (eq x ':->))
                                do (setf left nil)
                                else
-                               if left
-                               collect x into lh
-                               else
-                               collect x into rh
+                               if left collect x into lh
+                               else collect x into rh
                                finally (return
-                                        (let
-                                         ((len (length lh)))
-                                         (unless
-                                          (not left)
-                                          (error
-                                           "Missing -> in rule ~s."
-                                           rule))
+                                        (let ((len (length lh)))
+                                         (unless (not left) (error "Missing -> in rule ~s." rule))
                                          (cond
-                                          ((= len 0)
-                                           (error
-                                            "Missing left hand side in ~s."
-                                            rule))
+                                          ((= len 0) (error "Missing left hand side in ~s." rule))
                                           ((= len 1)
-                                           (make-rewrite-rule
-                                            :successors
-                                            (getnodes rh table rule)
-                                            :trigger
-                                            (getnode
-                                             (if
-                                              (consp (car lh))
-                                              (caar lh)
-                                              (car lh))
-                                             table
-                                             rule)))
+                                           (make-rewrite-rule :successors (getnodes rh table rule)
+                                                              :trigger (getnode (if (consp (car lh))
+                                                                                    (caar lh)
+                                                                                    (car lh))
+                                                                                table rule)))
                                           (t
                                            (loop for tail on lh
                                             for x = (car tail)
                                             for i from 0
                                             when (consp x)
                                             do (rplaca tail (car x))
-                                            (return
-                                             (make-rewrite-rule
-                                              :successors
-                                              (getnodes
-                                               rh
-                                               table
-                                               rule)
-                                              :trigger
-                                              (getnode
-                                               (car x)
-                                               table
-                                               rule)
-                                              :context
-                                              (cons
-                                               (cons i len)
-                                               (getnodes
-                                                lh
-                                                table
-                                                rule))))
-                                            finally (error
-                                                     "No trigger in lh side of ~s."
-                                                     rule))))))))))
+                                            (return (make-rewrite-rule
+                                                     :successors (getnodes rh table rule)
+                                                     :trigger (getnode (car x) table rule)
+                                                     :context (cons (cons i len) (getnodes lh table rule))))
+                                            finally (error "No trigger in lh side of ~s." rule))))))))))
 
 (defun lookup-successors (successor table)
   (if (consp successor)
@@ -1951,29 +1467,14 @@
                                 (beg (- index (caar context)))
                                 (end (+ beg (cdar context))))
                                (when
-                                (and
-                                 (<=
-                                  0
-                                  beg
-                                  end
-                                  (or
-                                   len
-                                   (progn
-                                    (setf len (length generation))
-                                    len)))
-                                 (not
-                                  (generation-mismatch
-                                   (lambda
-                                    (a b)
-                                    (or (eq a '*) (eq a b)))
-                                   seq
-                                   generation
-                                   beg
-                                   end)))
-                                (return
-                                 (rewrite-rule-successors rule))))
-                              (return
-                               (rewrite-rule-successors rule))))
+                                (and (<= 0 beg end (or len (progn
+                                                             (setf len (length generation))
+                                                             len)))
+                                 (not (generation-mismatch
+                                       (lambda (a b) (or (eq a '*) (eq a b)))
+                                       seq generation beg end)))
+                                (return (rewrite-rule-successors rule))))
+                              (return (rewrite-rule-successors rule))))
                      finally (return (list)))))
 
 (defmacro %range-stepping? (flags) `(logtest ,flags +range-stepping+))
@@ -2024,150 +1525,46 @@
                   (expand-pattern-value (range-by obj)))
             (call-next-method))))
 
-(defmethod initialize-instance :after ((obj range)
-                                       &rest
-                                       args) args (let*
-                                                   ((raw
-                                                     (pattern-data
-                                                      obj))
-                                                    (data (car raw))
-                                                    (init (cadr raw))
-                                                    (flag nil)
-                                                    (test nil)
-                                                    (bits nil))
-                                                   (setf
-                                                    (pattern-data
-                                                     obj)
-                                                    data)
-                                                   (setf
-                                                    (range-from obj)
-                                                    (elt init 0))
-                                                   (setf
-                                                    (range-to obj)
-                                                    (elt init 1))
-                                                   (setf
-                                                    (range-downto
-                                                     obj)
-                                                    (elt init 2))
-                                                   (setf
-                                                    (range-by obj)
-                                                    (elt init 3))
-                                                   (setf
-                                                    (range-incf obj)
-                                                    (elt init 4))
-                                                   (setf
-                                                    flag
-                                                    (elt init 5))
-                                                   (setf
-                                                    bits
-                                                    (elt init 6))
-                                                   (case
-                                                    flag
-                                                    ((1)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       min
-                                                       (> x max))))
-                                                    ((2)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       min
-                                                       (>= x max))))
-                                                    ((4)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       max
-                                                       (< x min))))
-                                                    ((8)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       max
-                                                       (<= x min))))
-                                                    ((5)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       (or
-                                                        (< x min)
-                                                        (> x max)))))
-                                                    ((6)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       (or
-                                                        (< x min)
-                                                        (>=
-                                                         x
-                                                         max)))))
-                                                    ((9)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       (or
-                                                        (<= x min)
-                                                        (> x max)))))
-                                                    ((10)
-                                                     (setf
-                                                      test
-                                                      (lambda
-                                                       (x min max)
-                                                       (or
-                                                        (<= x min)
-                                                        (>=
-                                                         x
-                                                         max)))))
-                                                    ((16) nil)
-                                                    ((0)
-                                                     (setf
-                                                      bits
-                                                      (logior
-                                                       bits
-                                                       +range-unbounded+)))
-                                                    (t
-                                                     (error
-                                                      "Not a range specification: ~s."
-                                                      args)))
-                                                   (when
-                                                    (and
-                                                     (%range-initially?
-                                                      bits)
-                                                     (not
-                                                      (%range-unbounded?
-                                                       bits)))
-                                                    (error
-                                                     ":initially excludes lower or upper bound."))
-                                                   (when
-                                                    (eq
-                                                     (period-length
-                                                      (pattern-period
-                                                       obj))
-                                                     most-positive-fixnum)
-                                                    (setf
-                                                     bits
-                                                     (logior
-                                                      bits
-                                                      +range-dynamic+)))
-                                                   (setf
-                                                    (pattern-flags
-                                                     obj)
-                                                    (logior
-                                                     (pattern-flags
-                                                      obj)
-                                                     bits))
-                                                   (setf
-                                                    (range-test obj)
-                                                    test)))
+(defmethod initialize-instance :after ((obj range) &rest args)
+  args
+  (let* ((raw
+          (pattern-data
+           obj))
+         (data (car raw))
+         (init (cadr raw))
+         (flag nil)
+         (test nil)
+         (bits nil))
+    (setf (pattern-data obj) data)
+    (setf (range-from obj) (elt init 0))
+    (setf (range-to obj) (elt init 1))
+    (setf (range-downto obj) (elt init 2))
+    (setf (range-by obj) (elt init 3))
+    (setf (range-incf obj) (elt init 4))
+    (setf flag (elt init 5))
+    (setf bits (elt init 6))
+    (case flag
+      ((1) (setf test (lambda (x min max) min (> x max))))
+      ((2) (setf test (lambda (x min max) min (>= x max))))
+      ((4) (setf test (lambda (x min max) max (< x min))))
+      ((8) (setf test (lambda (x min max) max (<= x min))))
+      ((5) (setf test (lambda (x min max) (or (< x min) (> x max)))))
+      ((6) (setf test (lambda (x min max) (or (< x min) (>= x max)))))
+      ((9) (setf test (lambda (x min max) (or (<= x min) (> x max)))))
+      ((10) (setf test (lambda (x min max) (or (<= x min) (>= x max)))))
+      ((16) nil)
+      ((0) (setf bits (logior bits +range-unbounded+)))
+      (t (error "Not a range specification: ~s." args)))
+    (when (and
+           (%range-initially? bits)
+           (not (%range-unbounded? bits)))
+      (error ":initially excludes lower or upper bound."))
+    (when (eq (period-length (pattern-period obj))
+              most-positive-fixnum)
+      (setf bits (logior bits +range-dynamic+)))
+    (setf (pattern-flags obj)
+          (logior (pattern-flags obj) bits))
+    (setf (range-test obj) test)))
 
 (defmethod canonicalize-pattern-data ((obj range) data parser inits)
   obj
@@ -2302,82 +1699,37 @@
                            ',(object-name
                               (transposer-scale obj))))))))
 
-(defmethod initialize-instance :after ((obj transposer)
-                                       &rest
-                                       args) args (let
-                                                   ((data nil)
-                                                    (stepping? nil))
-                                                   (dopairs
-                                                    (s v args)
-                                                    (case
-                                                     s
-                                                     ((:stepping)
-                                                      (when
-                                                       data
-                                                       (error
-                                                        "Duplicate ':stepping', ':by' or ':on' in: ~s"
-                                                        args))
-                                                      (setf
-                                                       stepping?
-                                                       t)
-                                                      (setf data v))
-                                                     ((:by :on)
-                                                      (when
-                                                       data
-                                                       (error
-                                                        "Duplicate ':stepping', ':by' or ':on' in: ~s"
-                                                        args))
-                                                      (setf
-                                                       data
-                                                       v))))
-                                                   (unless
-                                                    data
-                                                    (error
-                                                     "Missing ':stepping', ':by' or ':on' in: ~s"
-                                                     args))
-                                                   (setf
-                                                    (transposer-by
-                                                     obj)
-                                                    (if
-                                                     stepping?
-                                                     (list
-                                                      nil
-                                                      data
-                                                      t)
-                                                     (if
-                                                      (pattern? data)
-                                                      (list
-                                                       nil
-                                                       data
-                                                       nil)
-                                                      (list
-                                                       data
-                                                       nil
-                                                       nil))))
-                                                   (unless
-                                                    (slot-boundp
-                                                     obj
-                                                     'of)
-                                                    (error
-                                                     "Missing ':of' data."))
-                                                   (setf
-                                                    data
-                                                    (transposer-form
-                                                     obj))
-                                                   (when
-                                                    data
-                                                    (setf
-                                                     (transposer-form
-                                                      obj)
-                                                     (if
-                                                      (and
-                                                       data
-                                                       (symbolp
-                                                        data))
-                                                      (list data nil)
-                                                      (list
-                                                       nil
-                                                       data))))))
+(defmethod initialize-instance :after ((obj transposer) &rest args)
+  args
+  (let ((data nil)
+        (stepping? nil))
+    (dopairs (s v args)
+      (case s
+        ((:stepping)
+         (when data (error "Duplicate ':stepping', ':by' or ':on' in: ~s" args))
+         (setf stepping? t)
+         (setf data v))
+        ((:by :on)
+         (when data (error "Duplicate ':stepping', ':by' or ':on' in: ~s" args))
+         (setf data v))))
+    (unless
+        data
+      (error "Missing ':stepping', ':by' or ':on' in: ~s" args))
+    (setf (transposer-by obj)
+     (if stepping?
+      (list nil data t)
+      (if (pattern? data)
+       (list nil data nil)
+       (list data nil nil))))
+    (unless (slot-boundp
+             obj
+             'of)
+      (error "Missing ':of' data."))
+    (setf data (transposer-form obj))
+    (when data (setf (transposer-form obj)
+                     (if (and data (symbolp data))
+                         (list data nil)
+                         (list nil data))))))
 
 (defmethod eop? ((obj transposer)) (eop? (transposer-of obj)))
 
@@ -2472,120 +1824,42 @@
                       (expand-pattern-value (join-format obj)))
                 (call-next-method)))
 
-(defmethod initialize-instance :after ((obj join)
-                                       &rest
-                                       args) args (let*
-                                                   ((per
-                                                     (pattern-period
-                                                      obj))
-                                                    (len
-                                                     (length
-                                                      (pattern-data
-                                                       obj)))
-                                                    (data
-                                                     (pattern-data
-                                                      obj))
-                                                    (fmat
-                                                     (join-format
-                                                      obj))
-                                                    (ppat nil))
-                                                   (period-stream-set!
-                                                    per
-                                                    (period-default
-                                                     per))
-                                                   (cond
-                                                    ((not fmat)
-                                                     (setf
-                                                      fmat
-                                                      (make-list
-                                                       len
-                                                       :initial-element
-                                                       ':eop))
-                                                     (setf
-                                                      (join-format
-                                                       obj)
-                                                      fmat))
-                                                    ((not
-                                                      (listp fmat))
-                                                     (error
-                                                      "Expected :format list but got ~s instead."
-                                                      fmat))
-                                                    ((not
-                                                      (=
-                                                       (length fmat)
-                                                       len))
-                                                     (error
-                                                      ":format list has ~s elements but length of data is ~s."
-                                                      (length fmat)
-                                                      len)))
-                                                   (dotimes
-                                                    (i len)
-                                                    (case
-                                                     (elt fmat i)
-                                                     ((:eop)
-                                                      (if
-                                                       (pattern?
-                                                        (elt data i))
-                                                       nil
-                                                       (setf
-                                                        (elt fmat i)
-                                                        nil)))
-                                                     ((t)
-                                                      (if
-                                                       (pattern?
-                                                        (elt data i))
-                                                       (setf
-                                                        (elt fmat i)
-                                                        ':each)
-                                                       (setf
-                                                        (elt fmat i)
-                                                        nil)))
-                                                     ((nil)
-                                                      (if
-                                                       (pattern?
-                                                        (elt data i))
-                                                       (progn
-                                                        (setf ppat t)
-                                                        (setf
-                                                         (elt fmat i)
-                                                         ':once))
-                                                       (setf
-                                                        (elt fmat i)
-                                                        nil)))
-                                                     (t
-                                                      (error
-                                                       "Bad :format value ~s: not :eop, ~s or ~s"
-                                                       (elt fmat i)
-                                                       t
-                                                       nil))))
-                                                   (setf
-                                                    (join-format obj)
-                                                    fmat)
-                                                   (when
-                                                    ppat
-                                                    (setf
-                                                     ppat
-                                                     (make-list
-                                                      len
-                                                      :initial-element
-                                                      nil))
-                                                    (dotimes
-                                                     (i len)
-                                                     (if
-                                                      (eq
-                                                       (elt fmat i)
-                                                       ':once)
-                                                      (progn
-                                                       (setf
-                                                        (elt ppat i)
-                                                        (elt data i))
-                                                       (setf
-                                                        (elt data i)
-                                                        nil))))
-                                                    (setf
-                                                     (join-cache obj)
-                                                     ppat))
-                                                   (values)))
+(defmethod initialize-instance :after ((obj join) &rest args)
+  args
+  (let* ((per (pattern-period obj))
+         (len (length (pattern-data obj)))
+         (data (pattern-data obj))
+         (fmat (join-format obj))
+         (ppat nil))
+    (period-stream-set! per (period-default per))
+    (cond ((not fmat)
+           (setf fmat (make-list len :initial-element ':eop))
+           (setf (join-format obj) fmat))
+          ((not (listp fmat)) (error "Expected :format list but got ~s instead." fmat))
+          ((not (= (length fmat) len))
+           (error ":format list has ~s elements but length of data is ~s." (length fmat) len)))
+    (dotimes (i len)
+      (case (elt fmat i)
+        ((:eop) (if (pattern? (elt data i)) nil (setf (elt fmat i) nil)))
+        ((t) (if (pattern? (elt data i))
+                 (setf (elt fmat i) ':each)
+                 (setf (elt fmat i) nil)))
+        ((nil)
+         (if (pattern? (elt data i))
+             (progn
+               (setf ppat t)
+               (setf (elt fmat i) ':once))
+             (setf (elt fmat i) nil)))
+        (t (error "Bad :format value ~s: not :eop, ~s or ~s" (elt fmat i) t nil))))
+    (setf (join-format obj) fmat)
+    (when ppat (setf ppat (make-list len :initial-element nil))
+          (dotimes (i len)
+            (if (eq (elt fmat i) ':once)
+                (progn
+                  (setf (elt ppat i) (elt data i))
+                  (setf (elt data i) nil))))
+          (setf (join-cache obj) ppat))
+    (values)))
 
 (defmethod canonicalize-pattern-data ((obj join) data parser inits)
   obj
@@ -2682,34 +1956,13 @@
           (car res))
         (progn (setf (pattern-data obj) (cdr data)) (car data)))))
 
-(defparameter pattern-types (quote
-                             (cycle
-                              heap
-                              weighting
-                              line
-                              palindrome
-                              graph
-                              markov
-                              rewrite
-                              range
-                              rotation)))
+(defparameter pattern-types '(cycle heap weighting line palindrome graph markov rewrite range rotation))
 
-(defparameter pattern-item-types (quote
-                                  (notes
-                                   keynums
-                                   rhythms
-                                   amplitudes
-                                   hertz)))
+(defparameter pattern-item-types '(notes keynums rhythms amplitudes hertz))
 
-(defparameter pattern-options (quote
-                               ((pattern alias with)
+(defparameter pattern-options '((pattern alias with)
                                 (palindrome elide)
-                                (of
-                                 notes
-                                 keynums
-                                 hertz
-                                 rhythms
-                                 amplitudes)
+                                (of notes keynums hertz rhythms amplitudes)
                                 (notes in through)
                                 (keynums in through from)
                                 (hertz in through)
@@ -2718,28 +1971,15 @@
                                 (heap state)
                                 (weighting state adjustable)
                                 (markov past produce)
-                                (graph
-                                 last
-                                 selector
-                                 props
-                                 starting-node-index)
+                                (graph last selector props starting-node-index)
                                 (rotation rotations)
                                 (rewrite initially rules generations)
                                 (rotation rotations)
-                                (range
-                                 from
-                                 initially
-                                 to
-                                 below
-                                 pickto
-                                 downto
-                                 above
-                                 by
-                                 stepping)
+                                (range from initially to below pickto downto above by stepping)
                                 repeat
                                 eop-hook
                                 for
-                                name)))
+                                name))
 
 (defparameter pattern-no-items (quote (range transposer)))
 
