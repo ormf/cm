@@ -47,43 +47,17 @@
         (format port "#<~a \"~a\">" (class-name (class-of obj)) name)
         (call-next-method))))
 
-(defmethod initialize-instance :after ((obj container)
-                                       &rest
-                                       args) args (let
-                                                   ((name
-                                                     (object-name
-                                                      obj)))
-                                                   (when
-                                                    name
-                                                    (unless
-                                                     (stringp name)
-                                                     (if
-                                                      (and
-                                                       name
-                                                       (symbolp
-                                                        name))
-                                                      (setf
-                                                       name
-                                                       (string-downcase
-                                                        (symbol-name
-                                                         name)))
-                                                      (setf
-                                                       name
-                                                       (format
-                                                        nil
-                                                        "~a"
-                                                        name)))
-                                                     (setf
-                                                      (object-name
-                                                       obj)
-                                                      name))
-                                                    (setf
-                                                     (gethash
-                                                      (string-downcase
-                                                       name)
-                                                      *dictionary*)
-                                                     obj))
-                                                   (values)))
+(defmethod initialize-instance :after ((obj container) &rest args)
+  args
+  (let ((name (object-name obj)))
+    (when name
+      (unless (stringp name)
+        (if (and name (symbolp name))
+         (setf name (string-downcase (symbol-name name)))
+         (setf name (format nil "~a" name)))
+        (setf (object-name obj) name))
+      (setf (gethash (string-downcase name) *dictionary*) obj))
+    (values)))
 
 (defmethod make-load-form ((obj container))
   `(make-instance
@@ -426,13 +400,7 @@
                  (parameter-slot p))))
     t))
 
-(defparameter *time-slots* (quote
-                            (time start
-                                  start-time
-                                  starttime
-                                  startime
-                                  begin
-                                  beg)))
+(defparameter *time-slots* '(time start start-time starttime startime begin beg))
 
 (defun find-time-parameter (pars decl supers)
   (flet ((gettimepar (slot sups)
