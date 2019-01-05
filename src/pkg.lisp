@@ -75,7 +75,7 @@
 ;;; CLM package stubs
 ;;;
 
-#-clm
+#-(and clm (not opusmodus))
 (defpackage :clm
   (:use :common-lisp)
   #+openmcl (:import-from :ccl #:open-shared-library)
@@ -90,7 +90,7 @@
 
 (in-package :clm)
 
-#-clm
+#-(and clm (not opusmodus))
 (progn
 (defstub clm-load)
 (defstub dac)
