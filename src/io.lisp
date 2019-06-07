@@ -14,8 +14,7 @@
  (defclass event-stream (container)
            ((time :accessor object-time)
             (open :initform nil :accessor io-open)
-            (stream :initform nil :initarg :stream :accessor
-             event-stream-stream)
+            (stream :initform nil :initarg :stream :accessor event-stream-stream)
             (args :initform '() :accessor event-stream-args)
             (direction :initform nil :accessor io-direction)))
  (defparameter <event-stream> (find-class 'event-stream))
@@ -24,32 +23,22 @@
 
 (progn
  (defclass rt-stream (event-stream)
-           ((receive-mode :accessor rt-stream-receive-mode :initarg
-             :receive-mode)
-            (receive-rate :accessor rt-stream-receive-rate :initform
-             0.001 :initarg :receive-rate)
-            (receive-data :accessor rt-stream-receive-data :initform
-             '())
-            (receive-type :accessor rt-stream-receive-type :initarg
-             :receive-type :initform nil)
-            (receive-hook :accessor rt-stream-receive-hook :initarg
-             :receive-hook :initform nil)
-            (receive-stop :accessor rt-stream-receive-stop :initform
-             nil)
-            (latency :accessor rt-stream-latency :initarg :latency
-             :initform 0)))
+           ((receive-mode :accessor rt-stream-receive-mode :initarg :receive-mode)
+            (receive-rate :accessor rt-stream-receive-rate :initform 0.001 :initarg :receive-rate)
+            (receive-data :accessor rt-stream-receive-data :initform '())
+            (receive-type :accessor rt-stream-receive-type :initarg :receive-type :initform nil)
+            (receive-hook :accessor rt-stream-receive-hook :initarg :receive-hook :initform nil)
+            (receive-stop :accessor rt-stream-receive-stop :initform nil)
+            (latency :accessor rt-stream-latency :initarg :latency :initform 0)))
  (defparameter <rt-stream> (find-class 'rt-stream))
  (finalize-class <rt-stream>)
  (values))
 
 (progn
  (defclass event-file (event-stream)
-           ((version :initform 0 :accessor event-file-version
-             :initarg :version)
-            (versioning :initform nil :initarg :versioning :accessor
-             event-file-versioning)
-            (elt-type :initform :char :accessor file-elt-type
-             :initarg :elt-type)))
+           ((version :initform 0 :accessor event-file-version :initarg :version)
+            (versioning :initform nil :initarg :versioning :accessor event-file-versioning)
+            (elt-type :initform :char :accessor file-elt-type :initarg :elt-type)))
  (defparameter <event-file> (find-class 'event-file))
  (finalize-class <event-file>)
  (values))

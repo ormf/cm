@@ -803,7 +803,7 @@
                             do (setf s (second x))))))
          (append (list ':of
                        (cons 'list
-                             (loop for x in (cdr (pattern-data obj))
+                             (loop for x in (pattern-data obj)
                               collect (fnc x))))
                        (call-next-method)
                        (if (not (markov-pattern-produce obj))

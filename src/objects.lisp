@@ -563,39 +563,19 @@
             forms)))
 
 (defparameter *each-operators* (list
-                                (list
-                                 'as
-                                 #'parse-for
-                                 'iter
+                                (list 'as #'parse-for 'iter
                                  (list 'from #'parse-numerical-for)
-                                 (list
-                                  'downfrom
-                                  #'parse-numerical-for)
+                                 (list 'downfrom #'parse-numerical-for)
                                  (list 'below #'parse-numerical-for)
                                  (list 'to #'parse-numerical-for)
                                  (list 'above #'parse-numerical-for)
                                  (list 'downto #'parse-numerical-for)
-                                 (list
-                                  'in
-                                  #'parse-sequence-iteration)
+                                 (list 'in #'parse-sequence-iteration)
                                  (list 'on #'parse-numerical-for)
-                                 (list
-                                  'across
-                                  #'parse-sequence-iteration)
+                                 (list 'across #'parse-sequence-iteration)
                                  (list '= #'parse-general-iteration))
-                                (list
-                                 'output
-                                 #'parse-process-clause
-                                 'task
-                                 'to
-                                 'at
-                                 'ahead)
-                                (list
-                                 'sprout
-                                 #'parse-process-clause
-                                 'task
-                                 'at
-                                 'ahead)
+                                (list 'output #'parse-process-clause 'task 'to 'at 'ahead)
+                                (list 'sprout #'parse-process-clause 'task 'at 'ahead)
                                 (assoc 'do *loop-operators*)))
 
 (defun parse-each (forms clauses ops)
@@ -649,53 +629,17 @@
 
 (defparameter *process-operators* (append
                                    (mapcar
-                                    (lambda
-                                     (op)
-                                     (assoc op *loop-operators*))
-                                    '(with
-                                      initially
-                                      repeat
-                                      for
-                                      as
-                                      do
-                                      finally
-                                      when
-                                      unless
-                                      if))
+                                    (lambda (op) (assoc op *loop-operators*))
+                                    '(with initially repeat for as do finally when unless if))
                                    (list
-                                    (list
-                                     'set
-                                     #'parse-set-clause
-                                     'task)
-                                    (list
-                                     'output
-                                     #'parse-process-clause
-                                     'task
-                                     'to
-                                     'into)
-                                    (list
-                                     'sprout
-                                     #'parse-process-clause
-                                     'task
-                                     'at
-                                     'ahead)
-                                    (list
-                                     'wait
-                                     #'parse-process-clause
-                                     'task)
-                                    (list
-                                     'wait-until
-                                     #'parse-process-clause
-                                     'task)
+                                    (list 'set #'parse-set-clause 'task)
+                                    (list 'output #'parse-process-clause 'task 'to 'into)
+                                    (list 'sprout #'parse-process-clause 'task 'at 'ahead)
+                                    (list 'wait #'parse-process-clause 'task)
+                                    (list 'wait-until #'parse-process-clause 'task)
                                     (list 'each #'parse-each 'task)
-                                    (list
-                                     'while
-                                     #'process-while-until
-                                     nil)
-                                    (list
-                                     'until
-                                     #'process-while-until
-                                     nil))))
+                                    (list 'while #'process-while-until nil)
+                                    (list 'until #'process-while-until nil))))
 
 (defmacro process (&body forms)
   (expand-process forms *process-operators*))

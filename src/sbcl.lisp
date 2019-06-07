@@ -101,18 +101,23 @@
 				(subseq cmd (+ pos 4)))))
 	  (sb-ext:run-program exe (list arg)
 			      :output output :wait wait)))))
-	    
-(defun cd (&optional (dir (user-homedir-pathname )))
-  (sb-posix:chdir dir)
-  (let ((host (pathname-host dir))
-        (name (pathname-name dir))
-        (path (pathname-directory dir)))
-    ;; allow dirs without ending delim "/tmp"
-    (when name
-      (setq path (append path (list name))))
-    (setq *default-pathname-defaults*
-          (make-pathname :host host :directory path))
-    (namestring *default-pathname-defaults*)))
+
+
+
+(defun cd (&optional (dirarg (user-homedir-pathname )))
+  (let ((dir (if (stringp dirarg)
+                 (string-right-trim '(#\/) dirarg)
+                 dirarg)))
+    (sb-posix:chdir dir)
+    (let ((host (pathname-host dir))
+          (name (pathname-name dir))
+          (path (pathname-directory dir)))
+      ;; allow dirs without ending delim "/tmp"
+      (when name
+        (setq path (append path (list name))))
+      (setq *default-pathname-defaults*
+            (make-pathname :host host :directory path))
+      (namestring *default-pathname-defaults*))))
 
 (defun pwd ()
   (namestring

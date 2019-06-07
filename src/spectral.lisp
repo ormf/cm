@@ -177,9 +177,7 @@
     (when spectrum
       (if minimum (setf bot (hertz minimum :hz (eq type ':hertz))))
       (if maximum (setf top (hertz maximum :hz (eq type ':hertz)))))
-    (setf data
-          (fm-spectrum1 carrier mratio index (eq type nil) nil
-           all-sidebands))
+    (setf data (fm-spectrum1 carrier mratio index (eq type nil) nil all-sidebands))
     (when ignore-zero
       (setf data (delete-if (lambda (x) (zerop (car x))) data)))
     (when invert
@@ -503,57 +501,34 @@
                                (setf ftype ':frames))
                               ((equal s "par-text-partials-format")
                                (setf ftype ':partials))
-                              ((equal
-                                s
-                                "point-type time frequency amplitude")
-                               nil)
-                              ((equal
-                                s
-                                "point-type index frequency amplitude")
-                               nil)
+                              ((equal s "point-type time frequency amplitude") nil)
+                              ((equal s "point-type index frequency amplitude") nil)
                               (t
-                               (let
-                                ((x (string-substrings s)))
+                               (let ((x (string-substrings s)))
                                 (cond
                                  ((null x) nil)
                                  ((or
                                    (equal (car x) "partials-count")
                                    (equal (car x) "frame-count"))
-                                  (setf
-                                   count
-                                   (read-from-string (cadr x)))))))))
+                                  (setf count (read-from-string (cadr x)))))))))
                      (cond ((eq ftype ':frames)
                             (unless point-format
                               (setf
                                point-format
                                '(:hertz :amplitude)))
                             (cond ((consp point-format)
-                                   (if
-                                    (member
-                                     (car point-format)
-                                     '(:hertz :keynum :note))
+                                   (if (member (car point-format) '(:hertz :keynum :note))
                                     (setf para (car point-format))
-                                    (error
-                                     "import-spear-data: illegal point-format: ~s."
-                                     point-format))
+                                    (error "import-spear-data: illegal point-format: ~s." point-format))
                                    (if
                                     (and
                                      (consp (cdr point-format))
-                                     (eq
-                                      (car (cdr point-format))
-                                      ':amplitude))
+                                     (eq (car (cdr point-format)) ':amplitude))
                                     (setf parb t)
-                                    (error
-                                     "import-spear-data: illegal point-format: ~s."
-                                     point-format)))
-                                  ((member
-                                    point-format
-                                    '(:hertz :keynum :note :raw))
+                                    (error "import-spear-data: illegal point-format: ~s." point-format)))
+                                  ((member point-format '(:hertz :keynum :note :raw))
                                    (setf para point-format))
-                                  (t
-                                   (error
-                                    "import-spear-data: ~s is not a valid point-format."
-                                    point-format))))
+                                  (t (error "import-spear-data: ~s is not a valid point-format." point-format))))
                            ((eq ftype ':partials)
                             (unless point-format
                               (setf point-format '(:time :hertz)))
@@ -561,29 +536,17 @@
                                    (if
                                     (eq (car point-format) ':time)
                                     (setf para ':time)
-                                    (error
-                                     "import-spear-data: illegal point-format ~s."
-                                     point-format))
+                                    (error "import-spear-data: illegal point-format ~s." point-format))
                                    (if
                                     (and
                                      (consp (cdr point-format))
-                                     (member
-                                      (car (cdr point-format))
-                                      '(:hertz :keynum :note)))
-                                    (setf
-                                     parb
-                                     (car (cdr point-format)))
-                                    (error
-                                     "import-spear-data: illegal point-format ~s."
-                                     point-format)))
-                                  ((member
-                                    point-format
-                                    '(:hertz :keynum :note :raw))
+                                     (member (car (cdr point-format)) '(:hertz :keynum :note)))
+                                    (setf parb (car (cdr point-format)))
+                                    (error "import-spear-data: illegal point-format ~s." point-format)))
+                                  ((member point-format '(:hertz :keynum :note :raw))
                                    (setf parb point-format))
                                   (t
-                                   (error
-                                    "import-spear-data: ~s is not a valid point-format."
-                                    point-format))))
+                                   (error "import-spear-data: ~s is not a valid point-format." point-format))))
                            (t
                             (error "import-spear-data: no frames or partials.")))
                      (unless count
@@ -593,32 +556,13 @@
                            for i from 0
                            until (file-eof? s)
                            do (when
-                               (or
-                                (and
-                                 (>= i start)
-                                 (or (not end) (<= i end))))
-                               (if
-                                (eq ftype ':partials)
+                               (or (and (>= i start) (or (not end) (<= i end))))
+                               (if (eq ftype ':partials)
                                 (let
                                  ((hdr s))
                                  (setf s (file-line file))
-                                 (setf
-                                  d
-                                  (read-spear-partial
-                                   hdr
-                                   s
-                                   para
-                                   parb
-                                   freq-scaler
-                                   amp-scaler)))
-                                (setf
-                                 d
-                                 (read-spear-frame
-                                  s
-                                  para
-                                  parb
-                                  time-scaler
-                                  freq-scaler)))
+                                 (setf d (read-spear-partial hdr s para parb freq-scaler amp-scaler)))
+                                (setf d (read-spear-frame s para parb time-scaler freq-scaler)))
                                (if (consp d) (push d data))))
                            (setf err? nil))
                  (if file (close-file file ':input)))
@@ -858,11 +802,7 @@
         (do ((klis keys (cdr klis)) (tail head))
             ((null klis) (cdr head))
           (setf (cdr tail)
-                (list (apply #'make-instance
-                             (find-class 'midi)
-                             :keynum
-                             (car klis)
-                             args)))
+                (list (apply #'make-instance (find-class 'midi) :keynum (car klis) args)))
           (setf tail (cdr tail)))
         (do ((ampl (member ':amplitude args))
              (klis keys (cdr klis))
@@ -871,9 +811,5 @@
             ((null klis) (cdr head))
           (setf (car (cdr ampl)) (car alis))
           (setf (cdr tail)
-                (list (apply #'make-instance
-                             (find-class 'midi)
-                             :keynum
-                             (car klis)
-                             args)))
+                (list (apply #'make-instance (find-class 'midi) :keynum (car klis) args)))
           (setf tail (cdr tail))))))

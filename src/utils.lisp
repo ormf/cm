@@ -386,7 +386,7 @@
                  (let ((res '()))
                    (dopairs (x y (cdr args))
                     (push (slot-setter-form o
-                           (if (keyword? x) (keyword->symbol x) x) y)
+                            (if (keyword? x) (keyword->symbol x) x) y)
                           res))
                    (reverse res)))))))
 
