@@ -45,7 +45,7 @@
     :version "2.12.0"
     :author "Rick Taube <taube (at) uiuc.edu>"
     :licence "LLGPL"
-    :depends-on (:alexandria :fomus)
+    :depends-on (:alexandria)
     :components
     ((:module "src"
       :serial t
@@ -113,4 +113,4 @@
       (dolist (s systems) (use-system s :verbose nil)))
     (cmcall :cm-logo)))
 
-(export '(cm use-system) :cl-user)
+(export '(cm use-sys tem) :cl-user)

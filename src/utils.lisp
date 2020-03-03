@@ -217,36 +217,27 @@
 (defparameter *cm-logo* t)
 
 (defun cm-logo ()
+  "draw cm logo on *standard-output* the nerdy way. Originally written
+by Tobias Kunze. Some cleanup done by Orm Finnendahl."
   (if *cm-logo*
-      (progn (format t "~%")
-             (do ((e "~%") (v (make-string 15)) (y 0 (+ y 1)))
-                 ((= y 7) nil)
-               (format t
-                       (do ((x 0 (+ x 1)))
-                           ((= x 15)
-                            (if (= y 3)
-                                (concatenate
-                                 'string
-                                 v
-                                 " "
-                                 (cm-version)
-                                 e)
-                                (concatenate 'string v e)))
-                         (setf (elt v x)
-                               (if
-                                (<= 2 (- x y) 4)
-                                #\\ 
-                                (if
-                                 (= (- x (- 4 (mod (+ 13 y) 15))) 1)
-                                 #\/
-                                 (if
-                                  (<= 1 y 5)
-                                  #\-
-                                  (if
-                                   (= (* (- x 6) (- y 3)) 15)
-                                   #\/
-                                   #\ ))))))))
-             (format t "~%")))
+      (let ((e "~%"))
+        (format t e)
+        (do ((v (make-string 15)) (y 0 (+ y 1)))
+            ((= y 7) nil)
+          (format t
+                  (do ((x 0 (+ x 1)))
+                      ((= x 15) (if (= y 3)
+                                    (concatenate
+                                     'string v " " (cm-version) e)
+                                    (concatenate 'string v e)))
+                    (setf (elt v x)
+                          (cond
+                            ((<= 2 (- x y) 4) #\\) 
+                            ((= (- x (- 4 (mod (+ 13 y) 15))) 1) #\/)
+                            ((<= 1 y 5) #\-)
+                            ((= (* (- x 6) (- y 3)) 15) #\/)
+                            (:else #\ ))))))
+        (format t e)))
   (values))
 
 (defun string-substrings (string &key (delimiters '(#\  #\Tab))
