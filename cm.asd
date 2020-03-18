@@ -79,7 +79,7 @@
                    (:file "midi2")
                    (:file "midi3")
                    (:file "cmn")
-;;;                   (:file "fomus")
+;;                   (:file "fomus")
                    (:file "sc")
                    (:file "rt")
                    (:file "parse")))))
@@ -113,4 +113,4 @@
       (dolist (s systems) (use-system s :verbose nil)))
     (cmcall :cm-logo)))
 
-(export '(cm use-sys tem) :cl-user)
+(export '(cm use-system) :cl-user)

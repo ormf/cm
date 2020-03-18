@@ -118,27 +118,27 @@
 			   (format "(use-system :%s)\n" s)))))
     init))
 
-(defun cm (program )
+(defun cm ()
   "Start CM"
-  (interactive (list (if prefix-arg
-			 (read-string "Command to start CM: " "cm") 
-		       nil)))
+  (interactive)
   (cond ((slime-connected-p)
-	 (switch-to-buffer (slime-repl-buffer)))
+         (slime-eval '(ql:quickload "cm"))
+         (slime-eval-expression-in-repl "(cm)")
+         (switch-to-buffer (slime-repl-buffer)))
 	(t
-	 (when program (setq cm-program program))
-	 (let ((parsed (split-string cm-program)))
-	   (add-hook 'slime-connected-hook 'cm-start-hook)
-	   (slime-start :program (first parsed) :program-args (rest parsed)
-			:init 'cm-init-command
-			:buffer " *inferior-lisp*"
-			)
-	   (claim-scratch-buffer)))))
+         (slime)
+         (eval-after-load 'slime
+           (progn
+             (slime-eval '(ql:quickload "cm"))
+             (cm))))))
+
+;; slime-eval-last-expression-in-repl
 
 (defun kill-cm ()
   "Kill *slime-repl* and all associated buffers."
   (interactive)
   (slime-repl-sayoonara))
+
 
 (defun enable-cm-commands ()
   (interactive )
