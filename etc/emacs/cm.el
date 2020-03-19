@@ -118,21 +118,31 @@
 			   (format "(use-system :%s)\n" s)))))
     init))
 
+(defun load-and-start-cm ()
+  (slime-eval '(ql:quickload "cm"))
+  (slime-repl-send-string "(cm)")
+  (switch-to-buffer (slime-repl-buffer)))
+
+(defun load-and-start-cm-remove-hook ()
+  "after starting cm remove this hook from slime-connected-hook"
+  (slime-eval '(ql:quickload "cm"))
+  (slime-repl-send-string "(cm)")
+  (switch-to-buffer (slime-repl-buffer))
+  (setq slime-connected-hook
+        (remove 'load-and-start-cm-remove-hook slime-connected-hook)))
+
 (defun cm ()
   "Start CM"
   (interactive)
+  (message "entering cm function.")
   (cond ((slime-connected-p)
-         (slime-eval '(ql:quickload "cm"))
-         (slime-eval-expression-in-repl "(cm)")
-         (switch-to-buffer (slime-repl-buffer)))
+         (load-and-start-cm))
 	(t
-         (slime)
-         (eval-after-load 'slime
-           (progn
-             (slime-eval '(ql:quickload "cm"))
-             (cm))))))
-
-;; slime-eval-last-expression-in-repl
+         ;;; temporarily set slime-connected-hook to start cm
+         (unless (member 'load-and-start-cm slime-connected-hook)
+           (setq slime-connected-hook
+                 (append slime-connected-hook '(load-and-start-cm-remove-hook))))
+         (slime))))
 
 (defun kill-cm ()
   "Kill *slime-repl* and all associated buffers."
