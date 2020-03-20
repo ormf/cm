@@ -281,7 +281,8 @@ of the io stream. Returns the io stream."
               path)
             *out*))))
 
-(defmethod write-event (obj io time) obj io time)
+(defmethod write-event (obj io time) obj io time
+  (format t "stub~%"))
 
 (defmethod write-event (obj (io seq) time)
            (setf (object-time obj) time) (insert-object obj io))

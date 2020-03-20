@@ -171,7 +171,7 @@
 ;;; to clm, sco and midi files. The simp object is declared with four
 ;;; required parameters: beg end amp and freq. We also add an 'ins' slot
 ;;; so that it can handle the differnet instrument naming conventions in
-;;; clm and csound. If you only use one syntheisis package you wouldn't
+;;; clm and csound. If you only use one synthesis package you wouldn't
 ;;; need to do this.
 ;;; note that we associate the system function OBJECT-TIME with the 
 ;;; 'beg' slot so these values will become the time value used by the

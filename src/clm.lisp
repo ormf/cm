@@ -86,11 +86,12 @@
             (date-and-time))))
 
 (defun play-clm-file (file &rest args)
-  (let ((verbose (getf args :verbose t))
-        (output (getf args ':output)))
-    (if (not output) (setf output *clm-file-name*))
-    (if verbose (apply #'tell-snd output args))
-    (apply #'clm-load file args)))
+  (if *clm-file-name*
+      (let ((verbose (getf args :verbose t))
+            (output (getf args ':output)))
+        (if (not output) (setf output *clm-file-name*))
+        (if verbose (apply #'tell-snd output args))
+        (apply #'clm-load file args))))
 
 (set-clm-output-hook! #'play-clm-file)
 
