@@ -149,8 +149,8 @@
         when (typep o <container>) collect o))
 
 (defun map-objects (fn objs &key (start 0) end (step 1) (width 1) at
-                    test class key slot slot! arg2 &aux doat indx
-                    this)
+                              test class key slot slot! arg2 &aux (doat nil) (indx nil)
+                                                               (this nil))
   (if (not (listp objs)) (setf objs (container-subobjects objs)))
   (if (and slot slot!)
       (error ":slot and slot! are exclusive keywords."))

@@ -19,13 +19,13 @@
 (pushnew ':metaclasses *features*)
 
 (import '(sb-ext::load-foreign
-          sb-pcl:slot-definition-initargs
-          sb-pcl:slot-definition-initform
-          sb-pcl:slot-definition-name
-          sb-pcl:class-direct-slots
-          sb-pcl:class-slots
-          sb-pcl:class-direct-superclasses
-          sb-pcl:generic-function-name
+          sb-mop:slot-definition-initargs
+          sb-mop:slot-definition-initform
+          sb-mop:slot-definition-name
+          sb-mop:class-direct-slots
+          sb-mop:class-slots
+          sb-mop:class-direct-superclasses
+          sb-mop:generic-function-name
           sb-mop:class-direct-subclasses
           sb-mop:validate-superclass
 	  sb-sys:without-interrupts
@@ -54,14 +54,14 @@
 (defun exit () (sb-ext:exit))
 
 ;(defun class-subclasses (c)
-;  (let ((subs (sb-pcl:class-direct-subclasses c)))
+;  (let ((subs (sb-mop:class-direct-subclasses c)))
 ;    (if (null subs)
 ;	'()
 ;      (loop for s in subs
 ;	append (cons s (class-subclasses s))))))
 	  
 (defun finalize-class (class) 
-  (sb-pcl:finalize-inheritance class))
+  (sb-mop:finalize-inheritance class))
 
 ;(defgeneric validate-class (obj1 obj2))
 ;(defmethod validate-class ((class t) (superclass t))
