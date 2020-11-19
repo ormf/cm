@@ -285,7 +285,9 @@ of the io stream. Returns the io stream."
   (format t "stub~%"))
 
 (defmethod write-event (obj (io seq) time)
-           (setf (object-time obj) time) (insert-object obj io))
+  (let ((obj (copy-object obj)))
+    (setf (object-time obj) time)
+    (insert-object obj io)))
 
 (defmethod import-events ((file string) &rest args)
            (if (probe-file file)
