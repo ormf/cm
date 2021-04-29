@@ -520,8 +520,7 @@
                       d)))
                  io)
                 (setf res io))
-               (if (not old)
-                   (remhash (string-downcase (object-name res))
-                            *dictionary*))
+               (unless old
+                 (%remove-from-dictionary (object-name res)))
                file)
         nil)))

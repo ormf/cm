@@ -136,6 +136,7 @@
 (defstub add-note-to-staff)
 (defstub (special *exact-rhythms* staff-descriptors)))
 
+#|
 ;;;
 ;;; Fomus stubs
 ;;;
@@ -151,40 +152,37 @@
 
 (in-package :fomus)
 
-#|
 #-fomus
 (progn
-(defclass fomusobj-base ()
- ((id :accessor obj-id :initform nil :initarg :id)))
-(defclass event-base (fomusobj-base)
- ((off :accessor event-off :initform nil :initarg :off)
-  (partid :accessor event-partid :initform nil :initarg :partid)))
-(defclass mark (event-base)
- ((off) (marks :accessor event-marks :initform nil :initarg :marks)
-  (voice :accessor event-voice :initform 1 :initarg :voice)))
-(defclass dur-base (mark)
- ((dur :accessor event-dur :initform 1 :initarg :dur)))
-(defclass note (dur-base)
- ((note :accessor event-note :initform nil :initarg :note)))
-(defclass part (fomusobj-base)
- ((name :accessor part-name :initform nil :initarg :name)
-  (abbrev :accessor part-abbrev :initform nil :initarg :abbrev)
-  (opts :accessor part-opts :initform nil :initarg :opts)
-  (events :accessor part-events :initform nil :initarg :events)
-  (instr :accessor part-instr :initform nil :initarg :instr)
-  (props :accessor part-props :initform nil :initarg :props)
-  (partid :accessor part-partid :initform nil :initarg :partid)))
+  (defclass fomusobj-base ()
+    ((id :accessor obj-id :initform nil :initarg :id)))
+  (defclass event-base (fomusobj-base)
+    ((off :accessor event-off :initform nil :initarg :off)
+     (partid :accessor event-partid :initform nil :initarg :partid)))
+  (defclass mark (event-base)
+    ((off) (marks :accessor event-marks :initform nil :initarg :marks)
+     (voice :accessor event-voice :initform 1 :initarg :voice)))
+  (defclass dur-base (mark)
+    ((dur :accessor event-dur :initform 1 :initarg :dur)))
+  (defclass note (dur-base)
+    ((note :accessor event-note :initform nil :initarg :note)))
+  (defclass part (fomusobj-base)
+    ((name :accessor part-name :initform nil :initarg :name)
+     (abbrev :accessor part-abbrev :initform nil :initarg :abbrev)
+     (opts :accessor part-opts :initform nil :initarg :opts)
+     (events :accessor part-events :initform nil :initarg :events)
+     (instr :accessor part-instr :initform nil :initarg :instr)
+     (props :accessor part-props :initform nil :initarg :props)
+     (partid :accessor part-partid :initform nil :initarg :partid)))
 
-(defstub obj-partid (x) :method)
-(defstub fomus)
-(defstub make-part)
-(defstub make-note)
-(defstub get-instr-syms)
-(defstub fomus-file)
-(defstub (special *parts*)))
-
+  (defstub obj-partid (x) :method)
+  (defstub fomus)
+  (defstub make-part)
+  (defstub make-note)
+  (defstub get-instr-syms)
+  (defstub fomus-file)
+  (defstub (special *parts*)))
 |#
-
 ;;;
 ;;; The CM package definition.
 ;;;

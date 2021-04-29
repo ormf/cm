@@ -28,7 +28,7 @@
              '("*.fms" "*.xml" "*.ly"))
        (values))
 
-(defmethod object-time ((obj event-base)) (event-off obj))
+(defmethod object-time ((obj fomus::event-base)) (fomus::event-off obj))
 
 (defmethod open-io ((io fomus-file) dir &rest args)
   args
@@ -105,7 +105,7 @@
        part)
     (if (eq id (obj-partid (car tail))) (setf part (car tail)))))
 
-(defmethod write-event ((obj event-base) (fil fomus-file) scoretime)
+(defmethod write-event ((obj fomus::event-base) (fil fomus-file) scoretime)
   (let ((part (fomus-file-part fil (obj-partid obj))))
     (setf (event-off obj) scoretime)
     (setf (part-events part) (cons obj (part-events part)))

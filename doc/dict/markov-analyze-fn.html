@@ -35,20 +35,20 @@ The order of the Markov analysis, defaults to 1.
 </dd>
 
 
-<dt><code class="keyword">:print</code> {<var>true</var> | <code class="keyword">:table</code> | <code class="keyword">:pattern</code> | <var>false</var>}</dt>
+<dt><code class="keyword">:print?</code> {<var>true</var> | <code class="keyword">:table</code> | <code class="keyword">:pattern</code> | <var>false</var>}</dt>
 <dd>
 
 If the value is true (the default) then two results are printed, a
 transition table and a pattern description. The transition table that
 is printer details the distribution of inputs and outputs in the data.
 The pattern description that is printed will instantiate that table if
-it is evalutated. If <code class="keyword">:print</code> is just <code class="keyword">:table</code> or <code class="keyword">:pattern</code> 
-then only that form of the analysis is printed.  If <code class="keyword">:print</code>
+it is evalutated. If <code class="keyword">:print?</code> is just <code class="keyword">:table</code> or <code class="keyword">:pattern</code> 
+then only that form of the analysis is printed.  If <code class="keyword">:print?</code>
 is false then no analysis is printed.
 </dd>
 
 
-<dt><code class="keyword">:pattern</code> {<var>false</var> | <var>true</var>}</dt>
+<dt><code class="keyword">:pattern?</code> {<var>false</var> | <var>true</var>}</dt>
 <dd>
 
 If false (the default) then <kbd>markov-analyze</kbd> does not

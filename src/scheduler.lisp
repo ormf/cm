@@ -351,12 +351,13 @@
 (defun wait (time)
   (case (scheduling-mode)
     ((:events) (setf *qnext* (+ *qnext* (abs time))))
-    ((:rts) (setf *rts-qnext* (+ *rts-qnext* (abs time))))
+    ((:rts) (setf *rts-qnext* (+ *rts-qnext* (* *rt-scale* (abs time)))))
     (t (error "wait: scheduler not running."))))
 
 (defun sprout (obj &key to at)
   (if (consp obj) (dolist (o obj) (sprout o :at at :to to))
-      (let ((sched (scheduling-mode)))
+      (let ((sched (scheduling-mode))
+            (*rt-scale* *rt-scale*))
         (if (not sched) ;;; called from repl
             (if (not at) (setf at (now)))
             (if at

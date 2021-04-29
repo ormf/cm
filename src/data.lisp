@@ -491,6 +491,34 @@
     (setf last tail)
     (setf tail (cddr tail))))
 
+(defmacro ensure-tail (list error head)
+  `(if (null ,list)
+       (error ,error ,head)
+       (pop ,list)))
+
+(defun interp1 (x coords base)
+  (let ((head coords)
+        (error "bad coordinate list: ~s"))
+    (let* ((x1 (ensure-tail coords error head))
+           (y1 (ensure-tail coords error head))
+           (x2 x1)
+           (y2 y1))
+      (do ()
+          ((or (null coords) (> x2 x)) nil)
+        (setf x1 x2)
+        (setf y1 y2)
+        (setf x2 (pop coords))
+        (setf y2 (ensure-tail coords error head)))
+      (cond ((>= x x2) y2)
+            ((<= x x1) y1)
+            ((= base 1) (+ y1 (* (- x x1) (/ (- y2 y1) (- x2 x1)))))
+            (t
+             (let ((pct (/ (- x x1) (- x2 x1))))
+               (+ y1
+                  (* (/ (- y2 y1) (- base 1.0))
+                     (- (expt base pct) 1.0)))))))))
+
+#|
 (defun interp1 (x coords base)
   (let ((head coords))
     (let* ((x1
@@ -520,6 +548,7 @@
                (+ y1
                   (* (/ (- y2 y1) (- base 1.0))
                      (- (expt base pct) 1.0)))))))))
+|#
 
 (defun interpl (x coords &key min max (offset min) scale (base 1))
   (if (and offset max) (setf scale (- max offset)))

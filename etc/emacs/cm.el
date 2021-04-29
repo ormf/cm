@@ -43,6 +43,8 @@
   (require 'slime)
   (slime-setup))
 
+(require 'cl)
+
 (when (member 'aquamacs features)
   (add-to-list 'obof-other-frame-regexps " \\*inferior-lisp\\*")
   (add-to-list 'obof-other-frame-regexps "\\*slime-repl\\\\*"))
@@ -666,6 +668,13 @@ selected; indent whole defun if prefixed."
    ("wait-until" "dict/index.html#wait-until-fn.html")
    ("weighting" "dict/index.html#weighting-cls.html"))
  )
+
+
+(setf cm-font-lock-keywords
+      (cons '("\\<\\(process\\|cycle\\|object\\|...\\)\\>"
+	      . font-lock-reference-face)
+            lisp-font-lock-keywords)
+      lisp-font-lock-keywords cm-font-lock-keywords)
 
 ;; eof
 (enable-cm-commands)
