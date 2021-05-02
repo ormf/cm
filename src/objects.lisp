@@ -35,8 +35,14 @@
 
 (defparameter *dictionary* (make-hash-table :size 31 :test #'equal))
 
+(defun %add-to-dictionary (name object)
+  (setf (gethash (string-downcase name) *dictionary*) object))
+
+(defun %remove-from-dictionary (name)
+  (remhash (string-downcase name) *dictionary*))
+
 (progn (defclass container ()
-         ((name :initform nil :accessor object-name :initarg :name)))
+         ((name :initform nil :reader object-name :initarg :name)))
        (defparameter <container> (find-class 'container))
        (finalize-class <container>)
        (values))
