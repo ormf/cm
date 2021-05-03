@@ -75,10 +75,27 @@
      ,(cons 'list
             (mapcar #'make-load-form (container-subobjects obj)))))
 
+(defmethod copy-object ((obj container))
+  (let ((new (call-next-method)))
+    (if (object-name new)
+        (setf (slot-value new 'name) nil))
+    new))
+
+(defmethod (setf object-name) (name (obj container))
+  (if name
+      (rename-object obj name)
+      ;; Unnamed object.
+      (let ((name (object-name obj)))
+        (if name (%remove-from-dictionary name))
+        (setf (slot-value obj 'name) nil)))
+  name)
+
 (defmethod rename-object ((obj container) newname &rest args)
   (let* ((err? (if (null args) t (car args)))
-         (str
-          (if (stringp newname) newname (format nil "~a" newname)))
+         (str (typecase newname
+                (string newname)
+                (symbol (string-downcase (symbol-name newname)))
+                (otherwise (format nil "~a" newname))))
          (old (find-object str)))
     (if old
         (if (eq obj old)
