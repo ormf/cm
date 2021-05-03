@@ -59,10 +59,10 @@
     (when name
       (unless (stringp name)
         (if (and name (symbolp name))
-         (setf name (string-downcase (symbol-name name)))
-         (setf name (format nil "~a" name)))
-        (setf (object-name obj) name))
-      (setf (gethash (string-downcase name) *dictionary*) obj))
+            (setf name (string-downcase (symbol-name name)))
+            (setf name (format nil "~a" name)))
+        (setf (slot-value obj 'name) name))
+      (%add-to-dictionary name obj))
     (values)))
 
 (defmethod make-load-form ((obj container))
@@ -105,10 +105,10 @@
                        newname
                        old)
                 nil))
-        (progn (remhash (object-name obj) *dictionary*)
-               (setf (object-name obj) str)
-               (setf (gethash (string-downcase str) *dictionary*)
-                     obj)
+        (progn (if (object-name obj)
+                   (%remove-from-dictionary (object-name obj)))
+               (setf (slot-value obj 'name) str)
+               (%add-to-dictionary str obj)
                obj))))
 
 (defun list-named-objects (&optional type)
