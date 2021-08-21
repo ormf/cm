@@ -171,6 +171,50 @@
   (loop for o in (container-subobjects obj)
         when (typep o <container>) collect o))
 
+;; map-subobjects and map-subcontainers are commented out in the
+;; scheme version in cm 2.12 (and therefore aren't contained in the
+;; lisp code). This might have been unintentional as the fns are
+;; contained in the docs and listed as exported symbols in
+;; package.lisp. Here is the code converted from scheme:
+
+(defun map-subobjects (fn container &key key recurse test type)
+  (let ((test (if type
+		  (lambda (x) (is-a? x type))
+		  test)))
+    (if key
+	(if test
+	    (dolist (o (container-subobjects container))
+	      (if (and recurse (is-a? o <container>))
+	          (map-subobjects fn o :key key :recurse recurse :test test)
+	          (when (funcall test o) (funcall fn (funcall key o)))))
+	    (dolist (o (container-subobjects container)) 
+	      (if (and recurse (is-a? o <container>))
+	          (map-subobjects fn o :key key :recurse recurse :test test)
+	          (funcall fn (funcall key o)))))
+	(if test
+	    (dolist (o (container-subobjects container))
+	      (if (and recurse (is-a? o <container>))
+	          (map-subobjects fn o :key key :recurse recurse :test test)
+	          (when (funcall test o) (funcall fn o))))
+	    (dolist (o (container-subobjects container))
+	      (if (and recurse (is-a? o <container>))
+	          (map-subobjects fn o :key key :recurse recurse :test test)
+	          (funcall fn o)))))
+    (values)))
+
+(defun map-subcontainers (fn container &key key recurse)
+  (if key
+      (dolist (o (container-subobjects container))
+	(when (is-a? o <container>)
+	  (funcall fn (funcall key o)))
+	(if recurse (map-subcontainers fn o :key key :recurse recurse)))
+      (dolist (o (container-subobjects container))
+	(when (is-a? o <container>) (funcall fn o))
+	(if recurse (map-subcontainers fn o :key key :recurse recurse))))
+  (values))
+
+
+
 (defun map-objects (fn objs &key (start 0) end (step 1) (width 1) at
                               test class key slot slot! arg2 &aux (doat nil) (indx nil)
                                                                (this nil))
