@@ -279,6 +279,6 @@
            :set-clm-output-hook! :set-midi-output-hook!
            :set-receiver! :remove-receiver!
            :set-sco-output-hook! :shell :shuffle :*softest* :sprout
-           :stop :subcontainers :subobjects :sv :sv+ :sv* :*tempo*
+           :stop :subcontainers :subobjects :sv :sv+ :sv* :svfn :*tempo*
            :tendency :thunk :*time-slots* :transpose :transposer :true
            :tuning :vary :wait :wait-until :weighting))

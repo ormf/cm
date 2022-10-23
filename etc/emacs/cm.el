@@ -43,7 +43,7 @@
   (require 'slime)
   (slime-setup))
 
-(require 'cl)
+(require 'cl-lib)
 
 (when (member 'aquamacs features)
   (add-to-list 'obof-other-frame-regexps " \\*inferior-lisp\\*")
@@ -63,7 +63,7 @@
 (defvar cm-scratch-mode 'lisp)
 
 ;; add music extensions if not already present...
-(loop for mode in '(("\\.clm$" . lisp-mode)
+(cl-loop for mode in '(("\\.clm$" . lisp-mode)
 		    ("\\.cm$"  . lisp-mode)
 		    ("\\.cmn$" . lisp-mode)
 		    ("\\.ins$" . lisp-mode)
@@ -72,7 +72,7 @@
       do (add-to-list 'auto-mode-alist mode))
 
 ;; add music-related ignored file types...
-(loop for type in '(".midi" ".mid" ".snd" ".aiff" ".wav" ".osc"
+(cl-loop for type in '(".midi" ".mid" ".snd" ".aiff" ".wav" ".osc"
 		    ".fas" ".dfas" ".fasl" ".lib" ".ppcf" ".so"
 		    ".dylib")
       do (add-to-list 'completion-ignored-extensions type))
@@ -171,7 +171,7 @@
             (let ((this (current-buffer))
 		  next)
               (if (eq repl this)
-                  (setq next (loop for b in (buffer-list)
+                  (setq next (cl-loop for b in (buffer-list)
 				   when (with-current-buffer b
 					  (or (eq major-mode 'lisp-mode)
 					      (eq major-mode 'sal-mode)
@@ -259,8 +259,8 @@ selected; indent whole defun if prefixed."
 (defun cm-doc (url)
   (interactive "FCM document:")
   (browse-url-firefox
-   (concatenate 'string *common-music-doc-root*
-                url)
+   (concat *common-music-doc-root*
+           url)
    nil))
 
 (defun cm-lookup (entry)

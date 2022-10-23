@@ -312,7 +312,7 @@
 
 (defun output (event &key to at (ahead 0))
   (let ((sched (scheduling-mode)))
-;;    (break "event: ~a, to: ~a, at: ~a, ahead: ~a, sched: ~a" event to at ahead sched)
+;;;    (break "event: ~a, to: ~a, at: ~a, ahead: ~a, sched: ~a" event to at ahead sched)
     (case sched
       ((:events)
        (unless to (setf to *out*))

@@ -396,6 +396,22 @@ by Tobias Kunze. Some cleanup done by Orm Finnendahl."
 
 (defmacro sv* (obj slot val &body more) (svaux obj '* slot val more))
 
+(defun svaux2 (obj op slot others)
+  (let* ((ob (gensym)) (args (list ob)) (done nil))
+    (do ()
+        (done `(let ((,ob ,obj)) (sv ,@args)))
+      (nconc args (list slot `(funcall ,op (sv ,ob ,slot))))
+      (if (null others)
+          (setf done t)
+          (progn (setf slot (car others))
+                 (setf others (cdr others)))))))
+
+(defmacro svfn (obj fn slot &body more)
+  "set the new value of a slot by calling a function fn with the old
+slot value as argument"
+  (svaux2 obj fn slot more))
+
+
 (defun u8vector-copy! (vec1 vec2 &rest args)
   (let ((p (if (null args) 0 (car args)))
         (l
