@@ -104,11 +104,11 @@
 
 
 
-(defun cd (&optional (dirarg (user-homedir-pathname )))
+(defun cd (&optional (dirarg (user-homedir-pathname)))
   (let ((dir (if (stringp dirarg)
                  (string-right-trim '(#\/) dirarg)
                  dirarg)))
-    (sb-posix:chdir dir)
+    (uiop:chdir dir)
     (let ((host (pathname-host dir))
           (name (pathname-name dir))
           (path (pathname-directory dir)))
