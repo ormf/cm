@@ -282,7 +282,7 @@ of the io stream. Returns the io stream."
             *out*))))
 
 (defmethod write-event (obj io time) obj io time
-  (format t "write-event: no method defined for ~a." obj))
+  (format t "write-event: no method defined for ~a on ~a." obj io))
 
 (defmethod write-event (obj (io seq) time)
   (let ((obj (copy-object obj)))
