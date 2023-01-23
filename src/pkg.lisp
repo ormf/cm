@@ -72,10 +72,11 @@
 (export '(defstub) :cl-user)
 
 ;;;
-;;; CLM package stubs
+;;; CLM package stubs (uncommented as incudine also uses clm as a
+;;; nickname vor cudere-clm)
 ;;;
 
-#-(and clm (not opusmodus))
+#-(or (not incudine) (and clm (not opusmodus)))
 (defpackage :clm
   (:use :common-lisp)
   #+openmcl (:import-from :ccl #:open-shared-library)
@@ -90,7 +91,7 @@
 
 (in-package :clm)
 
-#-(and clm (not opusmodus))
+#-(or (not incudine) (and clm (not opusmodus)))
 (progn
 (defstub clm-load)
 (defstub dac)
@@ -135,6 +136,7 @@
 (defstub init-clm-input)
 (defstub add-note-to-staff)
 (defstub (special *exact-rhythms* staff-descriptors)))
+
 
 #|
 ;;;
@@ -198,25 +200,25 @@
   (:use :common-lisp )
   ;; use keywords instead of strings for case sensitive lisps.
   (:import-from :cl-user #:cm #:use-system)
-  (:import-from :clm 
-                :mus-next
-                :mus-bshort
-                :mus-aifc
-                :mus-riff
-                :mus-lshort
-                :*clm-with-sound-depth*
-                :wsdat-play
-                :init-with-sound
-                :finish-with-sound
-                :*clm-channels*
-                :*clm-srate*
-                :*clm-file-name*
-                :clm-load
-                :dac
-                :*definstrument-hook*
-                ;; these are also used by CM but defs don't conflict.
-                ;#+(and clm2 (not clm3)) :graph 
-                :spectrum :env :src :filter :delay)
+  ;; (:import-from :clm 
+  ;;               :mus-next
+  ;;               :mus-bshort
+  ;;               :mus-aifc
+  ;;               :mus-riff
+  ;;               :mus-lshort
+  ;;               :*clm-with-sound-depth*
+  ;;               :wsdat-play
+  ;;               :init-with-sound
+  ;;               :finish-with-sound
+  ;;               :*clm-channels*
+  ;;               :*clm-srate*
+  ;;               :*clm-file-name*
+  ;;               :clm-load
+  ;;               :dac
+  ;;               :*definstrument-hook*
+  ;;               ;; these are also used by CM but defs don't conflict.
+  ;;               ;#+(and clm2 (not clm3)) :graph 
+  ;;               :spectrum :env :src :filter :delay)
   (:import-from :cmn
                 :init-clm-input
                 :*exact-rhythms*

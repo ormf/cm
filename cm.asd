@@ -74,7 +74,7 @@
                    (:file "gnuplot")
                    (:file "plt")
                    (:file "sco")
-                   (:file "clm")
+;;;                   (:file "clm")
                    (:file "midi1")
                    (:file "midi2")
                    (:file "midi3")
