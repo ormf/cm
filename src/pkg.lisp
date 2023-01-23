@@ -72,11 +72,10 @@
 (export '(defstub) :cl-user)
 
 ;;;
-;;; CLM package stubs (uncommented as incudine also uses clm as a
-;;; nickname vor cudere-clm)
+;;; CLM package stubs
 ;;;
 
-#-(or (not incudine) (and clm (not opusmodus)))
+#-clm
 (defpackage :clm
   (:use :common-lisp)
   #+openmcl (:import-from :ccl #:open-shared-library)
@@ -89,9 +88,10 @@
            #:spectrum #:env #:src #:clm-load #:dac #:definstrument
            #:*definstrument-hook* #:with-sound #:filter #:delay))
 
+#-clm
 (in-package :clm)
 
-#-(or (not incudine) (and clm (not opusmodus)))
+#-clm
 (progn
 (defstub clm-load)
 (defstub dac)
@@ -111,7 +111,7 @@
 ;;; CMN package stubs
 ;;;
 
-#-cmn
+#-:cmn
 (defpackage :cmn
   (:use :common-lisp)
   (:import-from :cl-user #:defstub)
@@ -120,9 +120,10 @@
            #:set-staff-clef #:finish-clm-input #:find-staff #:add-staff
            #:add-data-1 #:add-note-to-staff))
 
+#-:cmn
 (in-package :cmn)
 
-#-cmn
+#-:cmn
 (progn
 (defstub stfdat-staff )
 (defstub staff-data (x) :method )
