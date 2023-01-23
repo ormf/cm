@@ -75,7 +75,7 @@
 ;;; CLM package stubs
 ;;;
 
-#-clm
+#-:clm
 (defpackage :clm
   (:use :common-lisp)
   #+openmcl (:import-from :ccl #:open-shared-library)
@@ -88,10 +88,10 @@
            #:spectrum #:env #:src #:clm-load #:dac #:definstrument
            #:*definstrument-hook* #:with-sound #:filter #:delay))
 
-#-clm
+#-:clm
 (in-package :clm)
 
-#-clm
+#-:clm
 (progn
 (defstub clm-load)
 (defstub dac)
