@@ -39,9 +39,9 @@
 ;;; cm-scratch-mode
 ;;;   Emacs edit mode for *scratch* buffer, one of: lisp, sal or nil.
 
-(unless (member 'slime features)
-  (require 'slime)
-  (slime-setup))
+;; (unless (member 'slime features)
+;;   (require 'slime)
+;;   (slime-setup))
 
 (require 'cl-lib)
 
@@ -154,12 +154,23 @@
   ;; 1 stroke switching between repl and last editing buffer
   (global-set-key (kbd "<f8>") 'slime-toggle-repl)
   ;; eval before at or after point, region, or whole defun on whitespae
-  (define-key slime-mode-map (kbd "\C-x\C-e") 'slime-eval-last-expression)
-  ;; indent line or region
-  (define-key slime-mode-map (kbd "TAB") 'slime-indent-anything)
-  ;; lookup cm function at point
-  (define-key slime-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
-  (define-key slime-repl-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
+  (if (boundp 'slime-mode-map)
+      (progn
+        (define-key slime-mode-map (kbd "\C-x\C-e") 'slime-eval-last-expression)
+        ;; indent line or region
+        (define-key slime-mode-map (kbd "TAB") 'slime-indent-anything)
+        ;; lookup cm function at point
+        (define-key slime-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
+        (define-key slime-repl-mode-map (kbd "\C-c\C-dc") 'cm-lookup)))
+  (if (boundp 'sly-mode-map)
+      (progn
+        ;; (define-key lisp-mode-map (kbd "\C-x\C-e") 'sly-eval-last-expression)
+        ;; ;; indent line or region
+        ;; (define-key lisp-mode-map (kbd "TAB") 'slime-indent-anything)
+        ;; lookup cm function at point
+        (define-key lisp-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
+;;;        (define-key sly-mrepl-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
+        ))
   )
 
 (defun slime-toggle-repl ()
@@ -238,6 +249,39 @@
 	(slime-interactive-eval
 	 (buffer-substring-no-properties left-side right-side))))))
 
+(defun sly-eval-expr ()
+  "Evals expr before point, at point, around point, whole region."
+  (interactive)
+  (if (region-exists-p )
+      (sly-eval-region (region-beginning) (region-end))
+    (let ((wspace '(?\  ?\t ?\r ?\n))
+	  (left-char (char-before))
+	  (right-char (char-after))
+	  left-side right-side)
+      (setq left-side
+	    (if (or (not left-char)
+		    (member left-char wspace)
+		    (member left-char '(?\( )))
+		(point)
+	      (save-excursion
+		(backward-sexp)
+		(point))))
+      (setq right-side
+	    (if (or (not right-char)
+		    (member right-char wspace)
+		    (member right-char '(?\) ))
+		    ;; dont look ahead if different sexp leftward
+		    (and (< left-side (point))
+			 (char-equal left-char ?\))))
+		(point)
+	      (save-excursion
+		(forward-sexp)
+		(point))))
+      (if (equal left-side right-side)   
+	  nil
+	(sly-interactive-eval
+	 (buffer-substring-no-properties left-side right-side))))))
+
 (defun slime-indent-anything ()
   "Do line indentation/symbol completion; indent region if
 selected; indent whole defun if prefixed."
@@ -294,11 +338,18 @@ selected; indent whole defun if prefixed."
 ;; last argument changed to make it workable under xemacs 21.4.19
 ;; Robert Matovinovi,c 20.07.2006, robert.matovinovic@web.de
 
-(easy-menu-add-item menubar-slime
-		    '("Documentation")
-		    *common-music-doc-menu*
-		    ;(easy-menu-create-menu "Common Music" )
-		    )
+;; (easy-menu-add-item menubar-slime
+;; 		    '("Documentation")
+;; 		    *common-music-doc-menu*
+;; 		    ;(easy-menu-create-menu "Common Music" )
+;; 		    )
+
+(if (boundp 'sly-mode-map)
+    (easy-menu-add-item sly-menu
+		        '("Documentation")
+		        *common-music-doc-menu*
+                                        ;(easy-menu-create-menu "Common Music" )
+		        ))
 
 (defvar *common-music-symbols* (make-vector 66 0))
 

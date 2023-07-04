@@ -623,6 +623,7 @@
                                            y-min
                                            y-max)))))))
 
+(defun quantize (value step) (* (floor (+ (/ value step) 1/2)) step))
 
 (defun rescale (value oldmin oldmax newmin newmax)
   (+ (* (/ (- newmax newmin) (- oldmax oldmin)) (- value oldmin))
