@@ -670,6 +670,7 @@
                    (if (null data) (setf flag nil)))
              track))
 
+#|
 (defun midi-file-import-track (file
                                track
                                seq
@@ -689,54 +690,28 @@
                     (s (channel-message-opcode m))
                     (n nil))
                (cond ((channel-message-p m)
-                      (cond ((and
-                              channel-exclude
-                              (or
-                               (eq channel-exclude t)
-                               (member s channel-exclude)))
-                             (setf n nil))
-                            ((or
-                              (= s +ml-note-off-opcode+)
-                              (and
-                               (= s +ml-note-on-opcode+)
-                               (= 0 (channel-message-data2 m))))
-                             (let
-                              ((on
-                                (if
-                                 note-off-stack
-                                 (let
-                                  ((l
-                                    (gethash
-                                     (channel-note-hash m)
-                                     tabl))
-                                   (v nil))
-                                  (when
-                                   (and l (not (null l)))
-                                   (setf v (car l))
-                                   (setf
-                                    (gethash
-                                     (channel-note-hash m)
-                                     tabl)
-                                    (cdr l)))
-                                  v)
-                                 (let
-                                  ((x
-                                    (gethash
-                                     (channel-note-hash m)
-                                     tabl)))
-                                  (if
-                                   x
-                                   (if
-                                    (not (null (cdr x)))
-                                    (let*
-                                     ((tail
-                                       (loop with a = x
-                                        and b = (cdr x)
-                                        until (null (cdr b))
-                                        do (setf a b)
-                                        (setf b (cdr b))
-                                        finally (return a)))
-                                       (obj (cadr tail)))
+                      (cond
+                        ((and channel-exclude (or (eq channel-exclude t) (member s channel-exclude)))
+                         (setf n nil))
+                        ((or (= s +ml-note-off-opcode+) (and (= s +ml-note-on-opcode+) (= 0 (channel-message-data2 m))))
+                         (let ((on (if note-off-stack
+                                       (let
+                                           ((l (gethash (channel-note-hash m) tabl)) (v nil))
+                                         (when
+                                             (and l (not (null l)))
+                                           (setf v (car l))
+                                           (setf (gethash (channel-note-hash m) tabl) (cdr l)))
+                                         v)
+                                 (let ((x (gethash (channel-note-hash m) tabl)))
+                                   (if x
+                                       (if (not (null (cdr x)))
+                                           (let*
+                                               ((tail (loop
+                                                        with a = x and b = (cdr x)
+                                                        until (null (cdr b))
+                                                        do (setf a b) (setf b (cdr b))
+                                                        finally (return a)))
+                                      (obj (cadr tail)))
                                       (setf (cdr tail) (list))
                                       obj)
                                      (progn
@@ -812,6 +787,119 @@
                                  (- pb-width)
                                  pb-width)
                                 2)))
+                             (t
+                              (setf
+                               n
+                               (midi-message->midi-event
+                                m
+                                :time
+                                b)))))
+                      ((meta-message-p m)
+                       (unless (and
+                                meta-exclude
+                                (or
+                                 (eq meta-exclude t)
+                                 (eot-p m)
+                                 (member
+                                  (ldb +enc-data-1-byte+ m)
+                                  meta-exclude)))
+                         (setf n
+                               (midi-message->midi-event
+                                m
+                                :time
+                                b
+                                :data
+                                (midi-file-data mf)))))
+                      (t
+                       (setf n
+                             (midi-message->midi-event m :time b))))
+                     (when n (push n data)))))
+           (midi-file-set-track file track)
+           (midi-file-map-track #'mapper file))
+      (setf (container-subobjects seq) (nreverse data))
+    seq))
+|#
+
+(defun midi-file-import-track (file
+                               track
+                               seq
+                               notefn
+                               note-off-stack
+                               channel-exclude
+                               meta-exclude
+                               channel-tuning
+                               pb-width)
+  (let* ((data '())
+         (tune
+          (if channel-tuning (make-array 16 :initial-element 0) nil))
+         (tabl (make-hash-table :size 31 :test #'equal)))
+    (flet ((mapper (mf)
+             (let* ((b (midi-file-ticks mf))
+                    (m (midi-file-message mf))
+                    (s (channel-message-opcode m))
+                    (n nil))
+               (cond ((channel-message-p m)
+                      (cond
+                        ((and channel-exclude (or (eq channel-exclude t) (member s channel-exclude)))
+                         (setf n nil))
+                        ((or (= s +ml-note-off-opcode+) (and (= s +ml-note-on-opcode+) (= 0 (channel-message-data2 m))))
+                         (let ((on (if note-off-stack
+                                       (let
+                                           ((l (gethash (channel-note-hash m) tabl)) (v nil))
+                                         (when l
+                                           (setf v (car l))
+                                           (setf (gethash (channel-note-hash m) tabl) (cdr l)))
+                                         v)
+                                 (let ((x (gethash (channel-note-hash m) tabl)))
+                                   (if x
+                                       (if (not (null (cdr x)))
+                                           (let*
+                                               ((tail (loop
+                                                        with a = x and b = (cdr x)
+                                                        until (null (cdr b))
+                                                        do (setf a b) (setf b (cdr b))
+                                                        finally (return a)))
+                                                (obj (cadr tail)))
+                                             (setf (cdr tail) (list))
+                                             obj)
+                                           (progn (setf (gethash (channel-note-hash m) tabl) (list)) (car x)))
+                                       nil)))))
+                           (if on
+                               (setf (midi-duration on) (- b (object-time on)))
+                               (progn
+                                 (setf n (make-instance
+                                          <midi-note-off>
+                                          :time b
+                                          :keynum (channel-message-data1 m)
+                                          :channel (channel-message-channel m)))
+                                 (format
+                                  t
+                                  "~%No Note-On for channel ~s keynum ~s, midi-note-off obj added to seq."
+                                  (channel-message-channel m)
+                                  (channel-message-data1 m))))))
+                        ((= s +ml-note-on-opcode+)
+                         (setf n (make-instance
+                                  <midi>
+                                  :time b
+                                  :keynum (if notefn (funcall notefn (channel-message-data1 m))
+                                              (if channel-tuning
+                                                  (+ (channel-message-data1 m)
+                                                     (elt tune (channel-message-channel m)))
+                                                  (channel-message-data1 m)))
+                                  :channel (channel-message-channel m)
+                                  :amplitude (/ (channel-message-data2 m) 127.0)))
+                         (let
+                             ((v (gethash (channel-note-hash m) tabl)))
+                           (if (not v)
+                               (setf (gethash (channel-note-hash m) tabl) (list n))
+                               (setf (gethash (channel-note-hash m) tabl) (cons n v)))))
+                             ((and channel-tuning (= s +ml-pitch-bend-opcode+))
+                              (setf (elt tune (channel-message-channel m))
+                                    (decimals
+                                     (rescale
+                                      (- (+ (pitch-bend-lsb m) (* 128 (pitch-bend-msb m))) 8192)
+                                      -8192 8191 (- pb-width) pb-width)
+                                     2)))
                              (t
                               (setf
                                n
