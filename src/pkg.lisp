@@ -242,7 +242,7 @@
            :*beat* :best-normal-form :between :cd :cents->scaler
            :chord :*chromatic-scale* :clm-file :cm :cm-version 
 	   :cm-version-number :cmio
-           :cmn :cmn-file :copier :copy-object :cycle :date-and-time
+           :cmn :cmn-file :controller :copier :copy-object :cycle :date-and-time
            :decimals :decode-interval :defaxis :defobject :defprocess
            :doeach :drunk :dumposc :eod? :eop? :events :expl :explseg
            :explsegs :f :false :find-object :fit :fm-spectrum
@@ -271,7 +271,7 @@
            :player-unsolo :plotter-add-layer :plotter-close
            :plotter-data :plotter :plotter-front-styling
            :plotter-property :plotter-redraw :plotter-scroll
-           :plotter-zoom :point :power :prime-form :process :pval
+           :plotter-zoom :point :power :prime-form :process :program :pval
            :pval :pwd :quantize :ran :range :ransegs :remove-object
 	   :remove-subobjects :rescale-envelope :rescale :rewrite
 	   :rewrite-generation :rhythm :rm-spectrum :rotation
@@ -284,4 +284,4 @@
            :set-sco-output-hook! :shell :shuffle :*softest* :sprout
            :stop :subcontainers :subobjects :sv :sv+ :sv* :svfn :*tempo*
            :tendency :thunk :*time-slots* :transpose :transposer :true
-           :tuning :vary :wait :wait-until :weighting))
+           :tuning :value :vary :wait :wait-until :weighting))
