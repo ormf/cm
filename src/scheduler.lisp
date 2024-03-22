@@ -364,7 +364,7 @@
                 (if (eq sched ':events) (setf at (+ at *pstart*))
                     (setf at (+ at *rts-pstart*)))
                 (setf at (now))))
-;;        (format t "~&sprout, obj-type: ~a, now: ~a, at: ~a, *pstart*: ~a" (typep obj <object>) (now) at *pstart*)
+        ;;        (format t "~&sprout, obj-type: ~a, now: ~a, at: ~a, *pstart*: ~a" (typep obj <object>) (now) at *pstart*)
         (cond
           ((functionp obj) (enqueue *qentry-process* obj at at sched))
           ((integerp obj) (enqueue *qentry-message* obj at nil sched))
