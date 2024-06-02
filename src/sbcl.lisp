@@ -18,7 +18,7 @@
 
 (pushnew ':metaclasses *features*)
 
-(import '(sb-ext::load-foreign
+(import '(;; sb-ext::load-foreign
           sb-mop:slot-definition-initargs
           sb-mop:slot-definition-initform
           sb-mop:slot-definition-name

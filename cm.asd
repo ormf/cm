@@ -19,13 +19,7 @@
 (defpackage :common-music-system (:use :cl :asdf))
 (in-package :common-music-system)
 
-(defun cm-directory (&rest subs)
-  (namestring
-   (make-pathname :name nil :type nil
-                  :directory (append (pathname-directory cl-user::*cm-directory*)
-                                     subs)
-                  :defaults cl-user::*cm-directory*)))
-
+#|
 (defmethod perform :after ((op load-op) cm)
   ;; add cm feature before loading other systems...
   (pushnew :cm *features*)
@@ -33,9 +27,10 @@
   (load (merge-pathnames "cminit.lisp" (cm-directory "etc"))
         :if-does-not-exist nil)
   ;; load user init file if it exists
+  (format t "perform-after ")
   (load (merge-pathnames ".cminit.lisp" (user-homedir-pathname))
         :if-does-not-exist nil))
-
+|#
 ;;;
 ;;; system definition
 ;;;
@@ -82,7 +77,8 @@
 ;;;                   (:file "fomus")
                    (:file "sc")
                    (:file "rt")
-                   (:file "parse")))))
+                   (:file "parse")
+                   (:file "init")))))
 
 ;;;
 ;;; main functions
