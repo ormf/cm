@@ -354,23 +354,29 @@
     ((:rts) (setf *rts-qnext* (+ *rts-qnext* (* *rt-scale* (abs time)))))
     (t (error "wait: scheduler not running."))))
 
-(defun sprout (obj &key to at)
-  (if (consp obj) (dolist (o obj) (sprout o :at at :to to))
-      (let ((sched (scheduling-mode))
-            (*rt-scale* *rt-scale*))
-        (if (not sched) ;;; called from repl
-            (if (not at) (setf at (now)))
-            (if at
-                (if (eq sched ':events) (setf at (+ at *pstart*))
-                    (setf at (+ at *rts-pstart*)))
-                (setf at (now))))
-        ;;        (format t "~&sprout, obj-type: ~a, now: ~a, at: ~a, *pstart*: ~a" (typep obj <object>) (now) at *pstart*)
-        (cond
-          ((functionp obj) (enqueue *qentry-process* obj at at sched))
-          ((integerp obj) (enqueue *qentry-message* obj at nil sched))
-          ((typep obj <object>)
-           (schedule-object obj (or *pstart* at) sched))
-          (t (enqueue *qentry-unknown* obj at nil sched)))))
+(defun remf* (proplist &rest props)
+  (dolist (prop props) (remf proplist prop))
+  proplist)
+
+(defun sprout (obj &rest args &key to at &allow-other-keys)
+  (if to
+      (apply #'events obj (getf args :to) (remf* args :to :at))
+      (if (consp obj) (dolist (o obj) (sprout o :at at :to to))
+          (let ((sched (scheduling-mode))
+                (*rt-scale* *rt-scale*))
+            (if (not sched) ;;; called from repl
+                (if (not at) (setf at (now)))
+                (if at
+                    (if (eq sched ':events) (setf at (+ at *pstart*))
+                        (setf at (+ at *rts-pstart*)))
+                    (setf at (now))))
+            ;;        (format t "~&sprout, obj-type: ~a, now: ~a, at: ~a, *pstart*: ~a" (typep obj <object>) (now) at *pstart*)
+            (cond
+              ((functionp obj) (enqueue *qentry-process* obj at at sched))
+              ((integerp obj) (enqueue *qentry-message* obj at nil sched))
+              ((typep obj <object>)
+               (schedule-object obj (or *pstart* at) sched))
+              (t (enqueue *qentry-unknown* obj at nil sched))))))
   (values))
 
 (defun sec (val fmat)
