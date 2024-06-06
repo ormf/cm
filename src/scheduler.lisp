@@ -377,7 +377,7 @@
               ((typep obj <object>)
                (schedule-object obj (or *pstart* at) sched))
               (t (enqueue *qentry-unknown* obj at nil sched))))))
-  (values))
+  (getf args :to))
 
 (defun sec (val fmat)
   (case fmat
