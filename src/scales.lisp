@@ -54,431 +54,141 @@
 
 (define-list-struct sd note keynum octave class name accidental)
 
-(defmethod initialize-instance :after ((obj tuning)
-                                       &rest
-                                       args) args (let
-                                                   ((extern nil)
-                                                    (steps? t)
-                                                    (cents? t)
-                                                    (equal? nil)
-                                                    (nums nil)
-                                                    (syms nil)
-                                                    (data nil)
-                                                    (len nil)
-                                                    (octave nil))
-                                                   (dopairs
-                                                    (a v args)
-                                                    (case
-                                                     a
-                                                     ((:cents)
-                                                      (if
-                                                       extern
-                                                       (error
-                                                        "only one of :cents, :ratios or :steps allowed."))
-                                                      (setf cents? t)
-                                                      (setf
-                                                       extern
-                                                       v))
-                                                     ((:ratios)
-                                                      (if
-                                                       extern
-                                                       (error
-                                                        "only one of :cents, :ratios or :steps allowed."))
-                                                      (setf
-                                                       cents?
-                                                       nil)
-                                                      (setf
-                                                       extern
-                                                       v))
-                                                     ((:steps)
-                                                      (if
-                                                       extern
-                                                       (error
-                                                        "only one of :cents, :ratios or :steps allowed."))
-                                                      (unless
-                                                       (and
-                                                        (numberp v)
-                                                        (integerp v))
-                                                       (error
-                                                        "tuning: :steps value ~s is not an integer."
-                                                        v))
-                                                      (setf cents? t)
-                                                      (let*
-                                                       ((o
-                                                         (scaler->cents
-                                                          (or
-                                                           (scale-octave
-                                                            obj)
-                                                           2)))
-                                                        (i (/ o v)))
-                                                       (setq
-                                                        extern
-                                                        (loop repeat v
-                                                         collect i))))))
-                                                    (unless
-                                                     (consp extern)
-                                                     (error
-                                                      "Tuning needs :ratios or :cents initialization."))
-                                                    (cond
-                                                     ((consp
-                                                       (car extern))
-                                                      (setf
-                                                       nums
-                                                       (loop for e
-                                                             in
-                                                             extern
-                                                        collect (if
-                                                                 (and
-                                                                  (consp
-                                                                   e)
-                                                                  (numberp
-                                                                   (car
-                                                                    e)))
-                                                                 (car
-                                                                  e)
-                                                                 (if
-                                                                  (numberp
-                                                                   e)
-                                                                  e
-                                                                  (error
-                                                                   "Bad degree: ~s in ~s."
-                                                                   e
-                                                                   extern)))))
-                                                       (setf
-                                                        steps?
-                                                        (not
-                                                         (if
-                                                          cents?
-                                                          (=
-                                                           (car nums)
-                                                           0)
-                                                          (=
-                                                           (car nums)
-                                                           1))))
-                                                       (when
-                                                        (and
-                                                         (not steps?)
-                                                         (consp
-                                                          (car
-                                                           (last
-                                                            extern)))
-                                                         (scale-table
-                                                          obj))
-                                                        (error
-                                                         "No ending octave size (cent or ratio): ~s "
-                                                         extern))
-                                                       (setf
-                                                        syms
-                                                        (loop for e
-                                                              in
-                                                              extern
-                                                         while (consp
-                                                                e)
-                                                         collect (if
-                                                                  (null
-                                                                   (cdr
-                                                                    e))
-                                                                  (error
-                                                                   "Degree spec missing notes: ~s."
-                                                                   e)
-                                                                  (cdr
-                                                                   e)))))
-                                                       ((numberp
-                                                         (car
-                                                          extern))
-                                                        (setf
-                                                         nums
-                                                         extern)
-                                                        (setf
-                                                         steps?
-                                                         (not
-                                                          (if
-                                                           cents?
-                                                           (=
-                                                            (car
-                                                             nums)
-                                                            0)
-                                                           (=
-                                                            (car
-                                                             nums)
-                                                            1))))
-                                                        (setf
-                                                         syms
-                                                         nil))
-                                                       (t
-                                                        (error
-                                                         "Bad degree spec ~s."
-                                                         extern)))
-                                                      (setf
-                                                       equal?
-                                                       (if
-                                                        steps?
-                                                        (apply
-                                                         #'=
-                                                         nums)
-                                                        (let
-                                                         ((one
-                                                           (if
-                                                            cents?
-                                                            (-
-                                                             (second
-                                                              nums)
-                                                             (first
-                                                              nums))
-                                                            (/
-                                                             (second
-                                                              nums)
-                                                             (first
-                                                              nums)))))
-                                                         (loop for tail
-                                                               on
-                                                               nums
-                                                          while (not
-                                                                 (null
-                                                                  (cdr
-                                                                   tail)))
-                                                          always (let
-                                                                  ((a
-                                                                    (first
-                                                                     tail))
-                                                                   (b
-                                                                    (second
-                                                                     tail)))
-                                                                  (=
-                                                                   one
-                                                                   (if
-                                                                    cents?
-                                                                    (-
-                                                                     b
-                                                                     a)
-                                                                    (/
-                                                                     b
-                                                                     a))))))))
-                                                       (if
-                                                        equal?
-                                                        (if
-                                                         steps?
-                                                         (progn
-                                                          (setf
-                                                           data
-                                                           (if
-                                                            cents?
-                                                            (cents->scaler
-                                                             (first
-                                                              nums))
-                                                            (first
-                                                             nums)))
-                                                          (setf
-                                                           octave
-                                                           (if
-                                                            cents?
-                                                            (cents->scaler
-                                                             (apply
-                                                              #'+
-                                                              nums))
-                                                            (apply
-                                                             #'+
-                                                             nums)))
-                                                          (setf
-                                                           len
-                                                           (length
-                                                            nums)))
-                                                         (progn
-                                                          (setf
-                                                           data
-                                                           (if
-                                                            cents?
-                                                            (cents->scaler
-                                                             (second
-                                                              nums))
-                                                            (second
-                                                             nums)))
-                                                          (setf
-                                                           octave
-                                                           (if
-                                                            cents?
-                                                            (cents->scaler
-                                                             (car
-                                                              (last
-                                                               nums)))
-                                                            (car
-                                                             (last
-                                                              nums))))
-                                                          (setf
-                                                           len
-                                                           (-
-                                                            (length
-                                                             nums)
-                                                            1))))
-                                                        (progn
-                                                         (if
-                                                          steps?
-                                                          (setf
-                                                           data
-                                                           (do
-                                                            ((tail
-                                                              nums
-                                                              (cdr
-                                                               tail))
-                                                             (l
-                                                              (list
-                                                               (if
-                                                                cents?
-                                                                0
-                                                                1)))
-                                                             (k nil))
-                                                            ((null
-                                                              tail)
-                                                             l)
-                                                            (if
-                                                             (not k)
-                                                             (setf
-                                                              k
-                                                              (car
-                                                               tail))
-                                                             (setf
-                                                              k
-                                                              (if
-                                                               cents?
-                                                               (+
-                                                                k
-                                                                (car
-                                                                 tail))
-                                                               (*
-                                                                k
-                                                                (car
-                                                                 tail)))))
-                                                            (push
-                                                             k
-                                                             l)))
-                                                          (setf
-                                                           data
-                                                           (reverse
-                                                            nums)))
-                                                         (setf
-                                                          octave
-                                                          (if
-                                                           cents?
-                                                           (cents->scaler
-                                                            (pop
-                                                             data))
-                                                           (pop
-                                                            data)))
-                                                         (setf
-                                                          data
-                                                          (if
-                                                           cents?
-                                                           (mapcar
-                                                            #'cents->scaler
-                                                            (reverse
-                                                             data))
-                                                           (reverse
-                                                            data)))
-                                                         (setf
-                                                          len
-                                                          (length
-                                                           data))
-                                                         (setf
-                                                          (scale-into
-                                                           obj)
-                                                          (loop for s
-                                                                in
-                                                                data
-                                                           collect (log
-                                                                    s
-                                                                    octave)))))
-                                                        (setf
-                                                         (scale-steps
-                                                          obj)
-                                                         data)
-                                                        (setf
-                                                         (scale-divisions
-                                                          obj)
-                                                         len)
-                                                        (if
-                                                         (not syms)
-                                                         (setf
-                                                          (scale-table
-                                                           obj)
-                                                          nil)
-                                                         (let
-                                                          ((octaves
-                                                            (scale-table
-                                                             obj))
-                                                           (table
-                                                            (make-hash-table
-                                                             :size
-                                                             103
-                                                             :test
-                                                             #'equal))
-                                                           (degrees
-                                                            (loop for deg
-                                                                  in
-                                                                  syms
-                                                             for i
-                                                             from
-                                                             0
-                                                             collect (loop for d
-                                                                           in
-                                                                           deg
-                                                                      unless (consp
-                                                                              d)
-                                                                      do (setf
-                                                                          d
-                                                                          (list
-                                                                           d))
-                                                                      collect (let
-                                                                               ((n
-                                                                                 (pop
-                                                                                  d)))
-                                                                               (make-sd
-                                                                                :note
-                                                                                n
-                                                                                :keynum
-                                                                                i
-                                                                                :octave
-                                                                                (getf
-                                                                                 d
-                                                                                 :octave)
-                                                                                :class
-                                                                                i
-                                                                                :name
-                                                                                n
-                                                                                :accidental
-                                                                                (getf
-                                                                                 d
-                                                                                 :accidental)))))))
-                                                            (setf
-                                                             (scale-table
-                                                              obj)
-                                                             table)
-                                                            (fill-tuning-table
-                                                             obj
-                                                             degrees
-                                                             octaves)))
-                                                          (setf
-                                                           (scale-octave
-                                                            obj)
-                                                           octave)
-                                                          (if
-                                                           (scale-lowest
-                                                            obj)
-                                                           (unless
-                                                            (numberp
-                                                             (scale-lowest
-                                                              obj))
-                                                            (error
-                                                             "lowest not hertz value: ~s."
-                                                             (scale-lowest
-                                                              obj)))
-                                                           (setf
-                                                            (scale-lowest
-                                                             obj)
-                                                            (*
-                                                             6.875
-                                                             (expt
-                                                              2
-                                                              1/4))))))
+(defmethod initialize-instance :after ((obj tuning) &rest args)
+  args
+  (let ((extern nil) (steps? t) (cents? t) (equal? nil) (nums nil) (syms nil) (data nil) (len nil) (octave nil))
+    (dopairs
+        (a v args)
+      (case
+          a
+        ((:cents)
+         (if extern (error "only one of :cents, :ratios or :steps allowed."))
+         (setf cents? t)
+         (setf extern v))
+        ((:ratios)
+         (if extern (error "only one of :cents, :ratios or :steps allowed."))
+         (setf cents? nil)
+         (setf extern v))
+        ((:steps)
+         (if extern (error "only one of :cents, :ratios or :steps allowed."))
+         (unless (and (numberp v) (integerp v))
+           (error "tuning: :steps value ~s is not an integer." v))
+         (setf cents? t)
+         (let* ((o (scaler->cents (or (scale-octave obj) 2)))
+                (i (/ o v)))
+           (setq extern (loop repeat v collect i))))))
+    (unless
+        (consp extern)
+      (error
+       "Tuning needs :ratios or :cents initialization."))
+    (cond
+      ((consp (car extern))
+       (setf nums
+             (loop
+               for e in extern
+              collect (if (and (consp e) (numberp (car e))) (car e)
+                       (if (numberp e) e
+                        (error "Bad degree: ~s in ~s." e extern)))))
+       (setf steps? (not (if cents? (= (car nums) 0) (= (car nums) 1))))
+       (when (and (not steps?) (consp (car (last extern)))
+            (scale-table obj))
+         (error "No ending octave size (cent or ratio): ~s " extern))
+       (setf syms
+             (loop
+               for e in extern
+              while (consp e)
+              collect (if (null (cdr e))
+                       (error "Degree spec missing notes: ~s." e)
+                       (cdr e)))))
+      ((numberp (car extern))
+       (setf nums extern)
+       (setf steps? (not (if cents? (= (car nums) 0) (= (car nums) 1))))
+       (setf syms nil))
+      (t (error "Bad degree spec ~s." extern)))
+    (setf equal?
+     (if steps? (apply #'= nums)
+      (let
+          ((one (if cents?
+                    (- (second nums) (first nums))
+                    (/ (second nums) (first nums)))))
+        (loop
+          for tail on nums
+          while (not (null (cdr tail)))
+          always (let ((a (first tail))
+                       (b (second tail)))
+                   (= one (if cents? (- b a) (/ b a))))))))
+    (if equal?
+     (if steps?
+      (progn
+        (setf data
+         (if cents?
+          (cents->scaler (first nums))
+          (first nums)))
+        (setf octave
+         (if cents?
+          (cents->scaler
+           (apply #'+ nums))
+          (apply #'+ nums)))
+        (setf len (length nums)))
+      (progn
+        (setf data
+         (if cents? (cents->scaler (second nums)) (second nums)))
+        (setf octave
+         (if cents?
+          (cents->scaler (car (last nums)))
+          (car (last nums))))
+        (setf len (- (length nums) 1))))
+     (progn
+       (if steps?
+           (setf data
+                 (do ((tail nums (cdr tail)) (l (list (if cents? 0 1))) (k nil))
+                     ((null tail) l)
+                   (if (not k)
+                       (setf k (car tail))
+                       (setf k (if cents? (+ k (car tail)) (* k (car tail)))))
+           (push k l)))
+        (setf data (reverse nums)))
+       (setf octave
+        (if cents?
+         (cents->scaler (pop data))
+         (pop data)))
+       (setf data
+        (if cents?
+         (mapcar #'cents->scaler (reverse data)) (reverse data)))
+       (setf len (length data))
+       (setf (scale-into obj)
+        (loop
+          for s in data
+              collect (log s octave)))))
+    (setf (scale-steps obj) data)
+    (setf (scale-divisions obj) len)
+    (if
+     (not syms)
+     (setf (scale-table obj) nil)
+     (let ((octaves (scale-table obj))
+          (table (make-hash-table :size 103 :test #'equal))
+          (degrees
+            (loop
+              for deg in syms
+              for i from 0
+              collect (loop
+                        for d in deg
+                        unless (consp d)
+                          do (setf d (list d))
+                        collect (let
+                                    ((n (pop d)))
+                                  (make-sd :note n :keynum i
+                                           :octave (getf d :octave)
+                                           :class i :name n))))))
+       (setf (scale-table obj) table)
+       (fill-tuning-table obj degrees octaves)))
+    (setf (scale-octave obj) octave)
+    (if (scale-lowest obj)
+     (unless (numberp (scale-lowest obj))
+       (error "lowest not hertz value: ~s."
+        (scale-lowest obj)))
+     (setf (scale-lowest obj)
+      (* 6.875 (expt 2 1/4))))))
 
 (defun fill-tuning-table (tuning degrees octaves)
   (let ((table (scale-table tuning))
@@ -514,23 +224,11 @@
                       for o = (+ num (or (sd-octave d) 0))
                       collect (make-sd
                                :note
-                               (if
-                                octaves
-                                (intern
-                                 (string-upcase
-                                  (format nil "~A~A" n o))
-                                 :cm)
-                                (sd-note d))
-                               :keynum
-                               k
-                               :octave
-                               oct
-                               :class
-                               (sd-class d)
-                               :name
-                               n
-                               :accidental
-                               (sd-accidental d)))))
+                               (if octaves
+                                   (intern (string-upcase (format nil "~A~A" n o)) :cm)
+                                   (sd-note d))
+                               :keynum k :octave oct :class (sd-class d)
+                               :name n :accidental (sd-accidental d)))))
                (setf (gethash k table) l)
                (dolist (x l)
                  (setf (gethash (sd-note x) table)
@@ -593,271 +291,90 @@
       (setf old n))
     (nreverse res)))
 
-(defmethod initialize-instance :after ((obj mode)
-                                       &rest
-                                       args) args (let*
-                                                   ((spec nil)
-                                                    (owner
-                                                     (mode-tuning
-                                                      obj))
-                                                    (low
-                                                     (scale-lowest
-                                                      obj))
-                                                    (steps nil)
-                                                    (type nil)
-                                                    (len nil)
-                                                    (octave nil))
-                                                   (dopairs
-                                                    (a v args)
-                                                    (case
-                                                     a
-                                                     ((:steps)
-                                                      (if
-                                                       (let
-                                                        ((t6
-                                                          (car v)))
-                                                        (and
-                                                         t6
-                                                         (symbolp
-                                                          t6)))
-                                                       (progn
-                                                        (error
-                                                         "Bad :step value ~s, use :degrees to pass notes to a mode."
-                                                         v))
-                                                       (progn
-                                                        (setf spec v)
-                                                        (setf
-                                                         type
-                                                         a))))
-                                                     ((:degrees
-                                                       :notes)
-                                                      (when
-                                                       spec
-                                                       (error
-                                                        "Found duplicate keywords ~s and ~s."
-                                                        type
-                                                        a))
-                                                      (setf spec v)
-                                                      (setf type a))
-                                                     (t nil)))
-                                                   (if
-                                                    (member
-                                                     type
-                                                     '(:degrees
-                                                       :notes))
-                                                    (progn
-                                                     (setf
-                                                      spec
-                                                      (ascending-mode-order
-                                                       spec
-                                                       owner))
-                                                     (unless
-                                                      low
-                                                      (setf
-                                                       low
-                                                       (if
-                                                        (let
-                                                         ((t7
-                                                           (car
-                                                            spec)))
-                                                         (and
-                                                          t7
-                                                          (symbolp
-                                                           t7)))
-                                                        (sd-name
-                                                         (octave-equivalent
-                                                          (first
-                                                           spec)
-                                                          0
-                                                          owner))
-                                                        (sd-keynum
-                                                         (octave-equivalent
-                                                          (first
-                                                           spec)
-                                                          0
-                                                          owner)))))
-                                                     (if
-                                                      (eq
-                                                       type
-                                                       ':notes)
-                                                      (progn
-                                                       (unless
-                                                        (let
-                                                         ((t8
-                                                           (car
-                                                            spec)))
-                                                         (and
-                                                          t8
-                                                          (symbolp
-                                                           t8)))
-                                                        (error
-                                                         "mode :notes spec not note names: ~s."
-                                                         spec))
-                                                       (unless
-                                                        (eq
-                                                         owner
-                                                         *chromatic-scale*)
-                                                        (error
-                                                         "mode :notes but not chromatic scale: ~s."
-                                                         owner))
-                                                       (setf
-                                                        steps
-                                                        (do
-                                                         ((l
-                                                           (list
-                                                            (interval
-                                                             0
-                                                             0)))
-                                                          (x
-                                                           (cdr spec)
-                                                           (cdr x)))
-                                                         ((null x)
-                                                          l)
-                                                         (push
-                                                          (interval
-                                                           (car spec)
-                                                           (car x))
-                                                          l))))
-                                                      (progn
-                                                       (when
-                                                        (let
-                                                         ((t9
-                                                           (car
-                                                            spec)))
-                                                         (and
-                                                          t9
-                                                          (symbolp
-                                                           t9)))
-                                                        (setf
-                                                         spec
-                                                         (keynum
-                                                          spec
-                                                          :in
-                                                          owner)))
-                                                       (setf
-                                                        steps
-                                                        (do
-                                                         ((x
-                                                           spec
-                                                           (cdr x))
-                                                          (l '())
-                                                          (n
-                                                           (car
-                                                            spec)))
-                                                         ((null x)
-                                                          l)
-                                                         (push
-                                                          (-
-                                                           (car x)
-                                                           n)
-                                                          l))))))
-                                                    (progn
-                                                     (unless
-                                                      low
-                                                      (setf low 0))
-                                                     (when
-                                                      (consp
-                                                       (car spec))
-                                                      (setf
-                                                       spec
-                                                       (mapcar
-                                                        #'interval
-                                                        spec)))
-                                                     (if
-                                                      (%interval-encoded?
-                                                       (car spec))
-                                                      (setf
-                                                       steps
-                                                       (do
-                                                        ((l '())
-                                                         (s
-                                                          (encode-interval
-                                                           'p
-                                                           1))
-                                                         (k
-                                                          spec
-                                                          (cdr k)))
-                                                        ((null k)
-                                                         (cons s l))
-                                                        (push s l)
-                                                        (setf
-                                                         s
-                                                         (transpose
-                                                          s
-                                                          (car k)))))
-                                                      (setf
-                                                       steps
-                                                       (do
-                                                        ((l '())
-                                                         (s 0)
-                                                         (k
-                                                          spec
-                                                          (cdr k)))
-                                                        ((null k)
-                                                         (cons s l))
-                                                        (push s l)
-                                                        (incf
-                                                         s
-                                                         (car
-                                                          k)))))))
-                                                   (setf
-                                                    octave
-                                                    (pop steps))
-                                                   (setf
-                                                    steps
-                                                    (reverse steps))
-                                                   (setf
-                                                    len
-                                                    (length steps))
-                                                   (setf
-                                                    (scale-steps obj)
-                                                    steps)
-                                                   (setf
-                                                    (scale-divisions
-                                                     obj)
-                                                    len)
-                                                   (setf
-                                                    (scale-octave
-                                                     obj)
-                                                    octave)
-                                                   (let
-                                                    ((into
-                                                      (make-list
-                                                       (interval-semitones
-                                                        octave)
-                                                       :initial-element
-                                                       nil)))
-                                                    (loop for step
-                                                          in
-                                                          steps
-                                                     for degree
-                                                     from
-                                                     0
-                                                     do (setf
-                                                         (elt
-                                                          into
-                                                          (interval-semitones
-                                                           step))
-                                                         degree))
-                                                     (setf
-                                                      (scale-into
-                                                       obj)
-                                                      into))
-                                                    (transpose
-                                                     obj
-                                                     low
-                                                     owner)))
+(defmethod initialize-instance :after ((obj mode) &rest args)
+  args
+  (let* ((spec nil) (owner (mode-tuning obj))
+         (low (scale-lowest obj))
+         (steps nil)
+         (type nil)
+         (len nil)
+         (octave nil))
+    (dopairs (a v args)
+      (case a
+        ((:steps)
+         (if (let ((t6 (car v))) (and t6 (symbolp t6)))
+             (progn
+               (error "Bad :step value ~s, use :degrees to pass notes to a mode." v))
+             (progn
+               (setf spec v)
+               (setf type a))))
+        ((:degrees :notes)
+         (when spec
+           (error "Found duplicate keywords ~s and ~s." type a))
+         (setf spec v)
+         (setf type a))
+        (t nil)))
+    (if (member type '(:degrees :notes))
+        (progn
+          (setf spec (ascending-mode-order spec owner))
+          (unless low (setf low
+                            (if (let ((t7 (car spec)))
+                                  (and t7 (symbolp t7)))
+                                (sd-name (octave-equivalent (first spec) 0 owner))
+                                (sd-keynum (octave-equivalent (first spec) 0 owner)))))
+          (if (eq type ':notes)
+              (progn
+                (unless (let ((t8 (car spec)))
+                          (and t8 (symbolp t8)))
+                  (error "mode :notes spec not note names: ~s." spec))
+                (unless (eq owner *chromatic-scale*)
+                  (error "mode :notes but not chromatic scale: ~s." owner))
+                (setf steps
+                      (do ((l (list (interval 0 0))) (x (cdr spec) (cdr x)))
+                          ((null x) l)
+                        (push (interval (car spec) (car x)) l))))
+              (progn
+                (when (let ((t9 (car spec)))
+                        (and t9 (symbolp t9)))
+                  (setf spec (keynum spec :in owner)))
+                (setf steps
+                      (do ((x spec (cdr x)) (l '()) (n (car spec)))
+                          ((null x) l)
+                        (push (- (car x) n) l))))))
+        (progn
+          (unless low (setf low 0))
+          (when (consp (car spec)) (setf spec (mapcar #'interval spec)))
+          (if (%interval-encoded? (car spec))
+              (setf steps (do ((l '()) (s (encode-interval 'p 1)) (k spec (cdr k)))
+                              ((null k) (cons s l))
+                            (push s l)
+                            (setf s (transpose s (car k)))))
+              (setf steps (do ((l '()) (s 0) (k spec (cdr k)))
+                              ((null k) (cons s l))
+                            (push s l)
+                            (incf s (car k)))))))
+    (setf octave (pop steps))
+    (setf steps (reverse steps))
+    (setf len (length steps))
+    (setf (scale-steps obj) steps)
+    (setf (scale-divisions obj) len)
+    (setf (scale-octave obj) octave)
+    (let ((into (make-list (interval-semitones octave) :initial-element nil)))
+      (loop
+        for step in steps
+        for degree from 0
+        do (setf (elt into (interval-semitones step)) degree))
+      (setf (scale-into obj) into))
+    (transpose obj low owner)))
 
 (defmethod print-object ((obj mode) stream)
   (let* ((name (object-name obj))
          (low (scale-lowest obj))
-         (pos
-          (if (= 0 (sd-octave low))
-              (or (sd-name low) (sd-keynum low))
-              (or (sd-note low) (sd-keynum low))))
-         (str
-          (string-downcase
-            (symbol-name (class-name (class-of obj))))))
+         (pos (if (= 0 (sd-octave low))
+                  (or (sd-name low) (sd-keynum low))
+                  (or (sd-note low) (sd-keynum low))))
+         (str (string-downcase
+               (symbol-name (class-name (class-of obj))))))
     (if name
         (format stream "#<~a: ~s (on ~a)>" str name pos)
         (format stream "#<~a (on ~a)>" str pos))))
@@ -958,28 +475,17 @@
         (let ((it
                (if acci
                    (if (consp acci)
-                       (loop for a in acci
-                             for x =
-                                 (find-if
-                                  (lambda
-                                   (x)
-                                   (eq a (sd-accidental x)))
-                                  entries)
-                             when x
-                               return x)
-                               (find-if
-                                (lambda
-                                 (x)
-                                 (eq acci (sd-accidental x)))
-                                entries))
-                             (first entries))))
+                       (loop
+                         for a in acci
+                         for x = (find-if (lambda (x) (eq a (sd-accidental x))) entries)
+                         when x return x)
+                       (find-if (lambda (x) (eq acci (sd-accidental x))) entries))
+                   (first entries))))
                (if it
                    (sd-note it)
                    (if err?
                        (error "No note with accidental ~s for keynum ~s in ~s."
-                              acci
-                              (round knum)
-                              obj)
+                              acci (round knum) obj)
                        nil)))
               (if err?
                   (if table
@@ -1367,15 +873,10 @@
                        (trans
                         (elt names
                              (mod
-                              (+
-                               (let
-                                ((n (sd-name entry)))
-                                (position-if
-                                 (lambda (x) (member n x))
-                                 names))
-                               (*
-                                (%interval-letters int)
-                                (%interval-sign int)))
+                              (+ (let
+                                     ((n (sd-name entry)))
+                                   (position-if (lambda (x) (member n x)) names))
+                                 (* (%interval-letters int) (%interval-sign int)))
                               7)))
                        (keyn
                         (+ (sd-keynum entry)
@@ -1384,18 +885,13 @@
                         (scale-ref table
                          (if (sd-octave entry) keyn (mod keyn 12))))
                        (newnote
-                        (or (loop for n in trans
-                                  for e
-                                  =
-                                  (find-if
-                                   (lambda (x) (eq n (sd-name x)))
-                                   entries)
-                                  when e
-                                  return e)
-                                  (error
-                                   "Can't transpose ~a by ~a."
-                                   note
-                                   (decode-interval int)))))
+                         (or (loop
+                               for n in trans
+                               for e = (find-if
+                                        (lambda (x) (eq n (sd-name x)))
+                                        entries)
+                               when e return e)
+                             (error "Can't transpose ~a by ~a." note (decode-interval int)))))
                         (if (sd-octave entry)
                             (sd-note newnote)
                             (sd-name newnote)))

@@ -169,7 +169,7 @@
         ;; (define-key lisp-mode-map (kbd "TAB") 'slime-indent-anything)
         ;; lookup cm function at point
         (define-key lisp-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
-;;;        (define-key sly-mrepl-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
+        (define-key sly-mrepl-mode-map (kbd "\C-c\C-dc") 'cm-lookup)
         ))
   )
 
@@ -297,7 +297,7 @@ selected; indent whole defun if prefixed."
 ;;; CM documentation hacks, mostly cribbed from hyperspec.
 ;;;
 
-(defvar *common-music-doc-root* (concat "file://" (expand-file-name "~/quicklisp/local-projects/cm/doc/"))
+(defvar *common-music-doc-root* (concat "file://" (expand-file-name "~/quicklisp/local-projects/clamps/doc/"))
   "The root url for visiting CM documentation.")
 
 (defun cm-doc (url)
@@ -308,18 +308,21 @@ selected; indent whole defun if prefixed."
    nil))
 
 (defun cm-lookup (entry)
-  (interactive (list
-		(let* ((it (thing-at-point 'symbol))
-		       (sy (and it (downcase it))))
-		  (if (and sy (intern-soft sy *common-music-symbols*))
-		      sy
-		    (completing-read "Lookup CM symbol: "
-				     *common-music-symbols*
-				     #'boundp t nil nil nil)))))
+  (interactive
+   (list
+    (let* ((it (thing-at-point 'symbol))
+	   (sy (and it (downcase it))))
+      (if (and sy (intern-soft sy *common-music-symbols*))
+	  sy
+	(completing-read "Lookup CM symbol: "
+			 *common-music-symbols*
+			 #'boundp t nil nil nil)))))
   (if entry
       (let ((sym (intern-soft (downcase entry) *common-music-symbols*)))
 	(if (and sym (boundp sym))
 	    (cm-doc (car (symbol-value sym)))))))
+
+;;; (car (symbol-value (intern-soft "process" *common-music-symbols*)))
 
 (defvar *common-music-doc-menu*
   `("Common Music"
@@ -351,7 +354,7 @@ selected; indent whole defun if prefixed."
                                         ;(easy-menu-create-menu "Common Music" )
 		        ))
 
-(defvar *common-music-symbols* (make-vector 66 0))
+(defvar *common-music-symbols* (make-vector 63 0))
 
 (mapcar
  (lambda (entry)
@@ -720,6 +723,7 @@ selected; indent whole defun if prefixed."
    ("weighting" "dict/index.html#weighting-cls.html"))
  )
 
+(load "~/quicklisp/local-projects/clamps/doc/clamps-idx.el")
 
 (setf cm-font-lock-keywords
       (cons '("\\<\\(process\\|cycle\\|object\\|...\\)\\>"
