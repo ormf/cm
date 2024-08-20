@@ -40,7 +40,7 @@
     :version "2.12.0"
     :author "Rick Taube <taube (at) uiuc.edu>"
     :licence "LLGPL"
-    :depends-on (:alexandria)
+    :depends-on (:alexandria #+sbcl :sb-posix)
     :components
     ((:module "src"
       :serial t
