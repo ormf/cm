@@ -723,8 +723,6 @@ selected; indent whole defun if prefixed."
    ("weighting" "dict/index.html#weighting-cls.html"))
  )
 
-(load "~/quicklisp/local-projects/clamps/doc/clamps-idx.el")
-
 (setf cm-font-lock-keywords
       (cons '("\\<\\(process\\|cycle\\|object\\|...\\)\\>"
 	      . font-lock-reference-face)
