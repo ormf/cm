@@ -326,6 +326,18 @@ rts?
         res)
       nil))
 
+(defmethod import-events ((pathname pathname) &rest args)
+  (let ((file (namestring pathname)))
+    (if (probe-file file)
+        (let ((old (find-object file nil))
+              (io (init-io file))
+              (res nil))
+          (setf res (apply #'import-events io args))
+          (unless old
+            (%remove-from-dictionary (object-name io)))
+          res)
+        nil)))
+
 (defun play (file &rest args)
   (let* ((meta (filename->event-class file))
          (hook (io-class-output-hook meta)))
