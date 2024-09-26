@@ -32,5 +32,6 @@
 (load (merge-pathnames "cminit.lisp" (cm-directory "etc"))
       :if-does-not-exist nil)
   ;; load user init file if it exists
+
 (load (merge-pathnames ".cminit.lisp" (user-homedir-pathname))
       :if-does-not-exist nil)

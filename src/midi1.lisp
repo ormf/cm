@@ -11,119 +11,62 @@
 (in-package :cm)
 
 (defparameter +enc-route-byte+ (byte 10 22))
-
 (defparameter +enc-lower-status-byte+ (byte 4 18))
-
 (defparameter +enc-upper-status-byte+ (byte 4 14))
-
 (defparameter +enc-swapped-status-byte+ (byte 8 14))
-
 (defparameter +enc-logical-channel-byte+ (byte 14 18))
-
 (defparameter +enc-opcode-byte+ +enc-upper-status-byte+)
-
 (defparameter +enc-data-1-byte+ (byte 7 7))
-
 (defparameter +enc-data-2-byte+ (byte 7 0))
-
 (defparameter +enc-route-offs+ -22)
-
 (defparameter +enc-lower-status-offs+ -18)
-
 (defparameter +enc-upper-status-offs+ -10)
-
 (defparameter +enc-swapped-status-offs+ -14)
-
 (defparameter +enc-logical-channel-offs+ +enc-lower-status-offs+)
-
 (defparameter +enc-opcode-offs+ +enc-upper-status-offs+)
-
 (defparameter +enc-data-1-offs+ -7)
-
 (defparameter +enc-data-2-offs+ 0)
-
 (defparameter +enc-note-off-mask+ 4294852480)
-
 (defparameter +ml-note-off-opcode+ 8)
-
 (defparameter +ml-note-on-opcode+ 9)
-
 (defparameter +ml-key-pressure-opcode+ 10)
-
 (defparameter +ml-control-change-opcode+ 11)
-
 (defparameter +ml-program-change-opcode+ 12)
-
 (defparameter +ml-channel-pressure-opcode+ 13)
-
 (defparameter +ml-pitch-bend-opcode+ 14)
-
 (defparameter +ml-default-note-on-velocity+ 64)
-
 (defparameter +ml-default-note-off-velocity+ 64)
-
 (defparameter +ml-msg-sysex-type+ 15)
-
 (defparameter +ml-msg-mtc-quarter-frame-type+ 31)
-
 (defparameter +ml-msg-song-position-type+ 47)
-
 (defparameter +ml-msg-song-select-type+ 63)
-
 (defparameter +ml-msg-cable-select-type+ 95)
-
 (defparameter +ml-msg-tune-request-type+ 111)
-
 (defparameter +ml-msg-eox-type+ 127)
-
 (defparameter +ml-msg-timing-clock-type+ 143)
-
 (defparameter +ml-msg-timing-tick-type+ 159)
-
 (defparameter +ml-msg-start-type+ 175)
-
 (defparameter +ml-msg-continue-type+ 191)
-
 (defparameter +ml-msg-stop-type+ 207)
-
 (defparameter +ml-msg-active-sensing-type+ 239)
-
 (defparameter +ml-msg-system-reset-type+ 255)
-
 (defparameter +ml-meta-type+ 0)
-
 (defparameter +ml-file-meta-marker+ 255)
-
 (defparameter +ml-file-sequence-number-opcode+ 0)
-
 (defparameter +ml-file-text-event-opcode+ 1)
-
 (defparameter +ml-file-copyright-note-opcode+ 2)
-
 (defparameter +ml-file-sequence/track-name-opcode+ 3)
-
 (defparameter +ml-file-instrument-name-opcode+ 4)
-
 (defparameter +ml-file-lyric-opcode+ 5)
-
 (defparameter +ml-file-marker-opcode+ 6)
-
 (defparameter +ml-file-cue-point-opcode+ 7)
-
 (defparameter +ml-file-midi-channel-opcode+ 32)
-
 (defparameter +ml-file-midi-port-opcode+ 33)
-
 (defparameter +ml-file-eot-opcode+ 47)
-
 (defparameter +ml-file-tempo-change-opcode+ 81)
-
 (defparameter +ml-file-smpte-offset-opcode+ 84)
-
 (defparameter +ml-file-time-signature-opcode+ 88)
-
 (defparameter +ml-file-key-signature-opcode+ 89)
-
 (defparameter +ml-file-sequencer-event-opcode+ 127)
 
 (defun midimsg-data1 (message) (ldb +enc-data-1-byte+ message))

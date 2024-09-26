@@ -109,6 +109,24 @@
                        (error "~s is not a valid port or file name."
                               string))))))
 
+(defmethod init-io ((pathname pathname) &rest inits)
+  (let* ((string (namestring pathname))
+         (io (find-object string)))
+             (if io (apply #'init-io io inits)
+                 (let ((class (filename->event-class string)))
+                   (if class
+                       (multiple-value-bind
+                           (init args)
+                           (expand-inits class inits t t)
+                         (let ((n
+                                (apply #'make-instance class ':name
+                                       string init)))
+                           (if (not (null args))
+                               (setf (event-stream-args n) args))
+                           n))
+                       (error "~s is not a valid port or file name."
+                              string))))))
+
 (defmethod init-io ((io event-stream) &rest inits)
   "init-io sets the slots referred to by inits to the given
 values. Non-existent slots are stored in the event-stream-args slot
@@ -211,7 +229,15 @@ of the io stream. Returns the io stream."
 
 (defparameter *out* nil)
 
-(defparameter *rts-out* nil)
+(defparameter *rts-out* nil
+  "Default clamps Realtime output stream of class
+/<incudine-stream>/.
+
+@See-also
+*midi-out1*
+rts
+rts?
+" )
 
 (defparameter *rts-in* nil)
 
@@ -234,7 +260,7 @@ of the io stream. Returns the io stream."
   stream)
 
 (defparameter *special-event-streams*
-  `((,#'stringp) (,#'null) (,#'typep ,<object>))
+  `((,#'stringp) (,#'pathnamep) (,#'null) (,#'typep ,<object>))
   "extendable list of special targets of the events function.")
 
 (defun special-evt-stream? (first-arg)

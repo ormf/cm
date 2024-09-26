@@ -125,8 +125,6 @@
                   :directory (pathname-directory
                               *default-pathname-defaults*))))
 
-
-
 (defun cm-image-dir ()
   (let ((img (second (member "--core" sb-ext:*posix-argv*
                              :test #'string=))))

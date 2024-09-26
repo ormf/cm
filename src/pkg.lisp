@@ -239,7 +239,8 @@
   ;;               :make-note :*parts* :part-opts
   ;;               :part :note :meas :timesig :keysig :fomus-file)
   (:export :accumulation :amplitude :append-object :audio-file :axis
-           :*beat* :best-normal-form :between :cd :cents->scaler
+   :*rts-out* :*midi-out1* :*midi-in1*   
+   :*beat* :best-normal-form :between :cd :cents->scaler
            :chord :*chromatic-scale* :clm-file :cm :cm-version 
 	   :cm-version-number :cmio
            :cmn :cmn-file :controller :copier :copy-object :cycle :date-and-time
