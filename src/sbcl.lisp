@@ -118,7 +118,7 @@
       (setq *default-pathname-defaults*
             (make-pathname :host host :directory path))
       (namestring *default-pathname-defaults*))))
-
+(setq *default-pathname-defaults* (pathname "~/work/kompositionen/heidelberg/"))
 (defun pwd ()
   (namestring
    (make-pathname :host (pathname-host *default-pathname-defaults*)
@@ -141,7 +141,7 @@
                                 (declare (special *cm-readtable*))
                                 (setf *readtable* *cm-readtable*)
                                 (setf *package* (find-package :cm))
-                                (load-cminit)                            
+                                (load-cminit)                             
                                 (cm-logo)
                                 (sb-impl::toplevel-init)
                                 )))
