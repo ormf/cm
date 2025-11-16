@@ -1,3 +1,16 @@
+* This Repository has moved!
+
+  Due to the fact that GitHub is hosting the files on privately owned
+  Servers located in the USA, this repository has been moved to
+  [[https://codeberg.org/ormf/cm/][Codeberg]] in November of 2025. It will not receive further updates or
+  patches. Issues and pull requests will not be looked at here either,
+  please submit your patches and issue tickets on Codeberg, or send
+  them directly via good old email patches to the author.
+
+Thanks.
+
+** Common Music
+  
 This is the repository of an ancient version of Common Music (version
 2.12.0), the presumably last version which ran on Common Lisp dating
 from around 2007-09, before work on Common Music shifted to
